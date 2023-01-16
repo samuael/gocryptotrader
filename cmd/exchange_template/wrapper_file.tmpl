@@ -229,13 +229,7 @@ func ({{.Variable}} *{{.CapitalName}}) UpdateTradablePairs(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-
-	p, err := currency.NewPairsFromStrings(pairs)
-	if err != nil {
-		return err
-	}
-
-	return {{.Variable}}.UpdatePairs(p, asset.Spot, false, forceUpdate)
+	return {{.Variable}}.UpdatePairs(pairs, asset.Spot, false, forceUpdate)
 }
 
 
