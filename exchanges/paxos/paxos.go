@@ -104,8 +104,6 @@ func (pa *Paxos) GetPriceTickers(ctx context.Context) (*TckerDetail, error) {
 // func (pa *Paxos) GetHistoricalPrices(ctx context.Context, )
 
 // SendHTTPRequest sends an http request to a desired
-// path with a JSON payload (of present)
-// URL arguments must be in the request path and not as url.URL values
 func (pa *Paxos) SendHTTPRequest(ctx context.Context, ep exchange.URL, requestPath string, result interface{}) (err error) {
 	endpoint, err := pa.API.Endpoints.GetURL(ep)
 	if err != nil {
@@ -128,12 +126,4 @@ func (pa *Paxos) SendHTTPRequest(ctx context.Context, ep exchange.URL, requestPa
 		}, nil
 	}
 	return pa.SendPayload(ctx, request.Unset, newRequest, requestType)
-	// code, err := strconv.ParseInt(resp.Code, 10, 64)
-	// if err == nil && code != 0 {
-	// 	if resp.Msg != "" {
-	// 		return fmt.Errorf("error code: %d message: %s", code, resp.Msg)
-	// 	}
-	// 	return fmt.Errorf("error code: %d", code)
-	// }
-	// return nil
 }

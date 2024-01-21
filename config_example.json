@@ -2232,6 +2232,59 @@
    ]
   },
   {
+    "name": "Paxos",
+    "enabled": true,
+    "verbose": false,
+    "httpTimeout": 15000000000,
+    "websocketResponseCheckTimeout": 30000000,
+    "websocketResponseMaxLimit": 7000000000,
+    "websocketTrafficTimeout": 30000000000,
+    "websocketOrderbookBufferLimit": 5,
+    "baseCurrencies": "USD,EUR",
+    "currencyPairs": {
+     "bypassConfigFormatUpgrades": false,
+     "requestFormat": {
+      "uppercase": true
+     },
+     "configFormat": {
+      "uppercase": true,
+      "delimiter": "-"
+     },
+     "useGlobalFormat": true,
+     "pairs": {}
+    },
+    "api": {
+     "authenticatedSupport": false,
+     "authenticatedWebsocketApiSupport": false,
+     "credentials": {
+      "key": "Key",
+      "secret": "Secret"
+     },
+     "urlEndpoints": null
+    },
+    "features": {
+        "supports": {
+            "restAPI": true,
+            "restCapabilities": {
+            "tickerBatching": true,
+            "autoPairUpdates": true
+            },
+            "websocketAPI": true,
+            "websocketCapabilities": {}
+        },
+        "enabled": {
+            "autoPairUpdates": true,
+            "websocketAPI": true
+        }
+    },
+    "orderbook": {
+     "verificationBypass": false,
+     "websocketBufferLimit": 0,
+     "websocketBufferEnabled": false,
+     "publishPeriod": null
+    }
+  },
+  {
    "name": "Poloniex",
    "enabled": true,
    "verbose": false,

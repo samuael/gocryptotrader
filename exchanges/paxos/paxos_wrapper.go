@@ -53,13 +53,6 @@ func (pa *Paxos) SetDefaults() {
 	pa.Verbose = true
 	pa.API.CredentialsValidator.RequiresKey = true
 	pa.API.CredentialsValidator.RequiresSecret = true
-
-	// If using only one pair format for request and configuration, across all
-	// supported asset types either SPOT and FUTURES etc. You can use the
-	// example below:
-
-	// Request format denotes what the pair as a string will be, when you send
-	// a request to an exchange.
 	requestFmt := &currency.PairFormat{ /*Set pair request formatting details here for e.g.*/ Uppercase: true, Delimiter: ":"}
 	// Config format denotes what the pair as a string will be, when saved to
 	// the config.json file.
@@ -68,11 +61,6 @@ func (pa *Paxos) SetDefaults() {
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
-
-	// If assets require multiple differences in formatting for request and
-	// configuration, another exchange method can be be used e.g. futures
-	// contracts require a dash as a delimiter rather than an underscore. You
-	// can use this example below:
 
 	fmt1 := currency.PairStore{
 		RequestFormat: &currency.PairFormat{Uppercase: true},
@@ -271,33 +259,33 @@ func (pa *Paxos) UpdateTicker(ctx context.Context, p currency.Pair, assetType as
 func (pa *Paxos) UpdateTickers(ctx context.Context, assetType asset.Item) error {
 	// NOTE: EXAMPLE FOR GETTING TICKER PRICE
 	/*
-		tick, err := pa.GetTickers()
-		if err != nil {
-			return err
-		}
-	    for y := range tick {
-	        cp, err := currency.NewPairFromString(tick[y].Symbol)
-	        if err != nil {
-	            return err
-	        }
-	        err = ticker.ProcessTicker(&ticker.Price{
-	            Last:         tick[y].LastPrice,
-	            High:         tick[y].HighPrice,
-	            Low:          tick[y].LowPrice,
-	            Bid:          tick[y].BidPrice,
-	            Ask:          tick[y].AskPrice,
-	            Volume:       tick[y].Volume,
-	            QuoteVolume:  tick[y].QuoteVolume,
-	            Open:         tick[y].OpenPrice,
-	            Close:        tick[y].PrevClosePrice,
-	            Pair:         cp,
-	            ExchangeName: b.Name,
-	            AssetType:    assetType,
-	        })
-	        if err != nil {
-	            return err
-	        }
-	    }
+			tick, err := pa.GetTickers()
+			if err != nil {
+				return err
+			}
+		    for y := range tick {
+		        cp, err := currency.NewPairFromString(tick[y].Symbol)
+		        if err != nil {
+		            return err
+		        }
+		        err = ticker.ProcessTicker(&ticker.Price{
+		            Last:         tick[y].LastPrice,
+		            High:         tick[y].HighPrice,
+		            Low:          tick[y].LowPrice,
+		            Bid:          tick[y].BidPrice,
+		            Ask:          tick[y].AskPrice,
+		            Volume:       tick[y].Volume,
+		            QuoteVolume:  tick[y].QuoteVolume,
+		            Open:         tick[y].OpenPrice,
+		            Close:        tick[y].PrevClosePrice,
+		            Pair:         cp,
+		            ExchangeName: b.Name,
+		            AssetType:    assetType,
+		        })
+		        if err != nil {
+		            return err
+		        }
+		    }
 	*/
 	return nil
 }
