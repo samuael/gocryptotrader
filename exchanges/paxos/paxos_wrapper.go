@@ -30,12 +30,15 @@ import (
 // GetDefaultConfig returns a default exchange config
 func (pa *Paxos) GetDefaultConfig(ctx context.Context) (*config.Exchange, error) {
 	pa.SetDefaults()
-	exchCfg := new(config.Exchange)
-	exchCfg.Name = pa.Name
-	exchCfg.HTTPTimeout = exchange.DefaultHTTPTimeout
-	exchCfg.BaseCurrencies = pa.BaseCurrencies
+	exchCfg, err := pa.GetStandardConfig()
+	if err != nil {
+		return nil, err
+	}
 
-	pa.SetupDefaults(exchCfg)
+	err = pa.SetupDefaults(exchCfg)
+	if err != nil {
+		return nil, err
+	}
 
 	if pa.Features.Supports.RESTCapabilities.AutoPairUpdates {
 		err := pa.UpdateTradablePairs(ctx, true)
@@ -111,8 +114,9 @@ func (pa *Paxos) SetDefaults() {
 	// NOTE: SET THE URLs HERE
 	pa.API.Endpoints = pa.NewEndpoints()
 	pa.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
-		exchange.RestSpot: paxosAPIURL,
-		// exchange.WebsocketSpot: paxosWSAPIURL,
+		exchange.RestSpot:              paxosAPIURL,
+		exchange.RestSpotSupplementary: paxosTestAPIURL,
+		// exchange.WebsocketSpotSupplementary:
 	})
 	pa.Websocket = stream.New()
 	pa.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit

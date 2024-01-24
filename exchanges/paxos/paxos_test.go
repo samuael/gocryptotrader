@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
@@ -13,15 +14,14 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey                  = ""
-	apiSecret               = ""
+	apiKey                  = "a455062e-47c6-4756-89e9-9aefbacdb57c"
+	apiSecret               = "J3IJL32UJ7KT56IRJ6VGPATKHQ"
 	canManipulateRealOrders = false
 )
 
 var pa = &Paxos{}
 
 func TestMain(m *testing.M) {
-	pa.SetDefaults()
 	cfg := config.GetConfig()
 	err := cfg.LoadConfig("../../testdata/configtest.json", true)
 	if err != nil {
@@ -33,10 +33,13 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 
-	exchCfg.API.AuthenticatedSupport = true
-	exchCfg.API.AuthenticatedWebsocketSupport = true
 	exchCfg.API.Credentials.Key = apiKey
 	exchCfg.API.Credentials.Secret = apiSecret
+	pa.SetDefaults()
+	if apiKey != "" && apiSecret != "" {
+		exchCfg.API.AuthenticatedSupport = true
+		exchCfg.API.AuthenticatedWebsocketSupport = true
+	}
 
 	err = pa.Setup(exchCfg)
 	if err != nil {
@@ -103,6 +106,15 @@ func TestGetPrices(t *testing.T) {
 func TestGetTickers(t *testing.T) {
 	t.Parallel()
 	_, err := pa.GetPriceTickers(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetProfiles(t *testing.T) {
+	t.Parallel()
+	// sharedtestvalues.SkipTestIfCredentialsUnset(t, pa)
+	_, err := pa.GetProfiles(context.Background(), time.Now().Add(-time.Hour*24*5), lessthanEqualTo, 20, "DESC", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
