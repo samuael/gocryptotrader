@@ -226,6 +226,7 @@ Yes means supported, No means not yet implemented and NA means protocol unsuppor
 #### Add exchange to the list of [supported exchanges](../exchanges/support.go):
 ```go
 var Exchanges = []string{
+	"apexpro",
 	"binance",
 	"bitfinex",
 	"bitflyer",

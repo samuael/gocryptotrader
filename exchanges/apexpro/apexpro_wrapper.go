@@ -29,7 +29,7 @@ import (
 func (ap *Apexpro) SetDefaults() {
 	ap.Name = "Apexpro"
 	ap.Enabled = true
-	ap.Verbose = true
+	ap.Verbose = false
 	ap.API.CredentialsValidator.RequiresKey = true
 	ap.API.CredentialsValidator.RequiresSecret = true
 
@@ -214,33 +214,33 @@ func (ap *Apexpro) UpdateTicker(ctx context.Context, p currency.Pair, assetType 
 func (ap *Apexpro) UpdateTickers(ctx context.Context, assetType asset.Item) error {
 	// NOTE: EXAMPLE FOR GETTING TICKER PRICE
 	/*
-		tick, err := ap.GetTickers()
-		if err != nil {
-			return err
-		}
-	    for y := range tick {
-	        cp, err := currency.NewPairFromString(tick[y].Symbol)
-	        if err != nil {
-	            return err
-	        }
-	        err = ticker.ProcessTicker(&ticker.Price{
-	            Last:         tick[y].LastPrice,
-	            High:         tick[y].HighPrice,
-	            Low:          tick[y].LowPrice,
-	            Bid:          tick[y].BidPrice,
-	            Ask:          tick[y].AskPrice,
-	            Volume:       tick[y].Volume,
-	            QuoteVolume:  tick[y].QuoteVolume,
-	            Open:         tick[y].OpenPrice,
-	            Close:        tick[y].PrevClosePrice,
-	            Pair:         cp,
-	            ExchangeName: b.Name,
-	            AssetType:    assetType,
-	        })
-	        if err != nil {
-	            return err
-	        }
-	    }
+			tick, err := ap.GetTickers()
+			if err != nil {
+				return err
+			}
+		    for y := range tick {
+		        cp, err := currency.NewPairFromString(tick[y].Symbol)
+		        if err != nil {
+		            return err
+		        }
+		        err = ticker.ProcessTicker(&ticker.Price{
+		            Last:         tick[y].LastPrice,
+		            High:         tick[y].HighPrice,
+		            Low:          tick[y].LowPrice,
+		            Bid:          tick[y].BidPrice,
+		            Ask:          tick[y].AskPrice,
+		            Volume:       tick[y].Volume,
+		            QuoteVolume:  tick[y].QuoteVolume,
+		            Open:         tick[y].OpenPrice,
+		            Close:        tick[y].PrevClosePrice,
+		            Pair:         cp,
+		            ExchangeName: b.Name,
+		            AssetType:    assetType,
+		        })
+		        if err != nil {
+		            return err
+		        }
+		    }
 	*/
 	return nil
 }
