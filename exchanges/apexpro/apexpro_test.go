@@ -65,9 +65,23 @@ func TestGetSystemTimeV2(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
+func TestGetSystemTimeV1(t *testing.T) {
+	t.Parallel()
+	result, err := ap.GetSystemTimeV1(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func TestGetAllConfigDataV3(t *testing.T) {
 	t.Parallel()
 	result, err := ap.GetAllConfigDataV3(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetAllConfigDataV1(t *testing.T) {
+	t.Parallel()
+	result, err := ap.GetAllConfigDataV1(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -87,6 +101,13 @@ func TestGetMarketDepthV2(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
+func TestGetMarketDepthV1(t *testing.T) {
+	t.Parallel()
+	result, err := ap.GetMarketDepthV1(context.Background(), "BTCUSDT", 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func TestGetNewestTradingDataV3(t *testing.T) {
 	t.Parallel()
 	result, err := ap.GetNewestTradingDataV3(context.Background(), "BTCUSDT", 10)
@@ -97,6 +118,12 @@ func TestGetNewestTradingDataV3(t *testing.T) {
 func TestGetNewestTradingDataV2(t *testing.T) {
 	t.Parallel()
 	result, err := ap.GetNewestTradingDataV2(context.Background(), "BTCUSDT", 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+func TestGetNewestTradingDataV1(t *testing.T) {
+	t.Parallel()
+	result, err := ap.GetNewestTradingDataV1(context.Background(), "BTCUSDT", 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -117,6 +144,16 @@ func TestGetCandlestickChartDataV2(t *testing.T) {
 	_, err := ap.GetCandlestickChartDataV2(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
 	result, err := ap.GetCandlestickChartDataV2(context.Background(), "BTCUSDT", kline.FiveMin, time.Time{}, time.Time{}, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCandlestickChartDataV1(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	_, err := ap.GetCandlestickChartDataV1(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	result, err := ap.GetCandlestickChartDataV1(context.Background(), "BTCUSDT", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -157,6 +194,15 @@ func TestGetFundingHistoryRateV2(t *testing.T) {
 	require.NotNil(t, result)
 }
 
+func TestGetFundingHistoryRateV1(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetFundingHistoryRateV1(context.Background(), "", time.Time{}, time.Time{}, 10, 0)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	result, err := ap.GetFundingHistoryRateV1(context.Background(), "BTCUSDT", time.Time{}, time.Time{}, 0, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+}
+
 func TestGetAllConfigDataV2(t *testing.T) {
 	t.Parallel()
 	result, err := ap.GetAllConfigDataV2(context.Background())
@@ -167,7 +213,15 @@ func TestGetAllConfigDataV2(t *testing.T) {
 func TestGetCheckIfUserExistsV2(t *testing.T) {
 	t.Parallel()
 	ap.Verbose = true
-	result, err := ap.GetCheckIfUserExistsV2(context.Background(), "0x111111")
+	result, err := ap.GetCheckIfUserExistsV2(context.Background(), "0x0330eBB5e894720e6746070371F9Fd797BE9D074")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+}
+
+func TestGetCheckIfUserExistsV1(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	result, err := ap.GetCheckIfUserExistsV1(context.Background(), "0x0330eBB5e894720e6746070371F9Fd797BE9D074")
 	require.NoError(t, err)
 	require.NotNil(t, result)
 }

@@ -32,7 +32,8 @@ const (
 )
 
 var (
-	errEthereumAddressMissing = errors.New("ethereum address is required")
+	errEthereumAddressMissing = errors.New("ethereum address is missing")
+	errL2KeyMissing           = errors.New("l2 Key is required")
 )
 
 // Start implementing public and private exchange API funcs below
@@ -45,6 +46,11 @@ func (ap *Apexpro) GetSystemTimeV3(ctx context.Context) (time.Time, error) {
 // GetSystemTimeV2 retrieves V2 system time.
 func (ap *Apexpro) GetSystemTimeV2(ctx context.Context) (time.Time, error) {
 	return ap.getSystemTime(ctx, "v2/time")
+}
+
+// GetSystemTimeV2 retrieves V2 system time.
+func (ap *Apexpro) GetSystemTimeV1(ctx context.Context) (time.Time, error) {
+	return ap.getSystemTime(ctx, "v1/time")
 }
 
 func (ap *Apexpro) getSystemTime(ctx context.Context, path string) (time.Time, error) {
@@ -60,6 +66,12 @@ func (ap *Apexpro) GetAllConfigDataV3(ctx context.Context) (*AllSymbolsConfigs, 
 	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, "v3/symbols", request.UnAuth, &resp, true)
 }
 
+// Apexpro retrieves all symbols and asset configurations from the V1 API.
+func (ap *Apexpro) GetAllConfigDataV1(ctx context.Context) (*AllSymbolsV1Config, error) {
+	var resp *AllSymbolsV1Config
+	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, "v1/symbols", request.UnAuth, &resp, true)
+}
+
 // GetMarketDepthV3 retrieve all active orderbook for one symbol, inclue all bids and asks.
 func (ap *Apexpro) GetMarketDepthV3(ctx context.Context, symbol string, limit int64) (*MarketDepthV3, error) {
 	return ap.getMarketDepth(ctx, symbol, "v3/depth", limit)
@@ -68,6 +80,11 @@ func (ap *Apexpro) GetMarketDepthV3(ctx context.Context, symbol string, limit in
 // GetMarketDepthV2 retrieve all active orderbook for one symbol, inclue all bids and asks.
 func (ap *Apexpro) GetMarketDepthV2(ctx context.Context, symbol string, limit int64) (*MarketDepthV3, error) {
 	return ap.getMarketDepth(ctx, symbol, "v2/depth", limit)
+}
+
+// GetMarketDepthV1 retrieve all active orderbook for one symbol, inclue all bids and asks.
+func (ap *Apexpro) GetMarketDepthV1(ctx context.Context, symbol string, limit int64) (*MarketDepthV3, error) {
+	return ap.getMarketDepth(ctx, symbol, "v1/depth", limit)
 }
 
 func (ap *Apexpro) getMarketDepth(ctx context.Context, symbol, path string, limit int64) (*MarketDepthV3, error) {
@@ -92,6 +109,11 @@ func (ap *Apexpro) GetNewestTradingDataV3(ctx context.Context, symbol string, li
 // GetNewestTradingDataV2 retrieve trading data.
 func (ap *Apexpro) GetNewestTradingDataV2(ctx context.Context, symbol string, limit int64) ([]NewTradingData, error) {
 	return ap.getNewestTradingData(ctx, symbol, "v2/trades", limit)
+}
+
+// GetNewestTradingDataV1 retrieve trading data.
+func (ap *Apexpro) GetNewestTradingDataV1(ctx context.Context, symbol string, limit int64) ([]NewTradingData, error) {
+	return ap.getNewestTradingData(ctx, symbol, "v1/trades", limit)
 }
 
 func (ap *Apexpro) getNewestTradingData(ctx context.Context, symbol, path string, limit int64) ([]NewTradingData, error) {
@@ -127,6 +149,12 @@ func (ap *Apexpro) GetCandlestickChartDataV3(ctx context.Context, symbol string,
 func (ap *Apexpro) GetCandlestickChartDataV2(ctx context.Context, symbol string, interval kline.Interval, startTime, endTime time.Time, limit int64) (map[string][]CandlestickData, error) {
 	return ap.getCandlestickChartData(ctx, symbol, "v2/klines", interval, startTime, endTime, limit)
 }
+
+// GetCandlestickChartDataV2 retrieves v2 all candlestick chart data.
+func (ap *Apexpro) GetCandlestickChartDataV1(ctx context.Context, symbol string, interval kline.Interval, startTime, endTime time.Time, limit int64) (map[string][]CandlestickData, error) {
+	return ap.getCandlestickChartData(ctx, symbol, "v1/klines", interval, startTime, endTime, limit)
+}
+
 func (ap *Apexpro) getCandlestickChartData(ctx context.Context, symbol, path string, interval kline.Interval, startTime, endTime time.Time, limit int64) (map[string][]CandlestickData, error) {
 	if symbol == "" {
 		return nil, currency.ErrSymbolStringEmpty
@@ -183,6 +211,11 @@ func (ap *Apexpro) GetFundingHistoryRateV2(ctx context.Context, symbol string, b
 	return ap.getFundingHistoryRate(ctx, symbol, "v2/history-funding", beginTime, endTime, page, limit)
 }
 
+// GetFundingHistoryRateV1 retrieves a funding history rate.
+func (ap *Apexpro) GetFundingHistoryRateV1(ctx context.Context, symbol string, beginTime, endTime time.Time, page, limit int64) (*FundingRateHistory, error) {
+	return ap.getFundingHistoryRate(ctx, symbol, "v2/history-funding", beginTime, endTime, page, limit)
+}
+
 func (ap *Apexpro) getFundingHistoryRate(ctx context.Context, symbol, path string, beginTime, endTime time.Time, page, limit int64) (*FundingRateHistory, error) {
 	if symbol == "" {
 		return nil, currency.ErrSymbolStringEmpty
@@ -213,13 +246,35 @@ func (ap *Apexpro) GetAllConfigDataV2(ctx context.Context) (*V2ConfigData, error
 
 // GetCheckIfUserExistsV2 checks existence of a persion using ther ethereum Address
 func (ap *Apexpro) GetCheckIfUserExistsV2(ctx context.Context, ethAddress string) (bool, error) {
+	return ap.getCheckIfUserExists(ctx, ethAddress, "v2/check-user-exist")
+}
+
+// GetCheckIfUserExistsV1 checks existence of a persion using ther ethereum Address
+func (ap *Apexpro) GetCheckIfUserExistsV1(ctx context.Context, ethAddress string) (bool, error) {
+	return ap.getCheckIfUserExists(ctx, ethAddress, "v1/check-user-exist")
+}
+
+func (ap *Apexpro) getCheckIfUserExists(ctx context.Context, ethAddress, path string) (bool, error) {
 	if ethAddress == "" {
 		return false, errEthereumAddressMissing
 	}
 	params := url.Values{}
 	params.Set("ethAddress", ethAddress)
 	var resp bool
-	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, common.EncodeURLValues("v2/check-user-exist", params), request.UnAuth, &resp)
+	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, common.EncodeURLValues(path, params), request.UnAuth, &resp)
+}
+
+// ----------------------------------------------------------------     Authenticated Endpoints ----------------------------------------------------------------
+
+// GenerateNonce generate and obtain nonce before registration. The nonce is used to assemble the signature field upon registration.
+func (ap *Apexpro) GenerateNonce(ctx context.Context, l2Key, ethAddress, chainID string) (*NonceResponse, error) {
+	if l2Key == "" {
+		return nil, errL2KeyMissing
+	}
+	params := url.Values{}
+	params.Set("l2Key", l2Key)
+	var resp *NonceResponse
+	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, common.EncodeURLValues("v3/generate-nonce", params), request.UnAuth, &resp)
 }
 
 // SendHTTPRequest sends an unauthenticated request
