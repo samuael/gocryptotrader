@@ -254,7 +254,7 @@
         "currencyPairs": {
             "requestFormat": {
             "uppercase": true,
-            "delimiter": "-"
+            "delimiter": ""
             },
             "configFormat": {
             "uppercase": true,
@@ -262,7 +262,7 @@
             },
             "useGlobalFormat": true,
             "assetTypes": [
-            "spot"
+            "futures"
             ],
             "pairs": {}
         },

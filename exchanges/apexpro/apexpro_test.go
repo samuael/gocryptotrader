@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 )
 
@@ -18,6 +20,7 @@ import (
 const (
 	apiKey                  = ""
 	apiSecret               = ""
+	clientID                = ""
 	canManipulateRealOrders = false
 )
 
@@ -40,12 +43,15 @@ func TestMain(m *testing.M) {
 	exchCfg.API.AuthenticatedWebsocketSupport = true
 	exchCfg.API.Credentials.Key = apiKey
 	exchCfg.API.Credentials.Secret = apiSecret
+	exchCfg.API.Credentials.ClientID = clientID
 
 	err = ap.Setup(exchCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	if err := ap.UpdateTradablePairs(context.Background(), true); err != nil {
+		log.Fatal(err)
+	}
 	os.Exit(m.Run())
 }
 
@@ -53,6 +59,10 @@ func TestMain(m *testing.M) {
 
 func TestGetSystemTimeV3(t *testing.T) {
 	t.Parallel()
+
+	enabledPairs, err := ap.GetEnabledPairs(asset.Futures)
+	require.NoError(t, err)
+	println(strings.Join(enabledPairs.Strings(), ","))
 	result, err := ap.GetSystemTimeV3(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)

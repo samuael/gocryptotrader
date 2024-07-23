@@ -23,7 +23,6 @@ type Apexpro struct {
 
 const (
 	apexproAPIURL     = "https://pro.apex.exchange/api/"
-	apexproAPIVersion = "v1/"
 	apexproTestAPIURL = "https://testnet.pro.apex.exchange/api/"
 
 	// Public endpoints
@@ -32,8 +31,9 @@ const (
 )
 
 var (
-	errEthereumAddressMissing = errors.New("ethereum address is missing")
-	errL2KeyMissing           = errors.New("l2 Key is required")
+	errEthereumAddressMissing   = errors.New("ethereum address is missing")
+	errL2KeyMissing             = errors.New("l2 Key is required")
+	errOrderbookLevelIsRequired = errors.New("orderbook level is required")
 )
 
 // Start implementing public and private exchange API funcs below

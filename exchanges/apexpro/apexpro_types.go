@@ -621,3 +621,9 @@ type NonceResponse struct {
 	Nonce        string               `json:"nonce"`
 	NonceExpired convert.ExchangeTime `json:"nonceExpired"`
 }
+
+// WsMessage represents a websocket input message.
+type WsMessage struct {
+	Operation string   `json:"op"`
+	Args      []string `json:"args"`
+}

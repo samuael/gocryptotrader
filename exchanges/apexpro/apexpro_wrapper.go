@@ -2,6 +2,7 @@ package apexpro
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common"
@@ -33,17 +34,12 @@ func (ap *Apexpro) SetDefaults() {
 	ap.API.CredentialsValidator.RequiresKey = true
 	ap.API.CredentialsValidator.RequiresSecret = true
 
-	// If using only one pair format for request and configuration, across all
-	// supported asset types either SPOT and FUTURES etc. You can use the
-	// example below:
-
-	// Request format denotes what the pair as a string will be, when you send
-	// a request to an exchange.
-	requestFmt := &currency.PairFormat{ /*Set pair request formatting details here for e.g.*/ Uppercase: true, Delimiter: ":"}
-	// Config format denotes what the pair as a string will be, when saved to
-	// the config.json file.
-	configFmt := &currency.PairFormat{ /*Set pair request formatting details here*/ }
-	err := ap.SetGlobalPairsManager(requestFmt, configFmt /*multiple assets can be set here using the asset package ie asset.Spot*/)
+	requestFmt := &currency.PairFormat{Uppercase: true, Delimiter: ""}
+	configFmt := &currency.PairFormat{Uppercase: true, Delimiter: "-"}
+	err := ap.StoreAssetPairFormat(asset.Futures, currency.PairStore{
+		RequestFormat: requestFmt,
+		ConfigFormat:  configFmt,
+	})
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
@@ -52,25 +48,6 @@ func (ap *Apexpro) SetDefaults() {
 	// configuration, another exchange method can be be used e.g. futures
 	// contracts require a dash as a delimiter rather than an underscore. You
 	// can use this example below:
-
-	fmt1 := currency.PairStore{
-		RequestFormat: &currency.PairFormat{Uppercase: true},
-		ConfigFormat:  &currency.PairFormat{Uppercase: true},
-	}
-
-	fmt2 := currency.PairStore{
-		RequestFormat: &currency.PairFormat{Uppercase: true},
-		ConfigFormat:  &currency.PairFormat{Uppercase: true, Delimiter: ":"},
-	}
-
-	err = ap.StoreAssetPairFormat(asset.Spot, fmt1)
-	if err != nil {
-		log.Errorln(log.ExchangeSys, err)
-	}
-	err = ap.StoreAssetPairFormat(asset.Margin, fmt2)
-	if err != nil {
-		log.Errorln(log.ExchangeSys, err)
-	}
 
 	// Fill out the capabilities/features that the exchange supports
 	ap.Features = exchange.Features{
@@ -102,8 +79,10 @@ func (ap *Apexpro) SetDefaults() {
 	// NOTE: SET THE URLs HERE
 	ap.API.Endpoints = ap.NewEndpoints()
 	ap.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
-		exchange.RestSpot: apexproAPIURL,
-		// exchange.WebsocketSpot: apexproWSAPIURL,
+		exchange.RestSpotSupplementary:      apexproAPIURL,
+		exchange.RestSpot:                   apexproTestAPIURL,
+		exchange.WebsocketSpot:              apexProWebsocket,
+		exchange.WebsocketSpotSupplementary: apexProPrivateWebsocket,
 	})
 	ap.Websocket = stream.NewWebsocket()
 	ap.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
@@ -125,63 +104,73 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 	if err != nil {
 		return err
 	}
+	wsRunningEndpoint, err := ap.API.Endpoints.GetURL(exchange.WebsocketSpot)
+	if err != nil {
+		return err
+	}
 
-	/*
-		wsRunningEndpoint, err := ap.API.Endpoints.GetURL(exchange.WebsocketSpot)
-		if err != nil {
-			return err
-		}
+	err = ap.Websocket.Setup(
+		&stream.WebsocketSetup{
+			ExchangeConfig: exch,
+			DefaultURL:     apexProWebsocket,
+			RunningURL:     wsRunningEndpoint,
+			Connector:      ap.WsConnect,
+			Subscriber:     ap.Subscribe,
+			Unsubscriber:   ap.Unsubscribe,
+			Features:       &ap.Features.Supports.WebsocketCapabilities,
+		})
+	if err != nil {
+		return err
+	}
+	err = ap.Websocket.SetupNewConnection(stream.ConnectionSetup{
+		URL:                  apexProWebsocket,
+		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
+		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
+	})
+	if err != nil {
+		return err
+	}
 
-		// If websocket is supported, please fill out the following
-
-		err = ap.Websocket.Setup(
-			&stream.WebsocketSetup{
-				ExchangeConfig:  exch,
-				DefaultURL:      apexproWSAPIURL,
-				RunningURL:      wsRunningEndpoint,
-				Connector:       ap.WsConnect,
-				Subscriber:      ap.Subscribe,
-				UnSubscriber:    ap.Unsubscribe,
-				Features:        &ap.Features.Supports.WebsocketCapabilities,
-			})
-		if err != nil {
-			return err
-		}
-
-		ap.WebsocketConn = &stream.WebsocketConnection{
-			ExchangeName:         ap.Name,
-			URL:                  ap.Websocket.GetWebsocketURL(),
-			ProxyURL:             ap.Websocket.GetProxyAddress(),
-			Verbose:              ap.Verbose,
-			ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
-			ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
-		}
-	*/
-	return nil
+	return ap.Websocket.SetupNewConnection(stream.ConnectionSetup{
+		URL:                  apexProPrivateWebsocket,
+		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
+		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
+	})
 }
 
 // FetchTradablePairs returns a list of the exchanges tradable pairs
 func (ap *Apexpro) FetchTradablePairs(ctx context.Context, a asset.Item) (currency.Pairs, error) {
-	// Implement fetching the exchange available pairs if supported
-	return nil, nil
+	if !ap.SupportsAsset(a) {
+		return nil, fmt.Errorf("%w %v", asset.ErrNotSupported, a)
+	}
+	configs, err := ap.GetAllConfigDataV3(ctx)
+	if err != nil {
+		return nil, err
+	}
+	println("Fetching tradable pairs")
+	tradablePairs := make(currency.Pairs, 0, len((configs.ContractConfig.PerpetualContract)))
+	for a := range configs.ContractConfig.PerpetualContract {
+		println(configs.ContractConfig.PerpetualContract[a].Symbol, "\n")
+		if !configs.ContractConfig.PerpetualContract[a].EnableTrade {
+			continue
+		}
+		cp, err := currency.NewPairFromString(configs.ContractConfig.PerpetualContract[a].Symbol)
+		if err != nil {
+			return nil, err
+		}
+		tradablePairs = append(tradablePairs, cp)
+	}
+	return tradablePairs, nil
 }
 
 // UpdateTradablePairs updates the exchanges available pairs and stores
 // them in the exchanges config
 func (ap *Apexpro) UpdateTradablePairs(ctx context.Context, forceUpdate bool) error {
-	assetTypes := ap.GetAssetTypes(false)
-	for x := range assetTypes {
-		pairs, err := ap.FetchTradablePairs(ctx, assetTypes[x])
-		if err != nil {
-			return err
-		}
-
-		err = ap.UpdatePairs(pairs, assetTypes[x], false, forceUpdate)
-		if err != nil {
-			return err
-		}
+	pairs, err := ap.FetchTradablePairs(ctx, asset.Futures)
+	if err != nil {
+		return err
 	}
-	return nil
+	return ap.UpdatePairs(pairs, asset.Futures, true, forceUpdate)
 }
 
 // UpdateTicker updates and returns the ticker for a currency pair
