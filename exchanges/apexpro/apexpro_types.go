@@ -1,6 +1,8 @@
 package apexpro
 
 import (
+	"time"
+
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
 	"github.com/thrasher-corp/gocryptotrader/types"
 )
@@ -626,4 +628,59 @@ type NonceResponse struct {
 type WsMessage struct {
 	Operation string   `json:"op"`
 	Args      []string `json:"args"`
+}
+
+// WsDepth represents a websocket orderbook data.
+type WsDepth struct {
+	Topic string `json:"topic"`
+	Type  string `json:"type"`
+	Data  struct {
+		Symbol   string            `json:"s"`
+		Bids     [][2]types.Number `json:"b"`
+		Asks     [][2]types.Number `json:"a"`
+		UpdateID int64             `json:"u"`
+	} `json:"data"`
+	Cs        int64                `json:"cs"`
+	Timestamp convert.ExchangeTime `json:"ts"`
+}
+
+// WsTrade represents a trade data pushed through the websocket stream.
+type WsTrade struct {
+	Topic string `json:"topic"`
+	Type  string `json:"type"`
+	Data  []struct {
+		Timestamp       convert.ExchangeTime `json:"T"`
+		Symbol          string               `json:"s"`
+		Side            string               `json:"S"`
+		Volume          types.Number         `json:"v"`
+		Price           types.Number         `json:"p"`
+		TickerDirection string               `json:"L"`
+		OrderID         string               `json:"i"`
+	} `json:"data"`
+	Cs        int64                `json:"cs"`
+	Timestamp convert.ExchangeTime `json:"ts"`
+}
+
+// WsTicker represents a ticker item data.
+type WsTicker struct {
+	Topic string `json:"topic"`
+	Type  string `json:"type"`
+	Data  struct {
+		Symbol               string       `json:"symbol"`
+		LastPrice            types.Number `json:"lastPrice"`
+		Price24HPcnt         types.Number `json:"price24hPcnt"`
+		HighPrice24H         types.Number `json:"highPrice24h"`
+		LowPrice24H          types.Number `json:"lowPrice24h"`
+		Turnover24H          types.Number `json:"turnover24h"`
+		Volume24H            types.Number `json:"volume24h"`
+		NextFundingTime      time.Time    `json:"nextFundingTime"`
+		OraclePrice          types.Number `json:"oraclePrice"`
+		IndexPrice           types.Number `json:"indexPrice"`
+		OpenInterest         types.Number `json:"openInterest"`
+		TradeCount           types.Number `json:"tradeCount"`
+		FundingRate          types.Number `json:"fundingRate"`
+		PredictedFundingRate types.Number `json:"predictedFundingRate"`
+	} `json:"data"`
+	Cs int   `json:"cs"`
+	Ts int64 `json:"ts"`
 }

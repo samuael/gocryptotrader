@@ -272,19 +272,24 @@
     "websocketOrderbookBufferLimit": 5,
     "baseCurrencies": "USD,GBP,EUR",
     "currencyPairs": {
-        "requestFormat": {
-        "uppercase": true,
-        "delimiter": ""
-        },
-        "configFormat": {
-        "uppercase": true,
-        "delimiter": "-"
-        },
-        "useGlobalFormat": true,
+        "useGlobalFormat": false,
         "assetTypes": [
-        "futures"
+            "futures"
         ],
-        "pairs": {}
+        "pairs": {
+            "futures": {
+                "enabled": "BTC-USDT",
+                "available": "BTC-USDT",
+                "requestFormat": {
+                    "uppercase": true,
+                    "delimiter": ""
+                },
+                "configFormat": {
+                    "uppercase": true,
+                    "delimiter": "-"
+                }
+            }
+        }
     },
     "api": {
         "authenticatedSupport": true,
@@ -317,7 +322,7 @@
         },
         "enabled": {
         "autoPairUpdates": true,
-        "websocketAPI": false
+        "websocketAPI": true
         }
     },
     "bankAccounts": [

@@ -235,3 +235,10 @@ func TestGetCheckIfUserExistsV1(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 }
+
+func TestWsConnect(t *testing.T) {
+	t.Parallel()
+	err := ap.WsConnect()
+	require.NoError(t, err)
+	time.Sleep(time.Second * 23)
+}

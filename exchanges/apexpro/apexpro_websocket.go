@@ -8,10 +8,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
 )
 
 const (
@@ -43,7 +47,6 @@ func (ap *Apexpro) WsConnect() error {
 	if !ap.Websocket.IsEnabled() || !ap.IsEnabled() {
 		return stream.ErrWebsocketNotEnabled
 	}
-
 	var dialer websocket.Dialer
 	dialer.HandshakeTimeout = ap.Config.HTTPTimeout
 	dialer.Proxy = http.ProxyFromEnvironment
@@ -69,26 +72,31 @@ func (ap *Apexpro) WsConnect() error {
 		MessageType:       websocket.PongMessage,
 		Message:           payload,
 	})
-
 	ap.Websocket.Wg.Add(1)
 	go ap.wsReadData(ap.Websocket.Conn)
-	return nil
+	subscriptions, err := ap.GenerateDefaultSubscriptions()
+	if err != nil {
+		return err
+	}
+	return ap.Subscribe(subscriptions)
+	// return nil
 }
 
 // GenerateDefaultSubscriptions generates a default subscription list.
 func (ap *Apexpro) GenerateDefaultSubscriptions() (subscription.List, error) {
 	subscriptions := subscription.List{}
-	enabledPairs, err := ap.GetEnabledPairs(asset.Futures)
-	if err != nil {
-		return subscriptions, err
-	}
+	// enabledPairs, err := ap.GetEnabledPairs(asset.Futures)
+	// if err != nil {
+	// 	return subscriptions, err
+	// }
+	enabledPairs := []currency.Pair{{Base: currency.BTC, Quote: currency.USDT}}
 	for a := range defaultChannels {
 		switch defaultChannels[a] {
 		case chOrderbook:
 			subscriptions = append(subscriptions, &subscription.Subscription{
 				Channel: defaultChannels[a],
 				Pairs:   enabledPairs,
-				Levels:  100,
+				Levels:  200,
 			})
 		case chTrade, chTicker:
 			subscriptions = append(subscriptions, &subscription.Subscription{
@@ -100,7 +108,7 @@ func (ap *Apexpro) GenerateDefaultSubscriptions() (subscription.List, error) {
 			subscriptions = append(subscriptions, &subscription.Subscription{
 				Channel:  defaultChannels[a],
 				Pairs:    enabledPairs,
-				Levels:   100,
+				Levels:   200,
 				Interval: kline.FiveMin,
 			})
 		case chAllTickers:
@@ -203,10 +211,111 @@ func (ap *Apexpro) wsHandleData(respRaw []byte) error {
 	switch response.Operation {
 	case "pong":
 	case chOrderbook:
+		return ap.processOrderbook(respRaw)
 	case chTrade:
+		return ap.processTrades(respRaw)
 	case chTicker:
+		return ap.processTickerData(respRaw)
 	case chCandlestick:
 	case chAllTickers:
+	}
+	return nil
+}
+
+func (ap *Apexpro) processOrderbook(respRaw []byte) error {
+	var resp *WsDepth
+	var cp currency.Pair
+	err := json.Unmarshal(respRaw, &resp)
+	if err != nil {
+		return err
+	}
+	cp, err = currency.NewPairFromString(resp.Data.Symbol)
+	if err != nil {
+		return err
+	}
+	asks := make(orderbook.Tranches, len(resp.Data.Asks))
+	for a := range resp.Data.Asks {
+		asks[a].Price = resp.Data.Asks[a][0].Float64()
+		asks[a].Amount = resp.Data.Asks[a][1].Float64()
+	}
+	bids := make(orderbook.Tranches, len(resp.Data.Bids))
+	for b := range resp.Data.Bids {
+		bids[b].Price = resp.Data.Bids[b][0].Float64()
+		bids[b].Amount = resp.Data.Bids[b][1].Float64()
+	}
+	if resp.Type == "delta" {
+		return ap.Websocket.Orderbook.Update(&orderbook.Update{
+			Bids:       bids,
+			Asks:       asks,
+			Pair:       cp,
+			UpdateID:   resp.Data.UpdateID,
+			UpdateTime: resp.Timestamp.Time(),
+			Asset:      asset.Futures,
+		})
+	}
+	return ap.Websocket.Orderbook.LoadSnapshot(&orderbook.Base{
+		Pair:            cp,
+		Asset:           asset.Spot,
+		Exchange:        ap.Name,
+		LastUpdateID:    resp.Data.UpdateID,
+		VerifyOrderbook: ap.CanVerifyOrderbook,
+		LastUpdated:     time.Now(),
+		Asks:            asks,
+		Bids:            bids,
+	})
+}
+
+func (ap *Apexpro) processTrades(respRaw []byte) error {
+	var resp *WsTrade
+	err := json.Unmarshal(respRaw, &resp)
+	if err != nil {
+		return err
+	}
+	saveTradeData := ap.IsSaveTradeDataEnabled()
+	if !saveTradeData &&
+		!ap.IsTradeFeedEnabled() {
+		return nil
+	}
+	trades := make([]trade.Data, len(resp.Data))
+	for a := range resp.Data {
+		cp, err := currency.NewPairFromString(resp.Data[a].Symbol)
+		if err != nil {
+			return err
+		}
+		trades[a] = trade.Data{
+			CurrencyPair: cp,
+			Timestamp:    resp.Data[a].Timestamp.Time(),
+			Price:        resp.Data[a].Price.Float64(),
+			Amount:       resp.Data[a].Volume.Float64(),
+			Exchange:     ap.Name,
+			AssetType:    asset.Futures,
+			TID:          resp.Data[a].OrderID,
+		}
+	}
+	return ap.Websocket.Trade.Update(saveTradeData, trades...)
+}
+
+func (ap *Apexpro) processTickerData(respRaw []byte) error {
+	var resp *WsTicker
+	err := json.Unmarshal(respRaw, &resp)
+	if err != nil {
+		return err
+	}
+	cp, err := currency.NewPairFromString(resp.Data.Symbol)
+	if err != nil {
+		return err
+	}
+	ap.Websocket.DataHandler <- ticker.Price{
+		Last:         resp.Data.LastPrice.Float64(),
+		High:         resp.Data.HighPrice24H.Float64(),
+		Low:          resp.Data.LowPrice24H.Float64(),
+		Volume:       resp.Data.Volume24H.Float64(),
+		OpenInterest: resp.Data.OpenInterest.Float64(),
+		MarkPrice:    resp.Data.OraclePrice.Float64(),
+		IndexPrice:   resp.Data.IndexPrice.Float64(),
+		Pair:         cp,
+		ExchangeName: ap.Name,
+		AssetType:    asset.Futures,
 	}
 	return nil
 }

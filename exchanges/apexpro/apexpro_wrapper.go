@@ -44,12 +44,6 @@ func (ap *Apexpro) SetDefaults() {
 		log.Errorln(log.ExchangeSys, err)
 	}
 
-	// If assets require multiple differences in formatting for request and
-	// configuration, another exchange method can be be used e.g. futures
-	// contracts require a dash as a delimiter rather than an underscore. You
-	// can use this example below:
-
-	// Fill out the capabilities/features that the exchange supports
 	ap.Features = exchange.Features{
 		Supports: exchange.FeaturesSupported{
 			REST:      true,
@@ -69,21 +63,22 @@ func (ap *Apexpro) SetDefaults() {
 			AutoPairUpdates: true,
 		},
 	}
-	// NOTE: SET THE EXCHANGES RATE LIMIT HERE
 	ap.Requester, err = request.New(ap.Name,
 		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
 
-	// NOTE: SET THE URLs HERE
 	ap.API.Endpoints = ap.NewEndpoints()
-	ap.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
+	err = ap.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
 		exchange.RestSpotSupplementary:      apexproAPIURL,
 		exchange.RestSpot:                   apexproTestAPIURL,
 		exchange.WebsocketSpot:              apexProWebsocket,
 		exchange.WebsocketSpotSupplementary: apexProPrivateWebsocket,
 	})
+	if err != nil {
+		log.Errorln(log.ExchangeSys, err)
+	}
 	ap.Websocket = stream.NewWebsocket()
 	ap.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
 	ap.WebsocketResponseCheckTimeout = exchange.DefaultWebsocketResponseCheckTimeout
@@ -111,13 +106,14 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 
 	err = ap.Websocket.Setup(
 		&stream.WebsocketSetup{
-			ExchangeConfig: exch,
-			DefaultURL:     apexProWebsocket,
-			RunningURL:     wsRunningEndpoint,
-			Connector:      ap.WsConnect,
-			Subscriber:     ap.Subscribe,
-			Unsubscriber:   ap.Unsubscribe,
-			Features:       &ap.Features.Supports.WebsocketCapabilities,
+			ExchangeConfig:        exch,
+			DefaultURL:            apexProWebsocket,
+			RunningURL:            wsRunningEndpoint,
+			Connector:             ap.WsConnect,
+			Subscriber:            ap.Subscribe,
+			Unsubscriber:          ap.Unsubscribe,
+			GenerateSubscriptions: ap.GenerateDefaultSubscriptions,
+			Features:              &ap.Features.Supports.WebsocketCapabilities,
 		})
 	if err != nil {
 		return err
@@ -135,6 +131,7 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 		URL:                  apexProPrivateWebsocket,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
+		Authenticated:        true,
 	})
 }
 
@@ -147,10 +144,8 @@ func (ap *Apexpro) FetchTradablePairs(ctx context.Context, a asset.Item) (curren
 	if err != nil {
 		return nil, err
 	}
-	println("Fetching tradable pairs")
 	tradablePairs := make(currency.Pairs, 0, len((configs.ContractConfig.PerpetualContract)))
 	for a := range configs.ContractConfig.PerpetualContract {
-		println(configs.ContractConfig.PerpetualContract[a].Symbol, "\n")
 		if !configs.ContractConfig.PerpetualContract[a].EnableTrade {
 			continue
 		}
