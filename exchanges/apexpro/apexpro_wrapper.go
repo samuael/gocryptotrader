@@ -75,6 +75,8 @@ func (ap *Apexpro) SetDefaults() {
 		exchange.RestSpot:                   apexproTestAPIURL,
 		exchange.WebsocketSpot:              apexProWebsocket,
 		exchange.WebsocketSpotSupplementary: apexProPrivateWebsocket,
+
+		exchange.RestFutures: apexProOmniAPIURL,
 	})
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)

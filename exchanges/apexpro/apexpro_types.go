@@ -681,6 +681,167 @@ type WsTicker struct {
 		FundingRate          types.Number `json:"fundingRate"`
 		PredictedFundingRate types.Number `json:"predictedFundingRate"`
 	} `json:"data"`
-	Cs int   `json:"cs"`
-	Ts int64 `json:"ts"`
+	Cs        int64                `json:"cs"`
+	Timestamp convert.ExchangeTime `json:"ts"`
+}
+
+// UserData represents an account user information.
+type UserData struct {
+	EthereumAddress string `json:"ethereumAddress"`
+	IsRegistered    bool   `json:"isRegistered"`
+	Email           string `json:"email"`
+	Username        string `json:"username"`
+	UserData        struct {
+	} `json:"userData"`
+	IsEmailVerified          bool `json:"isEmailVerified"`
+	EmailNotifyGeneralEnable bool `json:"emailNotifyGeneralEnable"`
+	EmailNotifyTradingEnable bool `json:"emailNotifyTradingEnable"`
+	EmailNotifyAccountEnable bool `json:"emailNotifyAccountEnable"`
+	PopupNotifyTradingEnable bool `json:"popupNotifyTradingEnable"`
+}
+
+// UserResponse represents a user account detail response.
+type UserResponse struct {
+	Data    interface{} `json:"data"`
+	Code    int64       `json:"code"`
+	Message string      `json:"msg"`
+}
+
+// WsCandlesticks represents a list of candlestick data.
+type WsCandlesticks struct {
+	Topic     string               `json:"topic"`
+	Data      []CandlestickData    `json:"data"`
+	Timestamp convert.ExchangeTime `json:"ts"`
+	Type      string               `json:"type"`
+}
+
+// WsSymbolsTickerInformaton represents a ticker information for assets.
+type WsSymbolsTickerInformaton struct {
+	Topic string `json:"topic"`
+	Data  []struct {
+		Symbol                    string       `json:"s"`
+		LastPrice                 types.Number `json:"p"`
+		Price24HrChangePercentage types.Number `json:"pr"`
+		Highest24Hr               types.Number `json:"h"`
+		Lowest24Hr                types.Number `json:"l"`
+		OpeningPrice              types.Number `json:"op,omitempty"`
+		IndexPrice                types.Number `json:"xp"`
+		Turnover24Hr              types.Number `json:"to"`
+		Volume24Hr                types.Number `json:"v"`
+		FundingRate               types.Number `json:"fr"`
+		OpenInterest              types.Number `json:"o"`
+		TradeCount24Hr            types.Number `json:"tc"`
+		MarkPrice                 types.Number `json:"mp,omitempty"`
+	} `json:"data"`
+	Type      string               `json:"type"`
+	Timestamp convert.ExchangeTime `json:"ts"`
+}
+
+// RegistrationAndOnboardingResponse represents a registration and onboarding response.
+type RegistrationAndOnboardingResponse struct {
+	APIKey struct {
+		APIKey string   `json:"apiKey"`
+		Key    string   `json:"key"`
+		Secret string   `json:"secret"`
+		Remark string   `json:"remark"`
+		Ips    []string `json:"ips"`
+	} `json:"apiKey"`
+	User struct {
+		EthereumAddress          string       `json:"ethereumAddress"`
+		IsRegistered             bool         `json:"isRegistered"`
+		Email                    string       `json:"email"`
+		Username                 string       `json:"username"`
+		ReferredByAffiliateLink  string       `json:"referredByAffiliateLink"`
+		AffiliateLink            string       `json:"affiliateLink"`
+		ApexTokenBalance         types.Number `json:"apexTokenBalance"`
+		StakedApexTokenBalance   types.Number `json:"stakedApexTokenBalance"`
+		IsEmailVerified          bool         `json:"isEmailVerified"`
+		IsSharingUsername        bool         `json:"isSharingUsername"`
+		IsSharingAddress         bool         `json:"isSharingAddress"`
+		Country                  string       `json:"country"`
+		ID                       string       `json:"id"`
+		AvatarURL                string       `json:"avatarUrl"`
+		AvatarBorderURL          string       `json:"avatarBorderUrl"`
+		EmailNotifyGeneralEnable bool         `json:"emailNotifyGeneralEnable"`
+		EmailNotifyTradingEnable bool         `json:"emailNotifyTradingEnable"`
+		EmailNotifyAccountEnable bool         `json:"emailNotifyAccountEnable"`
+		PopupNotifyTradingEnable bool         `json:"popupNotifyTradingEnable"`
+		AppNotifyTradingEnable   bool         `json:"appNotifyTradingEnable"`
+	} `json:"user"`
+	Account struct {
+		EthereumAddress string `json:"ethereumAddress"`
+		L2Key           string `json:"l2Key"`
+		ID              string `json:"id"`
+		Version         string `json:"version"`
+		SpotAccount     struct {
+			CreatedAt            convert.ExchangeTime `json:"createdAt"`
+			UpdatedAt            convert.ExchangeTime `json:"updatedAt"`
+			ZkAccountID          string               `json:"zkAccountId"`
+			IsMultiSigEthAddress bool                 `json:"isMultiSigEthAddress"`
+			DefaultSubAccountID  string               `json:"defaultSubAccountId"`
+			Nonce                int                  `json:"nonce"`
+			Status               string               `json:"status"`
+			SubAccounts          []struct {
+				SubAccountID       string `json:"subAccountId"`
+				L2Key              string `json:"l2Key"`
+				Nonce              int    `json:"nonce"`
+				NonceVersion       int    `json:"nonceVersion"`
+				ChangePubKeyStatus string `json:"changePubKeyStatus"`
+			} `json:"subAccounts"`
+		} `json:"spotAccount"`
+		SpotWallets []struct {
+			UserID                   string               `json:"userId"`
+			AccountID                string               `json:"accountId"`
+			SubAccountID             string               `json:"subAccountId"`
+			Balance                  types.Number         `json:"balance"`
+			TokenID                  string               `json:"tokenId"`
+			PendingDepositAmount     types.Number         `json:"pendingDepositAmount"`
+			PendingWithdrawAmount    types.Number         `json:"pendingWithdrawAmount"`
+			PendingTransferOutAmount types.Number         `json:"pendingTransferOutAmount"`
+			PendingTransferInAmount  types.Number         `json:"pendingTransferInAmount"`
+			CreatedAt                convert.ExchangeTime `json:"createdAt"`
+			UpdatedAt                convert.ExchangeTime `json:"updatedAt"`
+		} `json:"spotWallets"`
+		ExperienceMoney []struct {
+			AvailableAmount types.Number `json:"availableAmount"`
+			TotalNumber     types.Number `json:"totalNumber"`
+			TotalAmount     types.Number `json:"totalAmount"`
+			RecycledAmount  types.Number `json:"recycledAmount"`
+			Token           string       `json:"token"`
+		} `json:"experienceMoney"`
+		ContractAccount struct {
+			CreatedAt             convert.ExchangeTime `json:"createdAt"`
+			TakerFeeRate          types.Number         `json:"takerFeeRate"`
+			MakerFeeRate          types.Number         `json:"makerFeeRate"`
+			MinInitialMarginRate  types.Number         `json:"minInitialMarginRate"`
+			Status                string               `json:"status"`
+			UnrealizePnlPriceType string               `json:"unrealizePnlPriceType"`
+		} `json:"contractAccount"`
+		ContractWallets []struct {
+			UserID                   string       `json:"userId"`
+			AccountID                string       `json:"accountId"`
+			Balance                  types.Number `json:"balance"`
+			Asset                    string       `json:"asset"`
+			PendingDepositAmount     types.Number `json:"pendingDepositAmount"`
+			PendingWithdrawAmount    types.Number `json:"pendingWithdrawAmount"`
+			PendingTransferOutAmount types.Number `json:"pendingTransferOutAmount"`
+			PendingTransferInAmount  types.Number `json:"pendingTransferInAmount"`
+		} `json:"contractWallets"`
+		Positions []struct {
+			IsPrelaunch             bool                 `json:"isPrelaunch"`
+			Symbol                  string               `json:"symbol"`
+			Status                  string               `json:"status"`
+			Side                    string               `json:"side"`
+			Size                    types.Number         `json:"size"`
+			EntryPrice              types.Number         `json:"entryPrice"`
+			ExitPrice               types.Number         `json:"exitPrice"`
+			CreatedAt               convert.ExchangeTime `json:"createdAt"`
+			UpdatedTime             convert.ExchangeTime `json:"updatedTime"`
+			Fee                     types.Number         `json:"fee"`
+			FundingFee              types.Number         `json:"fundingFee"`
+			LightNumbers            types.Number         `json:"lightNumbers"`
+			CustomInitialMarginRate string               `json:"customInitialMarginRate"`
+		} `json:"positions"`
+		IsNewUser bool `json:"isNewUser"`
+	} `json:"account"`
 }

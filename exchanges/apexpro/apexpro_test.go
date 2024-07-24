@@ -14,6 +14,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
 )
 
 // Please supply your own keys here to do authenticated endpoint testing
@@ -105,7 +106,6 @@ func TestGetMarketDepthV3(t *testing.T) {
 
 func TestGetMarketDepthV2(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	result, err := ap.GetMarketDepthV2(context.Background(), "BTCUSDT", 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -140,7 +140,6 @@ func TestGetNewestTradingDataV1(t *testing.T) {
 
 func TestGetCandlestickChartDataV3(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	_, err := ap.GetCandlestickChartDataV3(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
 	result, err := ap.GetCandlestickChartDataV3(context.Background(), "BTCUSDT", kline.FiveMin, time.Time{}, time.Time{}, 10)
@@ -150,7 +149,6 @@ func TestGetCandlestickChartDataV3(t *testing.T) {
 
 func TestGetCandlestickChartDataV2(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	_, err := ap.GetCandlestickChartDataV2(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
 	result, err := ap.GetCandlestickChartDataV2(context.Background(), "BTCUSDT", kline.FiveMin, time.Time{}, time.Time{}, 10)
@@ -160,7 +158,6 @@ func TestGetCandlestickChartDataV2(t *testing.T) {
 
 func TestGetCandlestickChartDataV1(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	_, err := ap.GetCandlestickChartDataV1(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
 	result, err := ap.GetCandlestickChartDataV1(context.Background(), "BTCUSDT", kline.FiveMin, time.Time{}, time.Time{}, 10)
@@ -222,7 +219,6 @@ func TestGetAllConfigDataV2(t *testing.T) {
 
 func TestGetCheckIfUserExistsV2(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	result, err := ap.GetCheckIfUserExistsV2(context.Background(), "0x0330eBB5e894720e6746070371F9Fd797BE9D074")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -230,10 +226,9 @@ func TestGetCheckIfUserExistsV2(t *testing.T) {
 
 func TestGetCheckIfUserExistsV1(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	result, err := ap.GetCheckIfUserExistsV1(context.Background(), "0x0330eBB5e894720e6746070371F9Fd797BE9D074")
 	require.NoError(t, err)
-	require.NotNil(t, result)
+	assert.NotNil(t, result)
 }
 
 func TestWsConnect(t *testing.T) {
@@ -241,4 +236,28 @@ func TestWsConnect(t *testing.T) {
 	err := ap.WsConnect()
 	require.NoError(t, err)
 	time.Sleep(time.Second * 23)
+}
+
+func TestGenerateNonce(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.GenerateNonce(context.Background(), "0x064bbfda1ae95578713f23ad9dc4a19a0e8b2edc0efdc6819d389146b140f24b", "0x064bbfda1ae95578713f23a", "1")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestRegistrationAndOnboarding(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.RegistrationAndOnboarding(context.Background(), "0x064bbfda1ae95578713f23ad9dc4a19a0e8b2edc0efdc6819d389146b140f24b", "0x064bbfda1ae95578713f23a", "", "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUsersData(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUsersData(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
 }

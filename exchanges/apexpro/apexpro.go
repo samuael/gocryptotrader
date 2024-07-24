@@ -2,7 +2,9 @@ package apexpro
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
+	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
@@ -24,6 +27,8 @@ type Apexpro struct {
 const (
 	apexproAPIURL     = "https://pro.apex.exchange/api/"
 	apexproTestAPIURL = "https://testnet.pro.apex.exchange/api/"
+
+	apexProOmniAPIURL = "https://omni.apex.exchange/api/"
 
 	// Public endpoints
 
@@ -274,7 +279,36 @@ func (ap *Apexpro) GenerateNonce(ctx context.Context, l2Key, ethAddress, chainID
 	params := url.Values{}
 	params.Set("l2Key", l2Key)
 	var resp *NonceResponse
-	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, common.EncodeURLValues("v3/generate-nonce", params), request.UnAuth, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, common.EncodeURLValues("v3/generate-nonce", params), request.UnAuth, nil, &resp)
+}
+
+// RegistrationAndOnboarding consolidate onboarding data and generate digital signature via your wallet. You can refer to python sdk, derive_zk_key for more information
+// Create your zkKey pair with your signature, including (seeds, l2Key, pubKeyHash）
+// Send consolidated onboarding data request to the server for response to user registration data, including API keys
+func (ap *Apexpro) RegistrationAndOnboarding(ctx context.Context, l2Key, ethereumAddress, referredByAffiliateLink, country string) (*RegistrationAndOnboardingResponse, error) {
+	if l2Key == "" {
+		return nil, errL2KeyMissing
+	}
+	if ethereumAddress == "" {
+		return nil, errEthereumAddressMissing
+	}
+	params := make(map[string]interface{})
+	params["l2Key"] = l2Key
+	params["ethereumAddress"] = ethereumAddress
+	if referredByAffiliateLink != "" {
+		params["referredByAffiliateLink"] = referredByAffiliateLink
+	}
+	if country != "" {
+		params["country"] = country
+	}
+	var resp *RegistrationAndOnboardingResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/onboarding", request.UnAuth, params, &resp)
+}
+
+// GetUsersData retrieves an account users information.
+func (ap *Apexpro) GetUsersData(ctx context.Context) (*UserData, error) {
+	var resp *UserData
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/user", request.Unset, nil, &resp)
 }
 
 // SendHTTPRequest sends an unauthenticated request
@@ -293,15 +327,69 @@ func (ap *Apexpro) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path
 			Data: result,
 		}
 	}
-	item := &request.Item{
-		Method:        http.MethodGet,
-		Path:          endpointPath + path,
-		Result:        response,
-		Verbose:       ap.Verbose,
-		HTTPDebugging: ap.HTTPDebugging,
-		HTTPRecording: ap.HTTPRecording}
-
 	return ap.SendPayload(ctx, f, func() (*request.Item, error) {
-		return item, nil
+		return &request.Item{
+			Method:        http.MethodGet,
+			Path:          endpointPath + path,
+			Result:        response,
+			Verbose:       ap.Verbose,
+			HTTPDebugging: ap.HTTPDebugging,
+			HTTPRecording: ap.HTTPRecording,
+		}, nil
 	}, request.UnauthenticatedRequest)
+}
+
+// SendAuthenticatedHTTPRequest sends an authenticated HTTP request.
+func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, f request.EndpointLimit, arg, result interface{}) error {
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return err
+	}
+	endpointPath, err := ap.API.Endpoints.GetURL(ePath)
+	if err != nil {
+		return err
+	}
+	response := &UserResponse{
+		Data: result,
+	}
+	var dataString string
+	if arg != nil {
+		byteData, err := json.Marshal(arg)
+		if err != nil {
+			return err
+		}
+		dataString = string(byteData)
+	}
+	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
+		timestamp := time.Now().UnixMilli()
+		message := strconv.FormatInt(timestamp, 10) + method + path + dataString
+		var hmacSigned []byte
+		hmacSigned, err := crypto.GetHMAC(crypto.HashSHA256,
+			[]byte(message),
+			[]byte(creds.Secret))
+		if err != nil {
+			return nil, err
+		}
+		hmacSignedStr := crypto.HexEncodeToString(hmacSigned)
+		headers := make(map[string]string)
+		headers["APEX-API-KEY"] = creds.Key
+		headers["APEX-SIGNATURE"] = hmacSignedStr
+		headers["APEX-TIMESTAMP"] = strconv.FormatInt(timestamp, 10)
+		headers["APEX-PASSPHRASE"] = creds.ClientID
+		return &request.Item{
+			Method:        method,
+			Path:          endpointPath + path,
+			Headers:       headers,
+			Result:        response,
+			Verbose:       ap.Verbose,
+			HTTPDebugging: ap.HTTPDebugging,
+			HTTPRecording: ap.HTTPRecording}, nil
+	}, request.AuthenticatedRequest)
+	if err != nil {
+		return err
+	}
+	if response.Code != 0 {
+		return fmt.Errorf("code: %d msg: %q", response.Code, response.Message)
+	}
+	return nil
 }

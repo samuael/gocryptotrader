@@ -217,7 +217,9 @@ func (ap *Apexpro) wsHandleData(respRaw []byte) error {
 	case chTicker:
 		return ap.processTickerData(respRaw)
 	case chCandlestick:
+		return ap.processCandlestickData(respRaw)
 	case chAllTickers:
+		return ap.processAllTickers(respRaw)
 	}
 	return nil
 }
@@ -317,5 +319,64 @@ func (ap *Apexpro) processTickerData(respRaw []byte) error {
 		ExchangeName: ap.Name,
 		AssetType:    asset.Futures,
 	}
+	return nil
+}
+
+func (ap *Apexpro) processCandlestickData(respRaw []byte) error {
+	var resp *WsCandlesticks
+	err := json.Unmarshal(respRaw, &resp)
+	if err != nil {
+		return err
+	}
+	for a := range resp.Data {
+		pair, err := currency.NewPairFromString(resp.Data[a].Symbol)
+		if err != nil {
+			return err
+		}
+		ap.Websocket.DataHandler <- stream.KlineData{
+			Timestamp:  resp.Timestamp.Time(),
+			Pair:       pair,
+			AssetType:  asset.Futures,
+			Exchange:   ap.Name,
+			StartTime:  resp.Data[a].Start.Time(),
+			Interval:   resp.Data[a].Interval,
+			OpenPrice:  resp.Data[a].Open.Float64(),
+			ClosePrice: resp.Data[a].Close.Float64(),
+			HighPrice:  resp.Data[a].High.Float64(),
+			LowPrice:   resp.Data[a].Low.Float64(),
+			Volume:     resp.Data[a].Volume.Float64(),
+		}
+	}
+	return nil
+}
+
+func (ap *Apexpro) processAllTickers(respRaw []byte) error {
+	var resp *WsSymbolsTickerInformaton
+	err := json.Unmarshal(respRaw, &resp)
+	if err != nil {
+		return err
+	}
+	tickerData := make([]ticker.Price, len(resp.Data))
+	for a := range resp.Data {
+		pair, err := currency.NewPairFromString(resp.Data[a].Symbol)
+		if err != nil {
+			return err
+		}
+		tickerData[a] = ticker.Price{
+			Last:         resp.Data[a].LastPrice.Float64(),
+			High:         resp.Data[a].Highest24Hr.Float64(),
+			Low:          resp.Data[a].Lowest24Hr.Float64(),
+			Volume:       resp.Data[a].Volume24Hr.Float64(),
+			Open:         resp.Data[a].OpeningPrice.Float64(),
+			OpenInterest: resp.Data[a].OpenInterest.Float64(),
+			MarkPrice:    resp.Data[a].MarkPrice.Float64(),
+			IndexPrice:   resp.Data[a].IndexPrice.Float64(),
+			Pair:         pair,
+			ExchangeName: ap.Name,
+			AssetType:    asset.Futures,
+			LastUpdated:  resp.Timestamp.Time(),
+		}
+	}
+	ap.Websocket.DataHandler <- tickerData
 	return nil
 }
