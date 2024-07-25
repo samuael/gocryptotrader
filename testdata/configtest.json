@@ -282,7 +282,11 @@
             "credentials": {
                 "key": "Key",
                 "secret": "Secret",
-                "clientID": "ClientID"
+                "clientID": "ClientID",
+
+                "l2Key": "l2Key",
+                "l2Secret": "l2Secret",
+                "l2KeyYCoordinate": "l2KeyYCoordinate"
             },
             "credentialsValidator": {
                 "requiresKey": true,

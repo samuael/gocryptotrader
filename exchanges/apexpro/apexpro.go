@@ -1,8 +1,8 @@
 package apexpro
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -36,8 +36,9 @@ const (
 )
 
 var (
-	errEthereumAddressMissing   = errors.New("ethereum address is missing")
 	errL2KeyMissing             = errors.New("l2 Key is required")
+	errEthereumAddressMissing   = errors.New("ethereum address is missing")
+	errChainIDMissing           = errors.New("chain ID is missing")
 	errOrderbookLevelIsRequired = errors.New("orderbook level is required")
 )
 
@@ -272,14 +273,22 @@ func (ap *Apexpro) getCheckIfUserExists(ctx context.Context, ethAddress, path st
 // ----------------------------------------------------------------     Authenticated Endpoints ----------------------------------------------------------------
 
 // GenerateNonce generate and obtain nonce before registration. The nonce is used to assemble the signature field upon registration.
-func (ap *Apexpro) GenerateNonce(ctx context.Context, l2Key, ethAddress, chainID string) (*NonceResponse, error) {
+func (ap *Apexpro) GenerateNonce(ctx context.Context, l2Key, ethereumAddress, chainID string) (*NonceResponse, error) {
 	if l2Key == "" {
 		return nil, errL2KeyMissing
 	}
 	params := url.Values{}
+	if ethereumAddress == "" {
+		return nil, errEthereumAddressMissing
+	}
+	if chainID == "" {
+		return nil, errChainIDMissing
+	}
 	params.Set("l2Key", l2Key)
+	params.Set("ethAddress", ethereumAddress)
+	params.Set("chainId", chainID)
 	var resp *NonceResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, common.EncodeURLValues("v3/generate-nonce", params), request.UnAuth, nil, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/generate-nonce", request.UnAuth, params, &resp)
 }
 
 // RegistrationAndOnboarding consolidate onboarding data and generate digital signature via your wallet. You can refer to python sdk, derive_zk_key for more information
@@ -292,14 +301,14 @@ func (ap *Apexpro) RegistrationAndOnboarding(ctx context.Context, l2Key, ethereu
 	if ethereumAddress == "" {
 		return nil, errEthereumAddressMissing
 	}
-	params := make(map[string]interface{})
-	params["l2Key"] = l2Key
-	params["ethereumAddress"] = ethereumAddress
+	params := url.Values{}
+	params.Set("l2Key", l2Key)
+	params.Set("ethereumAddress", ethereumAddress)
 	if referredByAffiliateLink != "" {
-		params["referredByAffiliateLink"] = referredByAffiliateLink
+		params.Set("referredByAffiliateLink", referredByAffiliateLink)
 	}
 	if country != "" {
-		params["country"] = country
+		params.Set("country", country)
 	}
 	var resp *RegistrationAndOnboardingResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/onboarding", request.UnAuth, params, &resp)
@@ -308,7 +317,7 @@ func (ap *Apexpro) RegistrationAndOnboarding(ctx context.Context, l2Key, ethereu
 // GetUsersData retrieves an account users information.
 func (ap *Apexpro) GetUsersData(ctx context.Context) (*UserData, error) {
 	var resp *UserData
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/user", request.Unset, nil, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "v3/user", request.Unset, nil, &resp)
 }
 
 // SendHTTPRequest sends an unauthenticated request
@@ -340,7 +349,7 @@ func (ap *Apexpro) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path
 }
 
 // SendAuthenticatedHTTPRequest sends an authenticated HTTP request.
-func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, f request.EndpointLimit, arg, result interface{}) error {
+func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, f request.EndpointLimit, params url.Values, result interface{}, onboarding ...bool) error {
 	creds, err := ap.GetCredentials(ctx)
 	if err != nil {
 		return err
@@ -353,12 +362,14 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 		Data: result,
 	}
 	var dataString string
-	if arg != nil {
-		byteData, err := json.Marshal(arg)
-		if err != nil {
-			return err
-		}
-		dataString = string(byteData)
+	if method == http.MethodPost && params != nil {
+		// byteData, err := json.Marshal()
+		// if err != nil {
+		// 	return err
+		// }
+		dataString = params.Encode()
+	} else if method == http.MethodGet {
+		path = common.EncodeURLValues(path, params)
 	}
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		timestamp := time.Now().UnixMilli()
@@ -370,15 +381,15 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 		if err != nil {
 			return nil, err
 		}
-		hmacSignedStr := crypto.HexEncodeToString(hmacSigned)
 		headers := make(map[string]string)
 		headers["APEX-API-KEY"] = creds.Key
-		headers["APEX-SIGNATURE"] = hmacSignedStr
+		headers["APEX-SIGNATURE"] = crypto.HexEncodeToString(hmacSigned)
 		headers["APEX-TIMESTAMP"] = strconv.FormatInt(timestamp, 10)
 		headers["APEX-PASSPHRASE"] = creds.ClientID
 		return &request.Item{
 			Method:        method,
 			Path:          endpointPath + path,
+			Body:          bytes.NewBufferString(dataString),
 			Headers:       headers,
 			Result:        response,
 			Verbose:       ap.Verbose,

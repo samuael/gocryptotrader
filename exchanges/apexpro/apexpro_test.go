@@ -19,9 +19,13 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey                  = ""
-	apiSecret               = ""
-	clientID                = ""
+	apiKey    = ""
+	apiSecret = ""
+	clientID  = ""
+
+	starkKey                = ""
+	starkSecret             = ""
+	starkKeyYCoordinate     = ""
 	canManipulateRealOrders = false
 )
 
@@ -46,6 +50,10 @@ func TestMain(m *testing.M) {
 	exchCfg.API.Credentials.Secret = apiSecret
 	exchCfg.API.Credentials.ClientID = clientID
 
+	exchCfg.API.Credentials.L2Key = starkKey
+	exchCfg.API.Credentials.L2Secret = starkSecret
+	exchCfg.API.Credentials.L2KeyYCoordinate = starkKeyYCoordinate
+
 	err = ap.Setup(exchCfg)
 	if err != nil {
 		log.Fatal(err)
@@ -54,6 +62,14 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 	os.Exit(m.Run())
+}
+
+func (ap *Apexpro) isL2CredentialsProvided() bool {
+	_, err := ap.GetCredentials(context.Background())
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // Implement tests for API endpoints below
@@ -240,8 +256,8 @@ func TestWsConnect(t *testing.T) {
 
 func TestGenerateNonce(t *testing.T) {
 	t.Parallel()
-	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
-	result, err := ap.GenerateNonce(context.Background(), "0x064bbfda1ae95578713f23ad9dc4a19a0e8b2edc0efdc6819d389146b140f24b", "0x064bbfda1ae95578713f23a", "1")
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GenerateNonce(context.Background(), starkKey, "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "9")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -249,13 +265,14 @@ func TestGenerateNonce(t *testing.T) {
 func TestRegistrationAndOnboarding(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
-	result, err := ap.RegistrationAndOnboarding(context.Background(), "0x064bbfda1ae95578713f23ad9dc4a19a0e8b2edc0efdc6819d389146b140f24b", "0x064bbfda1ae95578713f23a", "", "")
+	result, err := ap.RegistrationAndOnboarding(context.Background(), starkKey, "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "", "")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
 
 func TestGetUsersData(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUsersData(context.Background())
 	require.NoError(t, err)

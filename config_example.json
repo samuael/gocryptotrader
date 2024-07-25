@@ -300,9 +300,12 @@
         "websocketURL": "NON_DEFAULT_HTTP_LINK_TO_WEBSOCKET_EXCHANGE_API"
         },
         "credentials": {
-        "key": "Key",
-        "secret": "Secret",
-        "clientID": "ClientID"
+            "key": "Key",
+            "secret": "Secret",
+            "clientID": "ClientID",
+            "l2Key": "L2Key",
+            "l2Secret": "L2Secret",
+            "l2KeyYCoordinate": "L2KeyYCoordinate"
         },
         "credentialsValidator": {
         "requiresKey": true,
