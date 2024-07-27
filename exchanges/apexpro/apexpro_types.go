@@ -845,3 +845,184 @@ type RegistrationAndOnboardingResponse struct {
 		IsNewUser bool `json:"isNewUser"`
 	} `json:"account"`
 }
+
+// EditUserDataParams represents a request parameter to edit user data.
+type EditUserDataParams struct {
+	Email                    string `json:"email"`
+	UserData                 string `json:"userData"`
+	Username                 string `json:"username"`
+	IsSharingUsername        bool   `json:"isSharingUsername"`
+	IsSharingAddress         bool   `json:"isSharingAddress"`
+	Country                  string `json:"country"`
+	EmailNotifyGeneralEnable bool   `json:"emailNotifyGeneralEnable"`
+	EmailNotifyTradingEnable bool   `json:"emailNotifyTradingEnable"`
+	EmailNotifyAccountEnable bool   `json:"emailNotifyAccountEnable"`
+	PopupNotifyTradingEnable bool   `json:"popupNotifyTradingEnable"`
+}
+
+// UserDataResponse represents a user data response.
+type UserDataResponse struct {
+	EthereumAddress string `json:"ethereumAddress"`
+	IsRegistered    bool   `json:"isRegistered"`
+	Email           string `json:"email"`
+	Username        string `json:"username"`
+	UserData        struct {
+	} `json:"userData"`
+	IsEmailVerified          bool `json:"isEmailVerified"`
+	EmailNotifyGeneralEnable bool `json:"emailNotifyGeneralEnable"`
+	EmailNotifyTradingEnable bool `json:"emailNotifyTradingEnable"`
+	EmailNotifyAccountEnable bool `json:"emailNotifyAccountEnable"`
+	PopupNotifyTradingEnable bool `json:"popupNotifyTradingEnable"`
+}
+
+// UserAccountDetail represents a user account detail.
+type UserAccountDetail struct {
+	EthereumAddress string `json:"ethereumAddress"`
+	L2Key           string `json:"l2Key"`
+	ID              string `json:"id"`
+	Version         string `json:"version"`
+	SpotAccount     struct {
+		CreatedAt            convert.ExchangeTime `json:"createdAt"`
+		UpdatedAt            convert.ExchangeTime `json:"updatedAt"`
+		ZkAccountID          string               `json:"zkAccountId"`
+		IsMultiSigEthAddress bool                 `json:"isMultiSigEthAddress"`
+		DefaultSubAccountID  string               `json:"defaultSubAccountId"`
+		Nonce                int64                `json:"nonce"`
+		Status               string               `json:"status"`
+		SubAccounts          []struct {
+			SubAccountID       string `json:"subAccountId"`
+			L2Key              string `json:"l2Key"`
+			Nonce              int64  `json:"nonce"`
+			NonceVersion       int64  `json:"nonceVersion"`
+			ChangePubKeyStatus string `json:"changePubKeyStatus"`
+		} `json:"subAccounts"`
+	} `json:"spotAccount"`
+	SpotWallets []struct {
+		UserID                   string               `json:"userId"`
+		AccountID                string               `json:"accountId"`
+		SubAccountID             string               `json:"subAccountId"`
+		Balance                  types.Number         `json:"balance"`
+		TokenID                  string               `json:"tokenId"`
+		PendingDepositAmount     types.Number         `json:"pendingDepositAmount"`
+		PendingWithdrawAmount    types.Number         `json:"pendingWithdrawAmount"`
+		PendingTransferOutAmount types.Number         `json:"pendingTransferOutAmount"`
+		PendingTransferInAmount  types.Number         `json:"pendingTransferInAmount"`
+		CreatedAt                convert.ExchangeTime `json:"createdAt"`
+		UpdatedAt                convert.ExchangeTime `json:"updatedAt"`
+	} `json:"spotWallets"`
+	ExperienceMoney []struct {
+		AvailableAmount types.Number `json:"availableAmount"`
+		TotalNumber     types.Number `json:"totalNumber"`
+		TotalAmount     types.Number `json:"totalAmount"`
+		RecycledAmount  types.Number `json:"recycledAmount"`
+		Token           string       `json:"token"`
+	} `json:"experienceMoney"`
+	ContractAccount struct {
+		CreatedAt             convert.ExchangeTime `json:"createdAt"`
+		TakerFeeRate          types.Number         `json:"takerFeeRate"`
+		MakerFeeRate          types.Number         `json:"makerFeeRate"`
+		MinInitialMarginRate  types.Number         `json:"minInitialMarginRate"`
+		Status                string               `json:"status"`
+		UnrealizePnlPriceType string               `json:"unrealizePnlPriceType"`
+		Token                 string               `json:"token"`
+	} `json:"contractAccount"`
+	ContractWallets []struct {
+		UserID                   string       `json:"userId"`
+		AccountID                string       `json:"accountId"`
+		Asset                    string       `json:"asset"`
+		Balance                  types.Number `json:"balance"`
+		PendingDepositAmount     types.Number `json:"pendingDepositAmount"`
+		PendingWithdrawAmount    types.Number `json:"pendingWithdrawAmount"`
+		PendingTransferOutAmount types.Number `json:"pendingTransferOutAmount"`
+		PendingTransferInAmount  types.Number `json:"pendingTransferInAmount"`
+	} `json:"contractWallets"`
+	Positions []struct {
+		IsPrelaunch             bool                 `json:"isPrelaunch"`
+		Symbol                  string               `json:"symbol"`
+		Status                  string               `json:"status"`
+		Side                    string               `json:"side"`
+		Size                    types.Number         `json:"size"`
+		EntryPrice              types.Number         `json:"entryPrice"`
+		ExitPrice               string               `json:"exitPrice"`
+		CreatedAt               convert.ExchangeTime `json:"createdAt"`
+		UpdatedTime             convert.ExchangeTime `json:"updatedTime"`
+		Fee                     types.Number         `json:"fee"`
+		FundingFee              types.Number         `json:"fundingFee"`
+		LightNumbers            string               `json:"lightNumbers"`
+		CustomInitialMarginRate string               `json:"customInitialMarginRate"`
+	} `json:"positions"`
+	IsNewUser bool `json:"isNewUser"`
+}
+
+// UserAccountBalanceResponse represents a user account balance.
+type UserAccountBalanceResponse struct {
+	TotalEquityValue    types.Number `json:"totalEquityValue"`
+	AvailableBalance    types.Number `json:"availableBalance"`
+	InitialMargin       types.Number `json:"initialMargin"`
+	MaintenanceMargin   types.Number `json:"maintenanceMargin"`
+	SymbolToOraclePrice map[string]struct {
+		OraclePrice types.Number         `json:"oraclePrice"`
+		CreatedTime convert.ExchangeTime `json:"createdTime"`
+	} `json:"symbolToOraclePrice"`
+}
+
+// UserWithdrawals represents users withdrawals list.
+type UserWithdrawals struct {
+	Transfers []UserWithdrawal `json:"transfers"`
+}
+
+// UserWithdrawal represents a user withdrawal information.
+type UserWithdrawal struct {
+	ID              string               `json:"id"`
+	Type            string               `json:"type"`
+	Amount          types.Number         `json:"amount"`
+	TransactionHash string               `json:"transactionHash"`
+	Status          string               `json:"status"`
+	CreatedAt       convert.ExchangeTime `json:"createdAt"`
+	UpdatedAt       convert.ExchangeTime `json:"updatedAt"`
+	ConfirmedAt     convert.ExchangeTime `json:"confirmedAt"`
+	FromTokenID     string               `json:"fromTokenId"`
+	ToTokenID       string               `json:"toTokenId"`
+	ChainID         string               `json:"chainId"`
+	OrderID         string               `json:"orderId"`
+	EthAddress      string               `json:"ethAddress"`
+	FromEthAddress  string               `json:"fromEthAddress"`
+	ToEthAddress    string               `json:"toEthAddress"`
+	Fee             types.Number         `json:"fee"`
+	ClientID        string               `json:"clientId"`
+}
+
+// AssetWithdrawalParams represents a user asset withdrawal parameter.
+type AssetWithdrawalParams struct {
+	Amount           float64
+	ClientWithdrawID string
+	Timestamp        time.Time
+	EthereumAddress  string
+	Signature        string
+	ZKAccountID      string
+	SubAccountID     string
+	L2Key            string
+	ToChainID        string
+	L2SourceTokenID  string
+	L1TargetTokenID  string
+	Fee              float64
+	Nonce            int64
+	IsFastWithdraw   bool
+}
+
+// WithdrawalResponse represents a withdrawal placing response.
+type WithdrawalResponse struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
+// WithdrawalFeeInfos represents an asset withdrawal fee information
+type WithdrawalFeeInfos struct {
+	WithdrawFeeAndPoolBalances []struct {
+		ChainID                 string       `json:"chainId"`
+		TokenID                 string       `json:"tokenId"`
+		Fee                     types.Number `json:"fee"`
+		ZkAvailableAmount       types.Number `json:"zkAvailableAmount"`
+		FastpoolAvailableAmount types.Number `json:"fastpoolAvailableAmount"`
+	} `json:"withdrawFeeAndPoolBalances"`
+}

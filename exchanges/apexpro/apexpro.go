@@ -1,7 +1,6 @@
 package apexpro
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 )
 
@@ -36,10 +36,14 @@ const (
 )
 
 var (
-	errL2KeyMissing             = errors.New("l2 Key is required")
-	errEthereumAddressMissing   = errors.New("ethereum address is missing")
-	errChainIDMissing           = errors.New("chain ID is missing")
-	errOrderbookLevelIsRequired = errors.New("orderbook level is required")
+	errL2KeyMissing                  = errors.New("l2 Key is required")
+	errEthereumAddressMissing        = errors.New("ethereum address is missing")
+	errChainIDMissing                = errors.New("chain ID is missing")
+	errOrderbookLevelIsRequired      = errors.New("orderbook level is required")
+	errInvalidTimestamp              = errors.New("err invalid timestamp")
+	errZeroKnowledgeAccountIDMissing = errors.New("zero knowledge account id is required")
+	errSubAccountIDMissing           = errors.New("missing sub-account id")
+	errUserNonceRequired             = errors.New("nonce is required")
 )
 
 // Start implementing public and private exchange API funcs below
@@ -288,7 +292,7 @@ func (ap *Apexpro) GenerateNonce(ctx context.Context, l2Key, ethereumAddress, ch
 	params.Set("ethAddress", ethereumAddress)
 	params.Set("chainId", chainID)
 	var resp *NonceResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/generate-nonce", request.UnAuth, params, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/generate-nonce", request.UnAuth, params, &resp, false)
 }
 
 // RegistrationAndOnboarding consolidate onboarding data and generate digital signature via your wallet. You can refer to python sdk, derive_zk_key for more information
@@ -311,13 +315,149 @@ func (ap *Apexpro) RegistrationAndOnboarding(ctx context.Context, l2Key, ethereu
 		params.Set("country", country)
 	}
 	var resp *RegistrationAndOnboardingResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/onboarding", request.UnAuth, params, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/onboarding", request.UnAuth, params, &resp, true)
 }
 
 // GetUsersData retrieves an account users information.
 func (ap *Apexpro) GetUsersData(ctx context.Context) (*UserData, error) {
 	var resp *UserData
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "v3/user", request.Unset, nil, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/user", request.Unset, nil, &resp)
+}
+
+// EditUserData edits user's data.
+func (ap *Apexpro) EditUserData(ctx context.Context, arg *EditUserDataParams) (*UserDataResponse, error) {
+	if arg == nil || *arg == (EditUserDataParams{}) {
+		return nil, common.ErrNilPointer
+	}
+	params := url.Values{}
+	if arg.UserData != "" {
+		params.Set("userData", arg.UserData)
+	}
+	if arg.Email != "" {
+		params.Set("email", arg.Email)
+	}
+	if arg.Username != "" {
+		params.Set("username", arg.Username)
+	}
+	if arg.Country != "" {
+		params.Set("country", arg.Country)
+	}
+	params.Set("isSharingUsername", strconv.FormatBool(arg.IsSharingUsername))
+	params.Set("isSharingAddress", strconv.FormatBool(arg.IsSharingAddress))
+	params.Set("emailNotifyGeneralEnable", strconv.FormatBool(arg.EmailNotifyGeneralEnable))
+	params.Set("emailNotifyTradingEnable", strconv.FormatBool(arg.EmailNotifyTradingEnable))
+	params.Set("emailNotifyAccountEnable", strconv.FormatBool(arg.EmailNotifyAccountEnable))
+	params.Set("popupNotifyTradingEnable", strconv.FormatBool(arg.PopupNotifyTradingEnable))
+	var resp *UserDataResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/modify-user", request.UnAuth, params, &resp)
+}
+
+// GetUserAccountData get an account for a user by id. Using the client, the id will be generated with client information and an Ethereum address.
+func (ap *Apexpro) GetUserAccountData(ctx context.Context) (*UserAccountDetail, error) {
+	var resp *UserAccountDetail
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/account", request.UnAuth, nil, &resp)
+}
+
+// GetUserAccountBalance retrieves user account balance information.
+func (ap *Apexpro) GetUserAccountBalance(ctx context.Context) (*UserAccountBalanceResponse, error) {
+	var resp *UserAccountBalanceResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/account-balance", request.UnAuth, nil, &resp)
+}
+
+// GetUserTransferData retrieves user's asset transfer data.
+func (ap *Apexpro) GetUserTransferData(ctx context.Context, id, tokenID, transferType, subAccountID, direction string, startAt, endAt time.Time, chainIds []string, limit int64) (*UserWithdrawals, error) {
+	params := url.Values{}
+	if limit > 0 {
+		params.Set("limit", strconv.FormatInt(limit, 10))
+	}
+	if id != "" {
+		params.Set("id", id)
+	}
+	if transferType != "" {
+		params.Set("transferType", transferType)
+	}
+	if tokenID != "" {
+		params.Set("tokenId", tokenID)
+	}
+	if subAccountID != "" {
+		params.Set("subAccountId", subAccountID)
+	}
+	if direction != "" {
+		params.Set("direction", direction)
+	}
+	if !startAt.IsZero() {
+		params.Set("beginTimeInclusive", strconv.FormatInt(startAt.UnixMilli(), 10))
+	}
+	if !endAt.IsZero() {
+		params.Set("endTimeExclusive", strconv.FormatInt(endAt.UnixMilli(), 10))
+	}
+	var resp *UserWithdrawals
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/transfers", request.UnAuth, nil, &resp)
+}
+
+// WithdrawAsset posts an asset withdrawal
+func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams) (*WithdrawalResponse, error) {
+	creds, err := ap.GetCredentials(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{}
+	if arg.Amount <= 0 {
+		return nil, order.ErrAmountBelowMin
+	}
+	if arg.ClientWithdrawID == "" {
+		return nil, order.ErrClientOrderIDMustBeSet
+	}
+	if arg.Timestamp.IsZero() {
+		return nil, errInvalidTimestamp
+	}
+	if arg.EthereumAddress == "" && creds.SubAccount == "" {
+		return nil, errEthereumAddressMissing
+	} else if arg.EthereumAddress == "" {
+		arg.EthereumAddress = creds.SubAccount
+	}
+	if arg.ZKAccountID == "" {
+		return nil, errZeroKnowledgeAccountIDMissing
+	}
+	if arg.SubAccountID == "" {
+		return nil, errSubAccountIDMissing
+	}
+	if arg.L2Key == "" && creds.L2Key == "" {
+		return nil, errL2KeyMissing
+	} else if arg.L2Key == "" {
+		arg.L2Key = creds.L2Key
+	}
+	if arg.ToChainID == "" {
+		return nil, fmt.Errorf("%w, toChainID is required", errChainIDMissing)
+	}
+	if arg.Nonce == 0 {
+		return nil, errUserNonceRequired
+	}
+	if arg.L2SourceTokenID != "" {
+		params.Set("l2SourceTokenId", arg.L2SourceTokenID)
+	}
+	if arg.L1TargetTokenID != "" {
+		params.Set("l1TargetTokenId", arg.L1TargetTokenID)
+	}
+	if arg.Fee != 0 {
+		params.Set("fee", strconv.FormatFloat(arg.Fee, 'f', -1, 64))
+	}
+	params.Set("isFastWithdraw", strconv.FormatBool(arg.IsFastWithdraw))
+	params.Set("nonce", strconv.FormatInt(arg.Nonce, 10))
+	params.Set("toChainId", arg.ToChainID)
+	params.Set("l2Key", arg.L2Key)
+	params.Set("subAccountId", arg.SubAccountID)
+	params.Set("zkAccountId", arg.ZKAccountID)
+	params.Set("zkAccountId", arg.ZKAccountID)
+	params.Set("ethAddress", arg.EthereumAddress)
+	params.Set("timestamp", strconv.FormatInt(arg.Timestamp.UnixMilli(), 10))
+	params.Set("clientWithdrawId", arg.ClientWithdrawID)
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+
+	// TODO: generate signature and fill in the parameters
+
+	var resp *WithdrawalResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/withdraw-fee", request.UnAuth, params, &resp)
 }
 
 // SendHTTPRequest sends an unauthenticated request
@@ -361,19 +501,10 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 	response := &UserResponse{
 		Data: result,
 	}
-	var dataString string
-	if method == http.MethodPost && params != nil {
-		// byteData, err := json.Marshal()
-		// if err != nil {
-		// 	return err
-		// }
-		dataString = params.Encode()
-	} else if method == http.MethodGet {
-		path = common.EncodeURLValues(path, params)
-	}
+	path = common.EncodeURLValues(path, params)
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		timestamp := time.Now().UnixMilli()
-		message := strconv.FormatInt(timestamp, 10) + method + path + dataString
+		message := strconv.FormatInt(timestamp, 10) + method + ("/api/" + path) //+ dataString
 		var hmacSigned []byte
 		hmacSigned, err := crypto.GetHMAC(crypto.HashSHA256,
 			[]byte(message),
@@ -386,15 +517,25 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 		headers["APEX-SIGNATURE"] = crypto.HexEncodeToString(hmacSigned)
 		headers["APEX-TIMESTAMP"] = strconv.FormatInt(timestamp, 10)
 		headers["APEX-PASSPHRASE"] = creds.ClientID
+		if len(onboarding) > 0 && onboarding[0] {
+			if creds.SubAccount == "" {
+				return nil, errEthereumAddressMissing
+			}
+			headers = make(map[string]string)
+			headers["APEX-SIGNATURE"] = crypto.HexEncodeToString(hmacSigned)
+			headers["APEX-ETHEREUM-ADDRESS"] = creds.SubAccount
+		} else if len(onboarding) > 0 {
+			headers = make(map[string]string)
+		}
 		return &request.Item{
 			Method:        method,
 			Path:          endpointPath + path,
-			Body:          bytes.NewBufferString(dataString),
 			Headers:       headers,
 			Result:        response,
 			Verbose:       ap.Verbose,
 			HTTPDebugging: ap.HTTPDebugging,
-			HTTPRecording: ap.HTTPRecording}, nil
+			HTTPRecording: ap.HTTPRecording,
+		}, nil
 	}, request.AuthenticatedRequest)
 	if err != nil {
 		return err

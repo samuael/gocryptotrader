@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
@@ -23,10 +24,13 @@ const (
 	apiSecret = ""
 	clientID  = ""
 
-	starkKey                = ""
-	starkSecret             = ""
-	starkKeyYCoordinate     = ""
-	canManipulateRealOrders = false
+	starkKey            = ""
+	starkSecret         = ""
+	starkKeyYCoordinate = ""
+
+	ethereumAddress = ""
+
+	canManipulateRealOrders = true
 )
 
 var ap = &Apexpro{}
@@ -53,6 +57,7 @@ func TestMain(m *testing.M) {
 	exchCfg.API.Credentials.L2Key = starkKey
 	exchCfg.API.Credentials.L2Secret = starkSecret
 	exchCfg.API.Credentials.L2KeyYCoordinate = starkKeyYCoordinate
+	exchCfg.API.Credentials.Subaccount = ethereumAddress
 
 	err = ap.Setup(exchCfg)
 	if err != nil {
@@ -256,16 +261,18 @@ func TestWsConnect(t *testing.T) {
 
 func TestGenerateNonce(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GenerateNonce(context.Background(), starkKey, "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "9")
+	result, err := ap.GenerateNonce(context.Background(), starkKey, ethereumAddress, "9")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
 
 func TestRegistrationAndOnboarding(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
-	result, err := ap.RegistrationAndOnboarding(context.Background(), starkKey, "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "", "")
+	result, err := ap.RegistrationAndOnboarding(context.Background(), starkKey, ethereumAddress, "", "")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -275,6 +282,52 @@ func TestGetUsersData(t *testing.T) {
 	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUsersData(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestEditUserData(t *testing.T) {
+	t.Parallel()
+	_, err := ap.EditUserData(context.Background(), &EditUserDataParams{})
+	require.ErrorIs(t, err, common.ErrNilPointer)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.EditUserData(context.Background(), &EditUserDataParams{
+		Email:                    "samuaeladnew@gmail.com",
+		UserData:                 "",
+		Username:                 "Thrasher",
+		IsSharingUsername:        true,
+		Country:                  "Ethiopia",
+		EmailNotifyGeneralEnable: true,
+		EmailNotifyTradingEnable: true,
+		EmailNotifyAccountEnable: true,
+		PopupNotifyTradingEnable: true,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUserAccountData(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserAccountData(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUserAccountBalance(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserAccountBalance(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUserDepositWithdrawData(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserTransferData(context.Background(), "", "", "WITHDRAW", "", "", time.Time{}, time.Time{}, []string{}, 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
