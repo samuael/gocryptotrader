@@ -1026,3 +1026,132 @@ type WithdrawalFeeInfos struct {
 		FastpoolAvailableAmount types.Number `json:"fastpoolAvailableAmount"`
 	} `json:"withdrawFeeAndPoolBalances"`
 }
+
+// ContractTransferLimit represents a contract transfer limit detail.
+type ContractTransferLimit struct {
+	WithdrawAvailableAmount          types.Number `json:"withdrawAvailableAmount"`
+	TransferAvailableAmount          types.Number `json:"transferAvailableAmount"`
+	ExperienceMoneyAvailableAmount   types.Number `json:"experienceMoneyAvailableAmount"`
+	ExperienceMoneyRecycledAmount    types.Number `json:"experienceMoneyRecycledAmount"`
+	WithdrawAvailableOriginAmount    types.Number `json:"withdrawAvailableOriginAmount"`
+	ExperienceMoneyNeedRecycleAmount types.Number `json:"experienceMoneyNeedRecycleAmount"`
+}
+
+// TradeHistory represents a trade history
+type TradeHistory struct {
+	Orders []struct {
+		ID                   string               `json:"id"`
+		ClientID             string               `json:"clientId"`
+		AccountID            string               `json:"accountId"`
+		Symbol               string               `json:"symbol"`
+		Side                 string               `json:"side"`
+		Price                types.Number         `json:"price"`
+		LimitFee             types.Number         `json:"limitFee"`
+		Fee                  types.Number         `json:"fee"`
+		TriggerPrice         types.Number         `json:"triggerPrice"`
+		TrailingPercent      types.Number         `json:"trailingPercent"`
+		Size                 types.Number         `json:"size"`
+		Type                 string               `json:"type"`
+		CreatedAt            convert.ExchangeTime `json:"createdAt"`
+		UpdatedTime          convert.ExchangeTime `json:"updatedTime"`
+		ExpiresAt            convert.ExchangeTime `json:"expiresAt"`
+		Status               string               `json:"status"`
+		TimeInForce          string               `json:"timeInForce"`
+		PostOnly             bool                 `json:"postOnly"`
+		ReduceOnly           bool                 `json:"reduceOnly"`
+		LatestMatchFillPrice string               `json:"latestMatchFillPrice"`
+		CumMatchFillSize     types.Number         `json:"cumMatchFillSize"`
+		CumMatchFillValue    types.Number         `json:"cumMatchFillValue"`
+		CumMatchFillFee      types.Number         `json:"cumMatchFillFee"`
+		CumSuccessFillSize   types.Number         `json:"cumSuccessFillSize"`
+		CumSuccessFillValue  types.Number         `json:"cumSuccessFillValue"`
+		CumSuccessFillFee    types.Number         `json:"cumSuccessFillFee"`
+	} `json:"orders"`
+	TotalSize int64 `json:"totalSize"`
+}
+
+// SymbolWorstPrice represents a worst price of a contract.
+type SymbolWorstPrice struct {
+	WorstPrice  types.Number `json:"worstPrice"`
+	BidOnePrice types.Number `json:"bidOnePrice"`
+	AskOnePrice types.Number `json:"askOnePrice"`
+}
+
+// OrderDetail represents an order detail.
+type OrderDetail struct {
+	ID                   string               `json:"id"`
+	ClientOrderID        string               `json:"clientOrderId"`
+	AccountID            string               `json:"accountId"`
+	Symbol               string               `json:"symbol"`
+	Side                 string               `json:"side"`
+	Price                types.Number         `json:"price"`
+	LimitFee             types.Number         `json:"limitFee"`
+	Fee                  types.Number         `json:"fee"`
+	TriggerPrice         types.Number         `json:"triggerPrice"`
+	TrailingPercent      string               `json:"trailingPercent"`
+	Size                 string               `json:"size"`
+	Type                 string               `json:"type"`
+	CreatedAt            convert.ExchangeTime `json:"createdAt"`
+	UpdatedTime          convert.ExchangeTime `json:"updatedTime"`
+	ExpiresAt            convert.ExchangeTime `json:"expiresAt"`
+	Status               string               `json:"status"`
+	TimeInForce          string               `json:"timeInForce"`
+	PostOnly             bool                 `json:"postOnly"`
+	ReduceOnly           bool                 `json:"reduceOnly"`
+	LatestMatchFillPrice types.Number         `json:"latestMatchFillPrice"`
+	CumMatchFillSize     types.Number         `json:"cumMatchFillSize"`
+	CumMatchFillValue    types.Number         `json:"cumMatchFillValue"`
+	CumMatchFillFee      types.Number         `json:"cumMatchFillFee"`
+	CumSuccessFillSize   types.Number         `json:"cumSuccessFillSize"`
+	CumSuccessFillValue  types.Number         `json:"cumSuccessFillValue"`
+	CumSuccessFillFee    types.Number         `json:"cumSuccessFillFee"`
+}
+
+// OrderHistoryResponse represents list of order.
+type OrderHistoryResponse struct {
+	Orders    []OrderDetail `json:"orders"`
+	TotalSize int64         `json:"totalSize"`
+}
+
+// FundingRateResponse represents a list of funding rates.
+type FundingRateResponse struct {
+	FundingValues []struct {
+		ID            string               `json:"id"`
+		Symbol        string               `json:"symbol"`
+		FundingValue  string               `json:"fundingValue"`
+		Rate          types.Number         `json:"rate"`
+		PositionSize  types.Number         `json:"positionSize"`
+		Price         types.Number         `json:"price"`
+		Side          string               `json:"side"`
+		Status        string               `json:"status"`
+		FundingTime   convert.ExchangeTime `json:"fundingTime"`
+		TransactionID string               `json:"transactionId"`
+	} `json:"fundingValues"`
+	TotalSize int64 `json:"totalSize"`
+}
+
+// PNLHistory represents positions profit and loss(PNL) history
+type PNLHistory struct {
+	HistoricalPnl []PNLDetail `json:"historicalPnl"`
+	TotalSize     int64       `json:"totalSize"`
+}
+
+// PNLDetail represents a profit and loss information of a symbol
+type PNLDetail struct {
+	Symbol       string               `json:"symbol"`
+	Size         types.Number         `json:"size"`
+	TotalPnl     types.Number         `json:"totalPnl"`
+	Price        types.Number         `json:"price"`
+	CreatedAt    convert.ExchangeTime `json:"createdAt"`
+	OrderType    string               `json:"type"`
+	IsLiquidate  bool                 `json:"isLiquidate"`
+	IsDeleverage bool                 `json:"isDeleverage"`
+}
+
+// AssetValueHistory represents a historical value of an asset.
+type AssetValueHistory struct {
+	HistoryValues []struct {
+		AccountTotalValue types.Number         `json:"accountTotalValue"`
+		DateTime          convert.ExchangeTime `json:"dateTime"`
+	} `json:"historyValues"`
+}

@@ -292,7 +292,7 @@
                 "requiresKey": true,
                 "requiresSecret": true,
                 "requiresClientID": true,
-                "requiresBase64DecodeSecret": true
+                "requiresBase64DecodeSecret": false
             }
         },
         "features": {
