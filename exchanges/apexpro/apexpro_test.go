@@ -21,17 +21,17 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey    = "0e5a88af-6daa-fceb-198b-8e1b2ceba8e3"
-	apiSecret = "4fbdz1O5IKl69uOnIVrQrjf8Bq_yRfvSYdWD5bB5"
-	clientID  = "3bqE1TqY-0dP7uncsatg"
+	apiKey    = ""
+	apiSecret = ""
+	clientID  = ""
 
-	starkKey            = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
-	starkSecret         = "0x074bcbe7f64f95e8d3f1afda4c338775702b4d1db3651fc70bad95a160b7f9ae"
-	starkKeyYCoordinate = "0x0207d57867e0820e0f7588339e8b7491ce1da964260044340e3fd27c718f2a91"
+	starkKey            = ""
+	starkSecret         = ""
+	starkKeyYCoordinate = ""
 
-	ethereumAddress = "0x0330eBB5e894720e6746070371F9Fd797BE9D074"
+	ethereumAddress = ""
 
-	canManipulateRealOrders = true
+	canManipulateRealOrders = false
 )
 
 var ap = &Apexpro{}
@@ -262,18 +262,32 @@ func TestWsConnect(t *testing.T) {
 
 func TestGenerateNonce(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GenerateNonce(context.Background(), starkKey, ethereumAddress, "9")
+	result, err := ap.GenerateNonceV3(context.Background(), starkKey, ethereumAddress, "9")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
 
+func TestGenerateNonceV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GenerateNonceV2(context.Background(), starkKey, ethereumAddress, "9")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
 func TestGetUsersData(t *testing.T) {
 	t.Parallel()
 	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GetUsersData(context.Background())
+	result, err := ap.GetUsersDataV3(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUsersDataV2GetUsersDataV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUsersDataV2(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -281,11 +295,32 @@ func TestGetUsersData(t *testing.T) {
 func TestEditUserData(t *testing.T) {
 	t.Parallel()
 	ap.Verbose = true
-	_, err := ap.EditUserData(context.Background(), &EditUserDataParams{})
+	_, err := ap.EditUserDataV3(context.Background(), &EditUserDataParams{})
 	require.ErrorIs(t, err, common.ErrNilPointer)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
-	result, err := ap.EditUserData(context.Background(), &EditUserDataParams{
+	result, err := ap.EditUserDataV3(context.Background(), &EditUserDataParams{
+		Email:                    "samuaeladnew@gmail.com",
+		UserData:                 "",
+		Username:                 "Thrasher",
+		IsSharingUsername:        true,
+		Country:                  "Ethiopia",
+		EmailNotifyGeneralEnable: true,
+		EmailNotifyTradingEnable: true,
+		EmailNotifyAccountEnable: true,
+		PopupNotifyTradingEnable: true,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+func TestEditUserDataV2(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	_, err := ap.EditUserDataV2(context.Background(), &EditUserDataParams{})
+	require.ErrorIs(t, err, common.ErrNilPointer)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.EditUserDataV2(context.Background(), &EditUserDataParams{
 		Email:                    "samuaeladnew@gmail.com",
 		UserData:                 "",
 		Username:                 "Thrasher",
@@ -304,7 +339,15 @@ func TestGetUserAccountData(t *testing.T) {
 	t.Parallel()
 	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GetUserAccountData(context.Background())
+	result, err := ap.GetUserAccountDataV3(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUserAccountDataV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserAccountDataV2(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -314,6 +357,56 @@ func TestGetUserAccountBalance(t *testing.T) {
 	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUserAccountBalance(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUserAccountBalanceV2(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserAccountBalanceV2(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUserTransferDataV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserTransferDataV2(context.Background(), currency.USDT, time.Now().Add(-time.Hour*50), time.Now(), "DEPOSIT", nil, 0, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetUserWithdrawalListV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserWithdrawalListV2(context.Background(), "WITHDRAWAL", time.Time{}, time.Time{}, 0, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetFastAndCrossChainWithdrawalFees(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	_, err := ap.GetFastAndCrossChainWithdrawalFees(context.Background(), 1, "1", currency.EMPTYCODE)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+	_, err = ap.GetFastAndCrossChainWithdrawalFees(context.Background(), 1, "", currency.BTC)
+	require.ErrorIs(t, err, errChainIDMissing)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetFastAndCrossChainWithdrawalFees(context.Background(), 1.32, "1", currency.USDC)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetAssetWithdrawalAndTransferLimit(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetAssetWithdrawalAndTransferLimit(context.Background(), currency.EMPTYCODE)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetAssetWithdrawalAndTransferLimit(context.Background(), currency.USDC)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -353,11 +446,38 @@ func TestGetTradeHistory(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-func TestGetWorstPricet(t *testing.T) {
+func TestGetTradeHistoryV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetTradeHistoryV2(context.Background(), "BTC-USD", order.Sell.String(), "LIMIT", currency.USDT, time.Time{}, time.Time{}, 0, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetWorstPrice(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetWorstPriceV3(context.Background(), "", "SELL", 1)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	_, err = ap.GetWorstPriceV3(context.Background(), "BTC-USDT", "", 1)
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	_, err = ap.GetWorstPriceV3(context.Background(), "BTC-USDT", "SELL", 0)
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+}
+
+func TestGetWorstPriceV3(t *testing.T) {
 	t.Parallel()
 	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GetWorstPrice(context.Background(), "BTC-USDT", "SELL", 1)
+	result, err := ap.GetWorstPriceV3(context.Background(), "BTC-USDT", "SELL", 1)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetWorstPriceV2(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetWorstPriceV2(context.Background(), "BTC-USDT", "SELL", 1)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -371,10 +491,27 @@ func TestCancelPerpOrder(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
+func TestCancelPerpOrderV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.CancelPerpOrderV2(context.Background(), "123231", currency.USDT)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func TestGetOpenOrders(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetOpenOrders(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetOpenOrdersV2(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetOpenOrdersV2(context.Background(), currency.USDC)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -388,6 +525,17 @@ func TestGetAllOrderHistory(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
+func TestGetAllOrderHistoryV2(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetAllOrderHistoryV2(context.Background(), currency.EMPTYCODE, "BTC-USDT", "SELL", "MARKET", "OPEN", "HISTORY", time.Time{}, time.Time{}, 0, 10)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetAllOrderHistoryV2(context.Background(), currency.USDT, "BTC-USDT", "SELL", "MARKET", "OPEN", "HISTORY", time.Time{}, time.Time{}, 0, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func TestGetOrderID(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetOrderID(context.Background(), "")
@@ -395,6 +543,31 @@ func TestGetOrderID(t *testing.T) {
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetOrderID(context.Background(), "12343")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSingleOrderV2(t *testing.T) {
+	t.Parallel()
+	_, err := ap.getSingleOrderV2(context.Background(), "", "", currency.USDT)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+	_, err = ap.getSingleOrderV2(context.Background(), "231232341", "", currency.EMPTYCODE)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+}
+
+func TestGetSingleOrderByOrderIDV2(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetSingleOrderByOrderIDV2(context.Background(), "231232341", currency.USDT)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSingleOrderByClientOrderIDV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetSingleOrderByClientOrderIDV2(context.Background(), "231232341", currency.USDT)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -414,7 +587,18 @@ func TestGetOrderClientOrderID(t *testing.T) {
 func TestGetFundingRate(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GetFundingRate(context.Background(), "BTC-USDT", "LONG", "", time.Now().Add(-time.Hour*50), time.Now(), 10, 10)
+	result, err := ap.GetFundingRateV3(context.Background(), "BTC-USDT", "LONG", "", time.Now().Add(-time.Hour*50), time.Now(), 10, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetFundingRateV2(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetFundingRateV2(context.Background(), currency.EMPTYCODE, "BTC-USDT", "LONG", "", time.Now().Add(-time.Hour*50), time.Now(), 10, 10)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetFundingRateV2(context.Background(), currency.USDT, "BTC-USDT", "LONG", "", time.Now().Add(-time.Hour*50), time.Now(), 10, 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -427,10 +611,32 @@ func TestGetUserHistorialProfitAndLoss(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
+func TestGetUserHistorialProfitAndLossV2(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetUserHistorialProfitAndLossV2(context.Background(), currency.EMPTYCODE, "BTC-USDT", "LONG", time.Time{}, time.Time{}, 0, 100)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetUserHistorialProfitAndLossV2(context.Background(), currency.USDT, "BTC-USDT", "LONG", time.Time{}, time.Time{}, 0, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func TestGetYesterdaysPNL(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetYesterdaysPNL(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetYesterdaysPNLV2(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetYesterdaysPNLV2(context.Background(), currency.EMPTYCODE)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetYesterdaysPNLV2(context.Background(), currency.USDC)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -443,9 +649,27 @@ func TestGetHistoricalAssetValue(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
+func TestGetHistoricalAssetValueV2(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetHistoricalAssetValueV2(context.Background(), currency.EMPTYCODE, time.Now().Add(-time.Hour*50), time.Now())
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetHistoricalAssetValueV2(context.Background(), currency.USDC, time.Now().Add(-time.Hour*50), time.Now())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func TestSetInitialMarginRateInfo(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	err := ap.SetInitialMarginRateInfo(context.Background(), "BTC-USDT", 200)
+	assert.NoError(t, err)
+}
+
+func TestSetInitialMarginRateInfoV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	err := ap.SetInitialMarginRateInfoV2(context.Background(), "BTC-USDT", 200)
 	assert.NoError(t, err)
 }

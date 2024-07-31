@@ -966,9 +966,39 @@ type UserAccountBalanceResponse struct {
 	} `json:"symbolToOraclePrice"`
 }
 
+// UserAccountBalanceV2Response represents a V2 user account balance information.
+type UserAccountBalanceV2Response struct {
+	USDTBalance *UserAccountBalanceResponse `json:"usdtBalance"`
+	USDCBalance *UserAccountBalanceResponse `json:"usdcBalance"`
+}
+
 // UserWithdrawals represents users withdrawals list.
 type UserWithdrawals struct {
 	Transfers []UserWithdrawal `json:"transfers"`
+}
+
+// UserWithdrawalsV2 represents users withdrawals list.
+type UserWithdrawalsV2 struct {
+	Transfers []UserWithdrawalV2 `json:"transfers"`
+}
+
+// UserWithdrawalV2 represents a user asset withdrawal info
+type UserWithdrawalV2 struct {
+	ID              string               `json:"id"`
+	Type            string               `json:"type"`
+	CurrencyID      string               `json:"currencyId"`
+	Amount          types.Number         `json:"amount"`
+	TransactionHash string               `json:"transactionHash"`
+	Status          string               `json:"status"`
+	CreatedAt       convert.ExchangeTime `json:"createdAt"`
+	UpdatedTime     convert.ExchangeTime `json:"updatedTime"`
+	ConfirmedAt     convert.ExchangeTime `json:"confirmedAt"`
+	ClientID        string               `json:"clientId"`
+	ConfirmedCount  int64                `json:"confirmedCount"`
+	RequiredCount   int64                `json:"requiredCount"`
+	OrderID         string               `json:"orderId"`
+	ChainID         string               `json:"chainId"`
+	Fee             types.Number         `json:"fee"`
 }
 
 // UserWithdrawal represents a user withdrawal information.
@@ -1039,35 +1069,38 @@ type ContractTransferLimit struct {
 
 // TradeHistory represents a trade history
 type TradeHistory struct {
-	Orders []struct {
-		ID                   string               `json:"id"`
-		ClientID             string               `json:"clientId"`
-		AccountID            string               `json:"accountId"`
-		Symbol               string               `json:"symbol"`
-		Side                 string               `json:"side"`
-		Price                types.Number         `json:"price"`
-		LimitFee             types.Number         `json:"limitFee"`
-		Fee                  types.Number         `json:"fee"`
-		TriggerPrice         types.Number         `json:"triggerPrice"`
-		TrailingPercent      types.Number         `json:"trailingPercent"`
-		Size                 types.Number         `json:"size"`
-		Type                 string               `json:"type"`
-		CreatedAt            convert.ExchangeTime `json:"createdAt"`
-		UpdatedTime          convert.ExchangeTime `json:"updatedTime"`
-		ExpiresAt            convert.ExchangeTime `json:"expiresAt"`
-		Status               string               `json:"status"`
-		TimeInForce          string               `json:"timeInForce"`
-		PostOnly             bool                 `json:"postOnly"`
-		ReduceOnly           bool                 `json:"reduceOnly"`
-		LatestMatchFillPrice string               `json:"latestMatchFillPrice"`
-		CumMatchFillSize     types.Number         `json:"cumMatchFillSize"`
-		CumMatchFillValue    types.Number         `json:"cumMatchFillValue"`
-		CumMatchFillFee      types.Number         `json:"cumMatchFillFee"`
-		CumSuccessFillSize   types.Number         `json:"cumSuccessFillSize"`
-		CumSuccessFillValue  types.Number         `json:"cumSuccessFillValue"`
-		CumSuccessFillFee    types.Number         `json:"cumSuccessFillFee"`
-	} `json:"orders"`
-	TotalSize int64 `json:"totalSize"`
+	Orders    []TradeFill `json:"orders"`
+	TotalSize int64       `json:"totalSize"`
+}
+
+// TradeFill  represents a trade fill information.
+type TradeFill struct {
+	ID                   string               `json:"id"`
+	ClientID             string               `json:"clientId"`
+	AccountID            string               `json:"accountId"`
+	Symbol               string               `json:"symbol"`
+	Side                 string               `json:"side"`
+	Price                types.Number         `json:"price"`
+	LimitFee             types.Number         `json:"limitFee"`
+	Fee                  types.Number         `json:"fee"`
+	TriggerPrice         types.Number         `json:"triggerPrice"`
+	TrailingPercent      types.Number         `json:"trailingPercent"`
+	Size                 types.Number         `json:"size"`
+	Type                 string               `json:"type"`
+	CreatedAt            convert.ExchangeTime `json:"createdAt"`
+	UpdatedTime          convert.ExchangeTime `json:"updatedTime"`
+	ExpiresAt            convert.ExchangeTime `json:"expiresAt"`
+	Status               string               `json:"status"`
+	TimeInForce          string               `json:"timeInForce"`
+	PostOnly             bool                 `json:"postOnly"`
+	ReduceOnly           bool                 `json:"reduceOnly"`
+	LatestMatchFillPrice string               `json:"latestMatchFillPrice"`
+	CumMatchFillSize     types.Number         `json:"cumMatchFillSize"`
+	CumMatchFillValue    types.Number         `json:"cumMatchFillValue"`
+	CumMatchFillFee      types.Number         `json:"cumMatchFillFee"`
+	CumSuccessFillSize   types.Number         `json:"cumSuccessFillSize"`
+	CumSuccessFillValue  types.Number         `json:"cumSuccessFillValue"`
+	CumSuccessFillFee    types.Number         `json:"cumSuccessFillFee"`
 }
 
 // SymbolWorstPrice represents a worst price of a contract.
@@ -1079,24 +1112,26 @@ type SymbolWorstPrice struct {
 
 // OrderDetail represents an order detail.
 type OrderDetail struct {
-	ID                   string               `json:"id"`
-	ClientOrderID        string               `json:"clientOrderId"`
-	AccountID            string               `json:"accountId"`
-	Symbol               string               `json:"symbol"`
-	Side                 string               `json:"side"`
-	Price                types.Number         `json:"price"`
+	ID              string               `json:"id"`
+	ClientOrderID   string               `json:"clientOrderId"`
+	AccountID       string               `json:"accountId"`
+	Symbol          string               `json:"symbol"`
+	Side            string               `json:"side"`
+	Price           types.Number         `json:"price"`
+	TriggerPrice    types.Number         `json:"triggerPrice"`
+	TrailingPercent string               `json:"trailingPercent"`
+	Size            string               `json:"size"`
+	Type            string               `json:"type"`
+	CreatedAt       convert.ExchangeTime `json:"createdAt"`
+	ExpiresAt       convert.ExchangeTime `json:"expiresAt"`
+	Status          string               `json:"status"`
+	TimeInForce     string               `json:"timeInForce"`
+	PostOnly        bool                 `json:"postOnly"`
+
+	// Included in the V3 API response.
 	LimitFee             types.Number         `json:"limitFee"`
 	Fee                  types.Number         `json:"fee"`
-	TriggerPrice         types.Number         `json:"triggerPrice"`
-	TrailingPercent      string               `json:"trailingPercent"`
-	Size                 string               `json:"size"`
-	Type                 string               `json:"type"`
-	CreatedAt            convert.ExchangeTime `json:"createdAt"`
 	UpdatedTime          convert.ExchangeTime `json:"updatedTime"`
-	ExpiresAt            convert.ExchangeTime `json:"expiresAt"`
-	Status               string               `json:"status"`
-	TimeInForce          string               `json:"timeInForce"`
-	PostOnly             bool                 `json:"postOnly"`
 	ReduceOnly           bool                 `json:"reduceOnly"`
 	LatestMatchFillPrice types.Number         `json:"latestMatchFillPrice"`
 	CumMatchFillSize     types.Number         `json:"cumMatchFillSize"`
@@ -1154,4 +1189,36 @@ type AssetValueHistory struct {
 		AccountTotalValue types.Number         `json:"accountTotalValue"`
 		DateTime          convert.ExchangeTime `json:"dateTime"`
 	} `json:"historyValues"`
+}
+
+// WithdrawalsV2 represents an asset withdrawal details
+type WithdrawalsV2 struct {
+	Transfers []struct {
+		ID              string               `json:"id"`
+		Type            string               `json:"type"`
+		CurrencyID      string               `json:"currencyId"`
+		Amount          types.Number         `json:"amount"`
+		TransactionHash string               `json:"transactionHash"`
+		Status          string               `json:"status"`
+		CreatedAt       convert.ExchangeTime `json:"createdAt"`
+		UpdatedTime     convert.ExchangeTime `json:"updatedTime"`
+		ConfirmedAt     convert.ExchangeTime `json:"confirmedAt"`
+		ClientID        string               `json:"clientId"`
+		OrderID         string               `json:"orderId"`
+		ChainID         string               `json:"chainId"`
+		Fee             types.Number         `json:"fee"`
+	} `json:"transfers"`
+	TotalSize int64 `json:"totalSize"`
+}
+
+// FastAndCrossChainWithdrawalFees represents a fast and cross-chain uncommon withdrawal fees
+type FastAndCrossChainWithdrawalFees struct {
+	Fee                 types.Number `json:"fee"`
+	PoolAvailableAmount types.Number `json:"poolAvailableAmount"`
+}
+
+// TransferAndWithdrawalLimit represents an asset transfer and withdrawal limit detail.
+type TransferAndWithdrawalLimit struct {
+	WithdrawAvailableAmount types.Number `json:"withdrawAvailableAmount"`
+	TransferAvailableAmount types.Number `json:"transferAvailableAmount"`
 }
