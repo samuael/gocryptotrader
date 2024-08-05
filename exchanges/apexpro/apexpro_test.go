@@ -22,9 +22,10 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey    = ""
-	apiSecret = ""
-	clientID  = ""
+	// Account ID: 603545650545558021
+	apiKey    = "bd722564-718d-7ac8-8838-fd436607abc3"
+	apiSecret = "6lMhERiSESGZEs7bDU39Iab6AG8-BQweaACSkEN5"
+	clientID  = "icKzZ0ZVqUrDZsX_-KfO"
 
 	starkKey            = ""
 	starkSecret         = ""

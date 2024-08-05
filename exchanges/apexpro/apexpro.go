@@ -1039,7 +1039,7 @@ func (ap *Apexpro) getHistoricalAssetValue(ctx context.Context, token, path stri
 		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
 	}
 	var resp *AssetValueHistory
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, path, request.UnAuth, params, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, ePath, http.MethodGet, path, request.UnAuth, params, &resp)
 }
 
 // SetInitialMarginRateInfo sets an initial margin rate
