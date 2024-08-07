@@ -236,9 +236,23 @@ func TestGetFundingHistoryRateV1(t *testing.T) {
 
 func TestGetAllConfigDataV2(t *testing.T) {
 	t.Parallel()
+	// ap.Verbose = true
 	result, err := ap.GetAllConfigDataV2(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, result)
+	for a := range result.Data.USDCConfig.Currency {
+		println("ID: ", result.Data.USDCConfig.Currency[a].ID)
+		println("StarkExAssetID: ", result.Data.USDCConfig.Currency[a].StarkExAssetID)
+		println("StarkExResolution: ", result.Data.USDCConfig.Currency[a].StarkExResolution)
+		break
+	}
+	for a := range result.Data.USDCConfig.PerpetualContract {
+		println("UnderlyingCurrencyID: ", result.Data.USDCConfig.PerpetualContract[a].UnderlyingCurrencyID)
+		println("SettleCurrencyID: ", result.Data.USDCConfig.PerpetualContract[a].SettleCurrencyID)
+		println("StarkExSyntheticAssetID: ", result.Data.USDCConfig.PerpetualContract[a].StarkExSyntheticAssetID)
+		// for b := range result.Data.
+		break
+	}
 }
 
 func TestGetCheckIfUserExistsV2(t *testing.T) {

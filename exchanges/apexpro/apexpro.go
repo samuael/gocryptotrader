@@ -20,12 +20,19 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
+	"github.com/thrasher-corp/gocryptotrader/internal/utils/starkex"
 	"github.com/thrasher-corp/gocryptotrader/types"
 )
 
 // Apexpro is the overarching type across this package
 type Apexpro struct {
 	exchange.Base
+
+	// SymbolsConfig represents all symbols configuration.
+	SymbolsConfig *AllSymbolsV1Config
+
+	StarkConfig       *starkex.StarkConfig
+	UserAccountDetail *UserAccountDetail
 }
 
 const (
@@ -80,7 +87,7 @@ func (ap *Apexpro) getSystemTime(ctx context.Context, path string) (time.Time, e
 // GetAllConfigDataV3 retrieves all symbols and asset configurations.
 func (ap *Apexpro) GetAllConfigDataV3(ctx context.Context) (*AllSymbolsConfigs, error) {
 	var resp *AllSymbolsConfigs
-	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, "v3/symbols", request.UnAuth, &resp, true)
+	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, "v3/symbols", request.UnAuth, &resp)
 }
 
 // Apexpro retrieves all symbols and asset configurations from the V1 API.
@@ -258,7 +265,7 @@ func (ap *Apexpro) getFundingHistoryRate(ctx context.Context, symbol, path strin
 // GetAllConfigDataV2 retrieves USDC and USDT config
 func (ap *Apexpro) GetAllConfigDataV2(ctx context.Context) (*V2ConfigData, error) {
 	var resp *V2ConfigData
-	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, "v2/symbols", request.UnAuth, &resp)
+	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, "v2/symbols", request.UnAuth, &resp, true)
 }
 
 // GetCheckIfUserExistsV2 checks existence of a persion using ther ethereum Address
@@ -679,6 +686,13 @@ func (ap *Apexpro) GetWorstPriceV2(ctx context.Context, symbol, side string, amo
 // GetWorstPriceV1 retrieves the worst market price from orderbook
 func (ap *Apexpro) GetWorstPriceV1(ctx context.Context, symbol, side string, amount float64) (*SymbolWorstPrice, error) {
 	return ap.getWorstPrice(ctx, symbol, side, "v1/get-worst-price", amount, exchange.RestSpot)
+}
+
+// CreateOrder creates a new order.
+func (ap *Apexpro) CreateOrder(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
+	params := url.Values{}
+	var resp *OrderDetail
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v3/order", request.UnAuth, params, &resp)
 }
 
 func (ap *Apexpro) getWorstPrice(ctx context.Context, symbol, side, path string, amount float64, ePath exchange.URL) (*SymbolWorstPrice, error) {

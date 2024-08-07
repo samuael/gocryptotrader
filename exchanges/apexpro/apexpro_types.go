@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
+	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/types"
 )
 
@@ -128,7 +129,7 @@ type AllSymbolsConfigs struct {
 			MaxPositionSize                  types.Number         `json:"maxPositionSize"`
 			MinOrderSize                     types.Number         `json:"minOrderSize"`
 			MaxMarketPriceRange              string               `json:"maxMarketPriceRange"`
-			SettleAssetID                    string               `json:"settleAssetId"`
+			SettleAssetID                    string               `json:"settleAssetId"` // Collateral asset ID.
 			BaseTokenID                      string               `json:"baseTokenId"`
 			StepSize                         types.Number         `json:"stepSize"`
 			Symbol                           string               `json:"symbol"`
@@ -287,19 +288,22 @@ type FundingRateHistory struct {
 	TotalSize int64 `json:"totalSize"`
 }
 
+// CurrencyInfo represents a currency detail.
+type CurrencyInfo struct {
+	ID                string       `json:"id"` // Settlement Currency ID.
+	StarkExAssetID    string       `json:"starkExAssetId"`
+	StarkExResolution string       `json:"starkExResolution"`
+	StepSize          types.Number `json:"stepSize"`
+	ShowStep          string       `json:"showStep"`
+	IconURL           string       `json:"iconUrl"`
+}
+
 // V2ConfigData v2 assets and symbols configuration response.
 type V2ConfigData struct {
 	Data struct {
-		UsdcConfig struct {
-			Currency []struct {
-				ID                string `json:"id"`
-				StarkExAssetID    string `json:"starkExAssetId"`
-				StarkExResolution string `json:"starkExResolution"`
-				StepSize          string `json:"stepSize"`
-				ShowStep          string `json:"showStep"`
-				IconURL           string `json:"iconUrl"`
-			} `json:"currency"`
-			Global struct {
+		USDCConfig struct {
+			Currency []CurrencyInfo `json:"currency"`
+			Global   struct {
 				FeeAccountID                    string `json:"feeAccountId"`
 				FeeAccountL2Key                 string `json:"feeAccountL2Key"`
 				StarkExCollateralCurrencyID     string `json:"starkExCollateralCurrencyId"`
@@ -324,6 +328,7 @@ type V2ConfigData struct {
 				ExperienceMoneyL2Key            string `json:"experienceMoneyL2Key"`
 			} `json:"global"`
 			PerpetualContract []struct {
+				Symbol                           string               `json:"symbol"`
 				BaselinePositionValue            string               `json:"baselinePositionValue"`
 				CrossID                          int                  `json:"crossId"`
 				CrossSymbolID                    int                  `json:"crossSymbolId"`
@@ -351,7 +356,6 @@ type V2ConfigData struct {
 				StarkExRiskFactor                string               `json:"starkExRiskFactor"`
 				StarkExSyntheticAssetID          string               `json:"starkExSyntheticAssetId"`
 				StepSize                         string               `json:"stepSize"`
-				Symbol                           string               `json:"symbol"`
 				SymbolDisplayName                string               `json:"symbolDisplayName"`
 				SymbolDisplayName2               string               `json:"symbolDisplayName2"`
 				TickSize                         string               `json:"tickSize"`
@@ -404,16 +408,9 @@ type V2ConfigData struct {
 			} `json:"multiChain"`
 			DepositFromBybit bool `json:"depositFromBybit"`
 		} `json:"usdcConfig"`
-		UsdtConfig struct {
-			Currency []struct {
-				ID                string       `json:"id"`
-				StarkExAssetID    string       `json:"starkExAssetId"`
-				StarkExResolution string       `json:"starkExResolution"`
-				StepSize          types.Number `json:"stepSize"`
-				ShowStep          string       `json:"showStep"`
-				IconURL           string       `json:"iconUrl"`
-			} `json:"currency"`
-			Global struct {
+		USDTConfig struct {
+			Currency []CurrencyInfo `json:"currency"`
+			Global   struct {
 				FeeAccountID                    string `json:"feeAccountId"`
 				FeeAccountL2Key                 string `json:"feeAccountL2Key"`
 				StarkExCollateralCurrencyID     string `json:"starkExCollateralCurrencyId"`
@@ -521,18 +518,21 @@ type V2ConfigData struct {
 	TimeCost int64 `json:"timeCost"`
 }
 
+// V1CurrencyConfig represents a V1 currency configuration.
+type V1CurrencyConfig struct {
+	ID                string       `json:"id"`
+	StarkExAssetID    string       `json:"starkExAssetId"`
+	StarkExResolution string       `json:"starkExResolution"`
+	StepSize          types.Number `json:"stepSize"`
+	ShowStep          string       `json:"showStep"`
+	IconURL           string       `json:"iconUrl"`
+}
+
 // AllSymbolsV1Config represents a configuration information
 type AllSymbolsV1Config struct {
 	Data struct {
-		Currency []struct {
-			ID                string       `json:"id"`
-			StarkExAssetID    string       `json:"starkExAssetId"`
-			StarkExResolution string       `json:"starkExResolution"`
-			StepSize          types.Number `json:"stepSize"`
-			ShowStep          string       `json:"showStep"`
-			IconURL           string       `json:"iconUrl"`
-		} `json:"currency"`
-		Global struct {
+		Currency []V1CurrencyConfig `json:"currency"`
+		Global   struct {
 			FeeAccountID                    string       `json:"feeAccountId"`
 			FeeAccountL2Key                 string       `json:"feeAccountL2Key"`
 			StarkExCollateralCurrencyID     string       `json:"starkExCollateralCurrencyId"`
@@ -550,42 +550,8 @@ type AllSymbolsV1Config struct {
 			FastWithdrawL2Key               string       `json:"fastWithdrawL2Key"`
 			FastWithdrawMaxAmount           string       `json:"fastWithdrawMaxAmount"`
 		} `json:"global"`
-		PerpetualContract []struct {
-			BaselinePositionValue            string       `json:"baselinePositionValue"`
-			CrossID                          int64        `json:"crossId"`
-			CrossSymbolID                    int64        `json:"crossSymbolId"`
-			CrossSymbolName                  string       `json:"crossSymbolName"`
-			DigitMerge                       string       `json:"digitMerge"`
-			DisplayMaxLeverage               types.Number `json:"displayMaxLeverage"`
-			DisplayMinLeverage               types.Number `json:"displayMinLeverage"`
-			EnableDisplay                    bool         `json:"enableDisplay"`
-			EnableOpenPosition               bool         `json:"enableOpenPosition"`
-			EnableTrade                      bool         `json:"enableTrade"`
-			FundingImpactMarginNotional      string       `json:"fundingImpactMarginNotional"`
-			FundingInterestRate              types.Number `json:"fundingInterestRate"`
-			IncrementalInitialMarginRate     types.Number `json:"incrementalInitialMarginRate"`
-			IncrementalMaintenanceMarginRate string       `json:"incrementalMaintenanceMarginRate"`
-			IncrementalPositionValue         string       `json:"incrementalPositionValue"`
-			InitialMarginRate                string       `json:"initialMarginRate"`
-			MaintenanceMarginRate            string       `json:"maintenanceMarginRate"`
-			MaxOrderSize                     string       `json:"maxOrderSize"`
-			MaxPositionSize                  string       `json:"maxPositionSize"`
-			MinOrderSize                     string       `json:"minOrderSize"`
-			MaxMarketPriceRange              string       `json:"maxMarketPriceRange"`
-			SettleCurrencyID                 string       `json:"settleCurrencyId"`
-			StarkExOraclePriceQuorum         string       `json:"starkExOraclePriceQuorum"`
-			StarkExResolution                string       `json:"starkExResolution"`
-			StarkExRiskFactor                string       `json:"starkExRiskFactor"`
-			StarkExSyntheticAssetID          string       `json:"starkExSyntheticAssetId"`
-			StepSize                         string       `json:"stepSize"`
-			Symbol                           string       `json:"symbol"`
-			SymbolDisplayName                string       `json:"symbolDisplayName"`
-			TickSize                         types.Number `json:"tickSize"`
-			UnderlyingCurrencyID             string       `json:"underlyingCurrencyId"`
-			MaxMaintenanceMarginRate         types.Number `json:"maxMaintenanceMarginRate"`
-			MaxPositionValue                 types.Number `json:"maxPositionValue"`
-		} `json:"perpetualContract"`
-		MultiChain struct {
+		PerpetualContract []PerpetualContractDetail `json:"perpetualContract"`
+		MultiChain        struct {
 			Chains []struct {
 				Chain             string       `json:"chain"`
 				ChainID           int64        `json:"chainId"`
@@ -616,6 +582,43 @@ type AllSymbolsV1Config struct {
 		} `json:"multiChain"`
 	} `json:"data"`
 	TimeCost int64 `json:"timeCost"`
+}
+
+// PerpetualContractDetail represents a perpetual contract detail.
+type PerpetualContractDetail struct {
+	BaselinePositionValue            string       `json:"baselinePositionValue"`
+	CrossID                          int64        `json:"crossId"`
+	CrossSymbolID                    int64        `json:"crossSymbolId"`
+	CrossSymbolName                  string       `json:"crossSymbolName"`
+	DigitMerge                       string       `json:"digitMerge"`
+	DisplayMaxLeverage               types.Number `json:"displayMaxLeverage"`
+	DisplayMinLeverage               types.Number `json:"displayMinLeverage"`
+	EnableDisplay                    bool         `json:"enableDisplay"`
+	EnableOpenPosition               bool         `json:"enableOpenPosition"`
+	EnableTrade                      bool         `json:"enableTrade"`
+	FundingImpactMarginNotional      string       `json:"fundingImpactMarginNotional"`
+	FundingInterestRate              types.Number `json:"fundingInterestRate"`
+	IncrementalInitialMarginRate     types.Number `json:"incrementalInitialMarginRate"`
+	IncrementalMaintenanceMarginRate string       `json:"incrementalMaintenanceMarginRate"`
+	IncrementalPositionValue         string       `json:"incrementalPositionValue"`
+	InitialMarginRate                string       `json:"initialMarginRate"`
+	MaintenanceMarginRate            string       `json:"maintenanceMarginRate"`
+	MaxOrderSize                     string       `json:"maxOrderSize"`
+	MaxPositionSize                  string       `json:"maxPositionSize"`
+	MinOrderSize                     string       `json:"minOrderSize"`
+	MaxMarketPriceRange              string       `json:"maxMarketPriceRange"`
+	SettleCurrencyID                 string       `json:"settleCurrencyId"`
+	StarkExOraclePriceQuorum         string       `json:"starkExOraclePriceQuorum"`
+	StarkExResolution                string       `json:"starkExResolution"`
+	StarkExRiskFactor                string       `json:"starkExRiskFactor"`
+	StarkExSyntheticAssetID          string       `json:"starkExSyntheticAssetId"`
+	StepSize                         string       `json:"stepSize"`
+	Symbol                           string       `json:"symbol"`
+	SymbolDisplayName                string       `json:"symbolDisplayName"`
+	TickSize                         types.Number `json:"tickSize"`
+	UnderlyingCurrencyID             string       `json:"underlyingCurrencyId"`
+	MaxMaintenanceMarginRate         types.Number `json:"maxMaintenanceMarginRate"`
+	MaxPositionValue                 types.Number `json:"maxPositionValue"`
 }
 
 // NonceResponse represents a nonce response.
@@ -879,7 +882,7 @@ type UserDataResponse struct {
 type UserAccountDetail struct {
 	EthereumAddress string `json:"ethereumAddress"`
 	L2Key           string `json:"l2Key"`
-	ID              string `json:"id"`
+	ID              string `json:"id"` // position ID or account ID
 	Version         string `json:"version"`
 	SpotAccount     struct {
 		CreatedAt            convert.ExchangeTime `json:"createdAt"`
@@ -1269,4 +1272,20 @@ type FastAndCrossChainWithdrawalFees struct {
 type TransferAndWithdrawalLimit struct {
 	WithdrawAvailableAmount types.Number `json:"withdrawAvailableAmount"`
 	TransferAvailableAmount types.Number `json:"transferAvailableAmount"`
+}
+
+// CreateOrderParams represents a request parameter for creating order.
+type CreateOrderParams struct {
+	Symbol          currency.Pair
+	Side            string
+	OrderType       string
+	Size            float64
+	Price           float64
+	LimitFee        float64
+	ExpirationTime  time.Time
+	TimeInForce     string
+	TriggerPrice    float64
+	TrailingPercent float64
+	ClientOrderID   int64
+	ReduceOnly      bool
 }

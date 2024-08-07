@@ -13,20 +13,6 @@ type WithdrawalToAddressParams struct {
 	ExpirationTimestamp int64    `json:"expiration_timestamp"`
 }
 
-// CreateOrderWithFeeParams represents a starkex create order parameters. Type value: 3
-type CreateOrderWithFeeParams struct {
-	IsBuyingSynthetic uint64   `json:"is_buying_synthetic"`
-	AssetIDSynthetic  *big.Int `json:"asset_id_synthetic"`
-	AssetIDCollateral *big.Int `json:"asset_id_collateral"`
-	AssetIDFee        *big.Int `json:"asset_id_fee"`
-	AmountSynthetic   uint64   `json:"amount_synthetic"`
-	AmountCollateral  uint64   `json:"amount_collateral"`
-	MaxAmountFee      uint64   `json:"max_amount_fee"`
-	PositionID        uint64   `json:"position_id"`
-	Nonce             uint32   `json:"nonce"`
-	ExpTimestampHrs   uint32   `json:"expiration_timestamp"`
-}
-
 // TransferParams represents a starkex asset transfer parameters. Type value: 4
 type TransferParams struct {
 	AssetID            *big.Int `json:"asset_id"`
@@ -54,4 +40,19 @@ type ConditionalTransferParams struct {
 	MaxAmountFee       uint64   `json:"max_amount_fee"`
 	Nonce              uint32   `json:"nonce"`
 	ExpTimestampHrs    uint32   `json:"expiration_timestamp"`
+}
+
+// CreateOrderWithFeeParams represents a starkex create order parameters. Order Prefix: 3
+type CreateOrderWithFeeParams struct {
+	OrderType               string   `json:"order_type"`
+	AssetIdSynthetic        *big.Int `json:"asset_id_synthetic"`
+	AssetIdCollateral       *big.Int `json:"asset_id_collateral"`
+	AssetIdFee              *big.Int `json:"asset_id_fee"`
+	QuantumAmountSynthetic  *big.Int `json:"quantum_amount_synthetic"`
+	QuantumAmountCollateral *big.Int `json:"quantum_amount_collateral"`
+	QuantumAmountFee        *big.Int `json:"quantum_amount_fee"`
+	IsBuyingSynthetic       bool     `json:"is_buying_synthetic"`
+	PositionId              *big.Int `json:"position_id"` // Users Account ID
+	Nonce                   *big.Int `json:"nonce"`
+	ExpirationEpochHours    *big.Int `json:"expiration_epoch_hours"`
 }

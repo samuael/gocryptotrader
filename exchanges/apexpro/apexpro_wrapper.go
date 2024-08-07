@@ -22,6 +22,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
+	"github.com/thrasher-corp/gocryptotrader/internal/utils/starkex"
 	"github.com/thrasher-corp/gocryptotrader/log"
 	"github.com/thrasher-corp/gocryptotrader/portfolio/withdraw"
 )
@@ -43,7 +44,13 @@ func (ap *Apexpro) SetDefaults() {
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
-
+	ap.StarkConfig, err = starkex.NewStarkExConfig(ap.Name)
+	if err != nil {
+		println("\n\n\n Config Download Error\n\n\n", err.Error())
+		log.Errorln(log.ExchangeSys, err)
+	} else {
+		println("\n\n\n Config Donloaded Succesfully\n\n\n")
+	}
 	ap.Features = exchange.Features{
 		Supports: exchange.FeaturesSupported{
 			REST:      true,
@@ -142,16 +149,19 @@ func (ap *Apexpro) FetchTradablePairs(ctx context.Context, a asset.Item) (curren
 	if !ap.SupportsAsset(a) {
 		return nil, fmt.Errorf("%w %v", asset.ErrNotSupported, a)
 	}
-	configs, err := ap.GetAllConfigDataV3(ctx)
+	configs, err := ap.GetAllConfigDataV1(ctx)
 	if err != nil {
 		return nil, err
 	}
-	tradablePairs := make(currency.Pairs, 0, len((configs.ContractConfig.PerpetualContract)))
-	for a := range configs.ContractConfig.PerpetualContract {
-		if !configs.ContractConfig.PerpetualContract[a].EnableTrade {
+	// Storing the configuration values for later use.
+	ap.SymbolsConfig = configs
+
+	tradablePairs := make(currency.Pairs, 0, len((configs.Data.PerpetualContract)))
+	for a := range configs.Data.PerpetualContract {
+		if !configs.Data.PerpetualContract[a].EnableTrade {
 			continue
 		}
-		cp, err := currency.NewPairFromString(configs.ContractConfig.PerpetualContract[a].Symbol)
+		cp, err := currency.NewPairFromString(configs.Data.PerpetualContract[a].Symbol)
 		if err != nil {
 			return nil, err
 		}
