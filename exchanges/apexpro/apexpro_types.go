@@ -882,7 +882,7 @@ type UserDataResponse struct {
 type UserAccountDetail struct {
 	EthereumAddress string `json:"ethereumAddress"`
 	L2Key           string `json:"l2Key"`
-	ID              string `json:"id"` // position ID or account ID
+	ID              string `json:"id,string"` // position ID or account ID
 	Version         string `json:"version"`
 	SpotAccount     struct {
 		CreatedAt            convert.ExchangeTime `json:"createdAt"`
@@ -1282,6 +1282,7 @@ type CreateOrderParams struct {
 	Size            float64
 	Price           float64
 	LimitFee        float64
+	Nonce           string
 	ExpirationTime  time.Time
 	TimeInForce     string
 	TriggerPrice    float64
