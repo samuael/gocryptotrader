@@ -2,6 +2,7 @@ package starkex
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -55,9 +56,10 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string) (string, erro
 
 // ECDSAHash generates an ECDSA signature given the private key and pedersen signed hash
 func (sfg *StarkConfig) ECDSAHash(message, starkPrivateKey string) (*big.Int, *big.Int, error) {
+	starkPrivateKey = strings.TrimPrefix(starkPrivateKey, "0x")
 	priKey, okay := new(big.Int).SetString(starkPrivateKey, 16)
 	if !okay {
-		return nil, nil, ErrInvalidPrivateKey
+		return nil, nil, fmt.Errorf("%w, %v", ErrInvalidPrivateKey, starkPrivateKey)
 	}
 	msgHash, okay := new(big.Int).SetString(message, 10)
 	if !okay {

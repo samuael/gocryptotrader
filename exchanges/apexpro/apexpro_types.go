@@ -882,7 +882,7 @@ type UserDataResponse struct {
 type UserAccountDetail struct {
 	EthereumAddress string `json:"ethereumAddress"`
 	L2Key           string `json:"l2Key"`
-	ID              string `json:"id,string"` // position ID or account ID
+	ID              string `json:"id"` // position ID or account ID
 	Version         string `json:"version"`
 	SpotAccount     struct {
 		CreatedAt            convert.ExchangeTime `json:"createdAt"`
@@ -1080,10 +1080,10 @@ type AssetWithdrawalParams struct {
 	SubAccountID     string
 	L2Key            string
 	ToChainID        string
-	L2SourceTokenID  string
-	L1TargetTokenID  string
+	L2SourceTokenID  currency.Code // L2 currency(Token ID). Eg. 'USDT' or 'USDC'
+	L1TargetTokenID  currency.Code // L1 currency(Token ID). Eg. 'USDT' or 'USDC'
 	Fee              float64
-	Nonce            int64
+	Nonce            string
 	IsFastWithdraw   bool
 }
 
@@ -1289,4 +1289,12 @@ type CreateOrderParams struct {
 	TrailingPercent float64
 	ClientOrderID   int64
 	ReduceOnly      bool
+}
+
+// WithdrawalParams represents an asset withdrawal parameters
+type WithdrawalParams struct {
+	Amount         float64
+	ClientID       string
+	ExpirationTime time.Time
+	Asset          currency.Code
 }

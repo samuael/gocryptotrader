@@ -149,7 +149,7 @@ func (ap *Apexpro) FetchTradablePairs(ctx context.Context, a asset.Item) (curren
 	if !ap.SupportsAsset(a) {
 		return nil, fmt.Errorf("%w %v", asset.ErrNotSupported, a)
 	}
-	configs, err := ap.GetAllConfigDataV1(ctx)
+	configs, err := ap.GetAllSymbolsConfigDataV1(ctx)
 	if err != nil {
 		return nil, err
 	}

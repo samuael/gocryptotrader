@@ -42,6 +42,39 @@ func (s *CreateOrderWithFeeParams) GetPedersenHash(pedersenHash func(...string) 
 	// pedersen hash
 	assetHash := pedersenHash(pedersenHash(assetIdSell.String(), assetIdBuy.String()), s.AssetIdFee.String())
 	part1Hash := pedersenHash(assetHash, part1.String())
-	part2Hash := pedersenHash(part1Hash, part2.String())
-	return part2Hash, nil
+	return pedersenHash(part1Hash, part2.String()), nil
+}
+
+// GetPedersenHash implements the Signable interface and generates a pedersen hash of WithdrawalToAddressParams
+func (s *WithdrawalToAddressParams) GetPedersenHash(pedersenHash func(...string) string) (string, error) {
+	// packed
+	packed := big.NewInt(WITHDRAWAL_TO_ADDRESS_PREFIX)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["position_id"])
+	packed.Add(packed, s.PositionID)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["nonce"])
+	packed.Add(packed, s.Nonce)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["quantums_amount"])
+	packed.Add(packed, s.Amount)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["expiration_epoch_hours"])
+	packed.Add(packed, s.ExpirationEpochHours)
+	packed.Lsh(packed, WITHDRAWAL_PADDING_BITS)
+	// pedersen hash
+	return pedersenHash(pedersenHash(s.AssetIDCollateral.String(), s.EthAddress.String()), packed.String()), nil
+}
+
+// GetPedersenHash implements the Signable interface and generates a pedersen hash of WithdrawalParams
+func (s *WithdrawalParams) GetPedersenHash(pedersenHash func(...string) string) (string, error) {
+	// packed
+	packed := big.NewInt(WITHDRAWAL_PREFIX)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["position_id"])
+	packed.Add(packed, s.PositionID)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["nonce"])
+	packed.Add(packed, s.Nonce)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["quantums_amount"])
+	packed.Add(packed, s.Amount)
+	packed.Lsh(packed, WITHDRAWAL_FIELD_BIT_LENGTHS["expiration_epoch_hours"])
+	packed.Add(packed, s.ExpirationEpochHours)
+	packed.Lsh(packed, WITHDRAWAL_PADDING_BITS)
+	// pedersen hash
+	return pedersenHash(s.AssetIDCollateral.String(), packed.String()), nil
 }

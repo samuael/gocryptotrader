@@ -2,17 +2,6 @@ package starkex
 
 import "math/big"
 
-// WithdrawalToAddressParams represents a starkex withdrawal to address parameters. Type value: 7.
-type WithdrawalToAddressParams struct {
-	NetworkID           int      `json:"-"`
-	AssetIDCollateral   *big.Int `json:"asset_id_collateral"`
-	EthAddress          *big.Int `json:"eth_address"`
-	PositionID          uint64   `json:"position_id"`
-	Amount              float64  `json:"amount"`
-	Nonce               uint32   `json:"nonce"`
-	ExpirationTimestamp int64    `json:"expiration_timestamp"`
-}
-
 // TransferParams represents a starkex asset transfer parameters. Type value: 4
 type TransferParams struct {
 	AssetID            *big.Int `json:"asset_id"`
@@ -44,15 +33,36 @@ type ConditionalTransferParams struct {
 
 // CreateOrderWithFeeParams represents a starkex create order parameters. Order Prefix: 3
 type CreateOrderWithFeeParams struct {
-	OrderType               string   `json:"order_type"`
-	AssetIdSynthetic        *big.Int `json:"asset_id_synthetic"`
-	AssetIdCollateral       *big.Int `json:"asset_id_collateral"`
-	AssetIdFee              *big.Int `json:"asset_id_fee"`
-	QuantumAmountSynthetic  *big.Int `json:"quantum_amount_synthetic"`
-	QuantumAmountCollateral *big.Int `json:"quantum_amount_collateral"`
-	QuantumAmountFee        *big.Int `json:"quantum_amount_fee"`
-	IsBuyingSynthetic       bool     `json:"is_buying_synthetic"`
-	PositionId              *big.Int `json:"position_id"` // Users Account ID
-	Nonce                   *big.Int `json:"nonce"`
-	ExpirationEpochHours    *big.Int `json:"expiration_epoch_hours"`
+	OrderType               string
+	AssetIdSynthetic        *big.Int
+	AssetIdCollateral       *big.Int
+	AssetIdFee              *big.Int
+	QuantumAmountSynthetic  *big.Int
+	QuantumAmountCollateral *big.Int
+	QuantumAmountFee        *big.Int
+	IsBuyingSynthetic       bool
+	PositionId              *big.Int // Users Account ID
+	Nonce                   *big.Int
+	ExpirationEpochHours    *big.Int
+}
+
+// WithdrawalToAddressParams represents a starkex withdrawal to address parameters. Type value: 7.
+type WithdrawalToAddressParams struct {
+	NetworkID            int64    `json:"-"`
+	AssetIDCollateral    *big.Int `json:"asset_id_collateral"`
+	EthAddress           *big.Int `json:"eth_address"`
+	PositionID           *big.Int `json:"position_id"`
+	Amount               *big.Int `json:"amount"`
+	Nonce                *big.Int `json:"nonce"`
+	ExpirationEpochHours *big.Int `json:"expiration_timestamp"`
+}
+
+// WithdrawalParams represents a starkex withdrawal parameters. Type value: 6.
+type WithdrawalParams struct {
+	NetworkID            int64    `json:"-"`
+	AssetIDCollateral    *big.Int `json:"asset_id_collateral"`
+	PositionID           *big.Int `json:"position_id"`
+	Amount               *big.Int `json:"amount"`
+	Nonce                *big.Int `json:"nonce"`
+	ExpirationEpochHours *big.Int `json:"expiration_timestamp"`
 }

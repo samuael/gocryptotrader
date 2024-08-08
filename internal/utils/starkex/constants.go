@@ -7,6 +7,7 @@ const (
 	ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS = 24 * 7 // Seven days.
 	ORDER_PREFIX                            = 3
 	CONDITIONAL_TRANSFER_PREFIX             = 5
+	WITHDRAWAL_TO_ADDRESS_PREFIX            = 7
 	WITHDRAWAL_PREFIX                       = 6
 
 	ORDER_PADDING_BITS                = 17

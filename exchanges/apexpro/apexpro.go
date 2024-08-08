@@ -49,6 +49,7 @@ const (
 var (
 	errL2KeyMissing                  = errors.New("l2 Key is required")
 	errEthereumAddressMissing        = errors.New("ethereum address is missing")
+	errInvalidEthereumAddress        = errors.New("invalid ethereum address")
 	errChainIDMissing                = errors.New("chain ID is missing")
 	errOrderbookLevelIsRequired      = errors.New("orderbook level is required")
 	errInvalidTimestamp              = errors.New("err invalid timestamp")
@@ -58,6 +59,7 @@ var (
 	errInitialMarginRateRequired     = errors.New("initial margin rate required")
 	errUserIDRequired                = errors.New("user ID is required")
 	errDeviceTypeIsRequired          = errors.New("device type is required")
+	errLimitFeeRequired              = errors.New("limit fee is required")
 )
 
 // Start implementing public and private exchange API funcs below
@@ -91,7 +93,7 @@ func (ap *Apexpro) GetAllConfigDataV3(ctx context.Context) (*AllSymbolsConfigs, 
 }
 
 // Apexpro retrieves all symbols and asset configurations from the V1 API.
-func (ap *Apexpro) GetAllConfigDataV1(ctx context.Context) (*AllSymbolsV1Config, error) {
+func (ap *Apexpro) GetAllSymbolsConfigDataV1(ctx context.Context) (*AllSymbolsV1Config, error) {
 	var resp *AllSymbolsV1Config
 	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, "v1/symbols", request.UnAuth, &resp, true)
 }
@@ -690,7 +692,54 @@ func (ap *Apexpro) GetWorstPriceV1(ctx context.Context, symbol, side string, amo
 
 // CreateOrder creates a new order.
 func (ap *Apexpro) CreateOrder(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
+	if arg.Symbol.IsEmpty() {
+		return nil, currency.ErrSymbolStringEmpty
+	}
+	if arg.Side == "" {
+		return nil, order.ErrSideIsInvalid
+	}
+	if arg.OrderType == "" {
+		return nil, order.ErrTypeIsInvalid
+	}
+	if arg.Size <= 0 {
+		return nil, order.ErrAmountBelowMin
+	}
+	if arg.Price <= 0 {
+		return nil, order.ErrPriceBelowMin
+	}
+	if arg.LimitFee < 0 {
+		return nil, errLimitFeeRequired
+	}
+	if arg.ExpirationTime.IsZero() {
+		return nil, errExpirationTimeRequired
+	}
+	signature, err := ap.ProcessOrderSignature(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
 	params := url.Values{}
+	params.Set("symbol", arg.Symbol.String())
+	params.Set("side", arg.Side)
+	params.Set("type", arg.OrderType)
+	params.Set("size", strconv.FormatFloat(arg.Size, 'f', -1, 64))
+	params.Set("price", strconv.FormatFloat(arg.Price, 'f', -1, 64))
+	params.Set("limitFee", strconv.FormatFloat(arg.LimitFee, 'f', -1, 64))
+	params.Set("expiration", strconv.FormatInt(arg.ExpirationTime.UnixMilli(), 10))
+	if signature != "" {
+		params.Set("signature", signature)
+	}
+	if arg.TimeInForce != "" {
+		params.Set("timeInForce", arg.TimeInForce)
+	}
+	if arg.TriggerPrice > 0 {
+		params.Set("triggerPrice", strconv.FormatFloat(arg.TriggerPrice, 'f', -1, 64))
+	}
+	if arg.TrailingPercent > 0 {
+		params.Set("trailingPercent", strconv.FormatFloat(arg.TrailingPercent, 'f', -1, 64))
+	}
+	if arg.ClientOrderID != 0 {
+		params.Set("clientOrderId", strconv.FormatInt(arg.ClientOrderID, 10))
+	}
 	var resp *OrderDetail
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v3/order", request.UnAuth, params, &resp)
 }
@@ -714,14 +763,32 @@ func (ap *Apexpro) getWorstPrice(ctx context.Context, symbol, side, path string,
 }
 
 // CancelPerpOrder cancels a perpetual contract order cancellation.
-func (ap *Apexpro) CancelPerpOrder(ctx context.Context, id string) (types.Number, error) {
+func (ap *Apexpro) CancelPerpOrder(ctx context.Context, orderID string) (types.Number, error) {
+	return ap.cancelOrderByID(ctx, orderID, "v3/delete-order")
+}
+
+// CancelPerpOrderByClientOrderID cancels a perpetual contract order by client order ID.
+func (ap *Apexpro) CancelPerpOrderByClientOrderID(ctx context.Context, clientOrderID string) (types.Number, error) {
+	return ap.cancelOrderByID(ctx, clientOrderID, "v3/delete-client-order-id")
+}
+
+func (ap *Apexpro) cancelOrderByID(ctx context.Context, id, path string) (types.Number, error) {
 	if id == "" {
 		return 0, order.ErrOrderIDNotSet
 	}
 	params := url.Values{}
 	params.Set("id", id)
 	var resp types.Number
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/delete-order", request.UnAuth, params, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, &resp)
+}
+
+// CancelAllOpenOrdersV3 cancels all open orders
+func (ap *Apexpro) CancelAllOpenOrdersV3(ctx context.Context, symbols []string) error {
+	params := url.Values{}
+	if len(symbols) > 0 {
+		params.Set("symbol", strings.Join(symbols, ","))
+	}
+	return ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v3/delete-open-orders", request.UnAuth, params, nil)
 }
 
 // CancelPerpOrderV2 cancels a perpetual contract futures order.
@@ -1090,7 +1157,6 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 	if err != nil {
 		return nil, err
 	}
-	params := url.Values{}
 	if arg.Amount <= 0 {
 		return nil, order.ErrAmountBelowMin
 	}
@@ -1105,12 +1171,6 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 	} else if arg.EthereumAddress == "" {
 		arg.EthereumAddress = creds.SubAccount
 	}
-	if arg.ZKAccountID == "" {
-		return nil, errZeroKnowledgeAccountIDMissing
-	}
-	if arg.SubAccountID == "" {
-		return nil, errSubAccountIDMissing
-	}
 	if arg.L2Key == "" && creds.L2Key == "" {
 		return nil, errL2KeyMissing
 	} else if arg.L2Key == "" {
@@ -1119,37 +1179,73 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 	if arg.ToChainID == "" {
 		return nil, fmt.Errorf("%w, toChainID is required", errChainIDMissing)
 	}
-	if arg.Nonce == 0 {
-		return nil, errUserNonceRequired
+	if arg.L2SourceTokenID.IsEmpty() {
+		return nil, fmt.Errorf("%w, l2SourceTokenId is required", currency.ErrCurrencyCodeEmpty)
 	}
-	if arg.L2SourceTokenID != "" {
-		params.Set("l2SourceTokenId", arg.L2SourceTokenID)
+	if arg.L1TargetTokenID.IsEmpty() {
+		return nil, fmt.Errorf("%w, l1TargetTokenId is required", currency.ErrCurrencyCodeEmpty)
 	}
-	if arg.L1TargetTokenID != "" {
-		params.Set("l1TargetTokenId", arg.L1TargetTokenID)
+	if arg.Nonce == "" {
+		arg.Nonce = strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10)
 	}
+	params := url.Values{}
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+	params.Set("clientWithdrawId", arg.ClientWithdrawID)
+	params.Set("timestamp", strconv.FormatInt(arg.Timestamp.UnixMilli(), 10))
+	params.Set("ethAddress", arg.EthereumAddress)
+	params.Set("subAccountId", arg.SubAccountID)
+	params.Set("l2Key", arg.L2Key)
+	params.Set("toChainId", arg.ToChainID)
+	params.Set("l2SourceTokenId", arg.L2SourceTokenID.String())
+	params.Set("l1TargetTokenId", arg.L1TargetTokenID.String())
 	if arg.Fee != 0 {
 		params.Set("fee", strconv.FormatFloat(arg.Fee, 'f', -1, 64))
 	}
 	params.Set("isFastWithdraw", strconv.FormatBool(arg.IsFastWithdraw))
-	params.Set("nonce", strconv.FormatInt(arg.Nonce, 10))
-	params.Set("toChainId", arg.ToChainID)
-	params.Set("l2Key", arg.L2Key)
-	params.Set("subAccountId", arg.SubAccountID)
+	params.Set("nonce", arg.Nonce)
+	signature, err := ap.ProcessWithdrawalToAddressSignature(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	if arg.ZKAccountID == "" {
+		return nil, errZeroKnowledgeAccountIDMissing
+	}
 	params.Set("zkAccountId", arg.ZKAccountID)
-	params.Set("zkAccountId", arg.ZKAccountID)
-	params.Set("ethAddress", arg.EthereumAddress)
-	params.Set("timestamp", strconv.FormatInt(arg.Timestamp.UnixMilli(), 10))
-	params.Set("clientWithdrawId", arg.ClientWithdrawID)
-	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
-
-	// TODO: generate signature and fill in the parameters
-
+	params.Set("signature", signature)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/withdraw-fee", request.UnAuth, params, &resp)
 }
 
 // ----------------------------------------------------- Private V2 Endpoints --------------------------------------------------------------------------------
+
+// UserWithdrawalV2 withdraws an asset
+func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientID string, expiration time.Time, asset currency.Code) (*WithdrawalResponse, error) {
+	if amount <= 0 {
+		return nil, order.ErrAmountBelowMin
+	}
+	if clientID == "" {
+		return nil, errUserNonceRequired
+	}
+	if expiration.IsZero() {
+		return nil, errExpirationTimeRequired
+	}
+	if asset.IsEmpty() {
+		return nil, currency.ErrCurrencyCodeEmpty
+	}
+	params := url.Values{}
+	signature, err := ap.ProcessWithdrawalSignature(ctx, &WithdrawalParams{
+		Amount:         amount,
+		ClientID:       strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10),
+		ExpirationTime: expiration,
+		Asset:          asset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	params.Set("signature", signature)
+	var resp *WithdrawalResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-withdrawal", request.UnAuth, params, &resp)
+}
 
 // SendHTTPRequest sends an unauthenticated request
 func (ap *Apexpro) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path string, f request.EndpointLimit, result interface{}, useAsItIs ...bool) error {

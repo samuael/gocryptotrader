@@ -23,9 +23,9 @@ import (
 // Please supply your own keys here to do authenticated endpoint testing
 const (
 	// Account ID: 603545650545558021
-	apiKey    = "bd722564-718d-7ac8-8838-fd436607abc3"
-	apiSecret = "6lMhERiSESGZEs7bDU39Iab6AG8-BQweaACSkEN5"
-	clientID  = "icKzZ0ZVqUrDZsX_-KfO"
+	apiKey    = ""
+	apiSecret = ""
+	clientID  = ""
 
 	starkKey            = ""
 	starkSecret         = ""
@@ -114,9 +114,9 @@ func TestGetAllConfigDataV3(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-func TestGetAllConfigDataV1(t *testing.T) {
+func TestGetAllSymbolsConfigDataV1(t *testing.T) {
 	t.Parallel()
-	result, err := ap.GetAllConfigDataV1(context.Background())
+	result, err := ap.GetAllSymbolsConfigDataV1(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -333,7 +333,7 @@ func TestEditUserData(t *testing.T) {
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.EditUserDataV3(context.Background(), &EditUserDataParams{
-		Email:                    "samuaeladnew@gmail.com",
+		Email:                    "someone@thrasher.io",
 		UserData:                 "",
 		Username:                 "Thrasher",
 		IsSharingUsername:        true,
@@ -583,13 +583,59 @@ func TestGetWorstPriceV1(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-func TestCancelPerpOrder(t *testing.T) {
+func TestCreateOrder(t *testing.T) {
 	t.Parallel()
 	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
+	require.NoError(t, err)
+
+	if ap.UserAccountDetail == nil {
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, ap.UserAccountDetail)
+	}
+	takerFeeRate := ap.UserAccountDetail.ContractAccount.TakerFeeRate.Float64()
+	result, err := ap.CreateOrder(context.Background(), &CreateOrderParams{
+		Symbol:          futuresTradablePair,
+		Side:            order.Sell.String(),
+		OrderType:       "LIMIT",
+		Size:            123,
+		Price:           1,
+		LimitFee:        takerFeeRate * 123 * 1,
+		ExpirationTime:  time.Now().Add(time.Hour * 240),
+		TimeInForce:     "GTC",
+		TriggerPrice:    0,
+		TrailingPercent: 1,
+		ClientOrderID:   2312312312,
+		ReduceOnly:      true,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelPerpOrder(t *testing.T) {
+	t.Parallel()
+	ap.Verbose = true
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.CancelPerpOrder(context.Background(), "123231")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+}
+
+func TestCancelPerpOrderByClientOrderID(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.CancelPerpOrderByClientOrderID(context.Background(), "2312312")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelAllOpenOrdersV3(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	err := ap.CancelAllOpenOrdersV3(context.Background(), []string{"BTC-USDC"})
+	assert.NoError(t, err)
 }
 
 func TestCancelPerpOrderV2(t *testing.T) {
@@ -872,4 +918,30 @@ func TestSetInitialMarginRateInfoV2(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	err := ap.SetInitialMarginRateInfoV2(context.Background(), "BTC-USDT", 200)
 	assert.NoError(t, err)
+}
+
+func TestWithdrawAsset(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.WithdrawAsset(context.Background(), &AssetWithdrawalParams{
+		Amount:           1,
+		ClientWithdrawID: "123123",
+		Timestamp:        time.Now(),
+		EthereumAddress:  ethereumAddress,
+		L2Key:            starkKey,
+		ToChainID:        "3",
+		L2SourceTokenID:  currency.USDC,
+		L1TargetTokenID:  currency.USDC,
+		IsFastWithdraw:   false,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestUserWithdrawalV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.UserWithdrawalV2(context.Background(), 1, "1231231", time.Now().Add(time.Hour*24), currency.USDC)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
 }
