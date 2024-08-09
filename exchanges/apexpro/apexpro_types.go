@@ -1298,3 +1298,15 @@ type WithdrawalParams struct {
 	ExpirationTime time.Time
 	Asset          currency.Code
 }
+
+// CrossChainWithdrawalParams represents a cross-chain withdrawal parameters
+type CrossChainWithdrawalParams struct {
+	Amount       float64
+	ClientID     string
+	Expiration   time.Time
+	Asset        currency.Code
+	ERC20Address string
+	ChainID      string
+	Fees         float64
+	IPAccountID  string
+}

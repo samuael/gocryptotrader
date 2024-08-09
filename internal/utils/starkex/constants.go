@@ -7,12 +7,14 @@ const (
 	ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS = 24 * 7 // Seven days.
 	ORDER_PREFIX                            = 3
 	CONDITIONAL_TRANSFER_PREFIX             = 5
+	TRANSFER_PREFIX                         = 4
 	WITHDRAWAL_TO_ADDRESS_PREFIX            = 7
 	WITHDRAWAL_PREFIX                       = 6
 
 	ORDER_PADDING_BITS                = 17
 	WITHDRAWAL_PADDING_BITS           = 49
 	CONDITIONAL_TRANSFER_PADDING_BITS = 81
+	TRANSFER_PADDING_BITS             = 81
 
 	CONDITIONAL_TRANSFER_FEE_ASSET_ID   = 0
 	CONDITIONAL_TRANSFER_MAX_AMOUNT_FEE = 0
@@ -40,6 +42,15 @@ var (
 		"position_id":            64,
 		"nonce":                  32,
 		"quantums_amount":        64,
+		"expiration_epoch_hours": 32,
+	}
+
+	TRANSFER_FIELD_BIT_LENGTHS = map[string]uint{
+		"asset_id":               250,
+		"receiver_public_key":    251,
+		"position_id":            64,
+		"quantums_amount":        64,
+		"nonce":                  32,
 		"expiration_epoch_hours": 32,
 	}
 

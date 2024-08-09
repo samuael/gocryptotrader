@@ -1242,10 +1242,16 @@ func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientI
 	if err != nil {
 		return nil, err
 	}
+	params.Set("amount", strconv.FormatFloat(amount, 'f', -1, 64))
+	params.Set("clientId", clientID)
+	params.Set("expiration", strconv.FormatInt(expiration.UnixMilli(), 10))
+	params.Set("asset", asset.String())
 	params.Set("signature", signature)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-withdrawal", request.UnAuth, params, &resp)
 }
+
+
 
 // SendHTTPRequest sends an unauthenticated request
 func (ap *Apexpro) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path string, f request.EndpointLimit, result interface{}, useAsItIs ...bool) error {

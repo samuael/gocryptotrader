@@ -247,3 +247,53 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
 	}, creds.L2Secret)
 }
+
+func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *CrossChainWithdrawalParams) (string, error) {
+	creds, err := ap.GetCredentials(context.Background())
+	if err != nil {
+		return "", err
+	}
+	var currencyInfo *V1CurrencyConfig
+	for c := range ap.SymbolsConfig.Data.Currency {
+		if ap.SymbolsConfig.Data.Currency[c].ID == arg.Asset.String() {
+			currencyInfo = &ap.SymbolsConfig.Data.Currency[c]
+			break
+		}
+	}
+	if currencyInfo == nil {
+		return "", errSettlementCurrencyInfoNotFound
+	}
+	if ap.UserAccountDetail == nil {
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		if err != nil {
+			return "", err
+		}
+	}
+	currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
+	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 16)
+	if !ok {
+		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
+	}
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.ID, 0)
+	if !ok {
+		return "", errInvalidPositionIDMissing
+	}
+	if ap.UserAccountDetail == nil {
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		if err != nil {
+			return "", err
+		}
+	}
+	return ap.StarkConfig.Sign(&starkex.TransferParams{
+		AssetID:          collateralAssetID,
+		AssetIDFee:       big.NewInt(0),
+		SenderPositionID: positionID,
+		// ReceiverPositionID:
+		// Nonce
+		// QuantumsAmount
+		// ExpirationEpochHours
+		// ReceiverPublicKey
+		// MaxAmountFee
+		// SrcFeePositionID
+	}, creds.L2Secret)
+}

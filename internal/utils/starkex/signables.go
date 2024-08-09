@@ -78,3 +78,70 @@ func (s *WithdrawalParams) GetPedersenHash(pedersenHash func(...string) string) 
 	// pedersen hash
 	return pedersenHash(s.AssetIDCollateral.String(), packed.String()), nil
 }
+
+// GetPedersenHash implements the Signable interface and generates a pedersen hash of TransferParams
+func (s *TransferParams) GetPedersenHash(pedersenHash func(...string) string) (string, error) {
+	assetID := pedersenHash(s.AssetID.String(), s.AssetIDFee.String())
+	// packed
+	part1 := pedersenHash(assetID, s.ReceiverPublicKey.String())
+	// packed
+	part2 := big.NewInt(0).Set(s.SenderPositionID)
+	part2.Lsh(part2, TRANSFER_FIELD_BIT_LENGTHS["position_id"])
+	part2.Add(part2, s.ReceiverPositionID)
+	part2.Lsh(part2, TRANSFER_FIELD_BIT_LENGTHS["position_id"])
+	part2.Add(part2, s.SenderPositionID)
+	part2.Lsh(part2, TRANSFER_FIELD_BIT_LENGTHS["nonce"])
+	part2.Add(part2, s.Nonce)
+
+	part3 := big.NewInt(TRANSFER_PREFIX)
+	part3.Lsh(part3, TRANSFER_FIELD_BIT_LENGTHS["quantums_amount"])
+	part3.Add(part3, s.QuantumsAmount)
+	part3.Lsh(part3, TRANSFER_FIELD_BIT_LENGTHS["quantums_amount"])
+	part3.Add(part3, s.MaxAmountFee)
+	part3.Lsh(part3, TRANSFER_FIELD_BIT_LENGTHS["expiration_epoch_hours"])
+	part3.Add(part3, s.ExpirationEpochHours)
+	part3.Lsh(part3, TRANSFER_PADDING_BITS)
+
+	return pedersenHash(
+		pedersenHash(
+			part1,
+			part2.String(),
+		),
+		part3.String(),
+	), nil
+}
+
+// GetPedersenHash implements the Signable interface and generates a pedersen hash of ConditionalTransferParams
+func (s *ConditionalTransferParams) GetPedersenHash(pedersenHash func(...string) string) (string, error) {
+	assetID := pedersenHash(s.AssetID.String(), s.AssetIDFee.String())
+
+	// packed
+	part1 := pedersenHash(pedersenHash(assetID, s.ReceiverPublicKey.String()), s.Condition.String())
+
+	// part 2
+	part2 := big.NewInt(0).Set(s.SenderPositionID)
+	part2.Lsh(part2, CONDITIONAL_TRANSFER_FIELD_BIT_LENGTHS["position_id"])
+	part2.Add(part2, s.ReceiverPositionID)
+	part2.Lsh(part2, CONDITIONAL_TRANSFER_FIELD_BIT_LENGTHS["position_id"])
+	part2.Add(part2, s.SenderPositionID)
+	part2.Lsh(part2, CONDITIONAL_TRANSFER_FIELD_BIT_LENGTHS["nonce"])
+	part2.Add(part2, s.Nonce)
+
+	// part 3
+	part3 := big.NewInt(CONDITIONAL_TRANSFER_PREFIX)
+	part3.Lsh(part3, CONDITIONAL_TRANSFER_FIELD_BIT_LENGTHS["quantums_amount"])
+	part3.Add(part3, s.QuantumsAmount)
+	part3.Lsh(part3, CONDITIONAL_TRANSFER_FIELD_BIT_LENGTHS["quantums_amount"])
+	part3.Add(part3, big.NewInt(CONDITIONAL_TRANSFER_MAX_AMOUNT_FEE))
+	part3.Lsh(part3, CONDITIONAL_TRANSFER_FIELD_BIT_LENGTHS["expiration_epoch_hours"])
+	part3.Add(part3, s.ExpTimestampHrs)
+	part3.Lsh(part3, CONDITIONAL_TRANSFER_PADDING_BITS)
+
+	return pedersenHash(
+		pedersenHash(
+			part1,
+			part2.String(),
+		),
+		part3.String(),
+	), nil
+}

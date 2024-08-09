@@ -4,31 +4,32 @@ import "math/big"
 
 // TransferParams represents a starkex asset transfer parameters. Type value: 4
 type TransferParams struct {
-	AssetID            *big.Int `json:"asset_id"`
-	AssetIDFee         *big.Int `json:"asset_id_fee"`
-	ReceiverPublicKey  *big.Int `json:"receiver_public_key"`
-	SenderPositionID   uint64   `json:"sender_position_id"`
-	ReceiverPositionID uint64   `json:"receiver_position_id"`
-	SrcFeePositionID   uint64   `json:"src_fee_position_id"`
-	Amount             uint64   `json:"amount"`
-	MaxAmountFee       uint64   `json:"max_amount_fee"`
-	Nonce              uint32   `json:"nonce"`
-	ExpTimestampHrs    uint32   `json:"expiration_timestamp"`
+	AssetID              *big.Int `json:"asset_id"`
+	AssetIDFee           *big.Int `json:"asset_id_fee"` // asset ID of
+	SenderPositionID     *big.Int `json:"sender_position_id"`
+	ReceiverPositionID   *big.Int `json:"receiver_position_id"`
+	Nonce                *big.Int `json:"nonce"`
+	QuantumsAmount       *big.Int `json:"amount"`
+	ExpirationEpochHours *big.Int `json:"expiration_timestamp"`
+	ReceiverPublicKey    *big.Int `json:"receiver_public_key"`
+	MaxAmountFee         *big.Int `json:"max_amount_fee"`
+	SrcFeePositionID     *big.Int `json:"src_fee_position_id"`
 }
 
 // ConditionalTransferParams represents a conditional transfer parameters. Type value: 5
 type ConditionalTransferParams struct {
+	QuantumsAmount     *big.Int `json:"amount"`
 	AssetID            *big.Int `json:"asset_id"`
-	AssetIDFee         *big.Int `json:"asset_id_fee"`
+	ExpTimestampHrs    *big.Int `json:"expiration_timestamp"`
+	Nonce              *big.Int `json:"nonce"`
+	ReceiverPositionID *big.Int `json:"receiver_position_id"`
 	ReceiverPublicKey  *big.Int `json:"receiver_public_key"`
+	SenderPositionID   *big.Int `json:"sender_position_id"`
+	SenderPublicKey    *big.Int `json:"sender_public_key"`
+	MaxAmountFee       *big.Int `json:"max_amount_fee"`
+	AssetIDFee         *big.Int `json:"asset_id_fee"`
+	SrcFeePositionID   *big.Int `json:"src_fee_position_id"`
 	Condition          *big.Int `json:"condition"`
-	SenderPositionID   uint64   `json:"sender_position_id"`
-	ReceiverPositionID uint64   `json:"receiver_position_id"`
-	SrcFeePositionID   uint64   `json:"src_fee_position_id"`
-	Amount             uint64   `json:"amount"`
-	MaxAmountFee       uint64   `json:"max_amount_fee"`
-	Nonce              uint32   `json:"nonce"`
-	ExpTimestampHrs    uint32   `json:"expiration_timestamp"`
 }
 
 // CreateOrderWithFeeParams represents a starkex create order parameters. Order Prefix: 3

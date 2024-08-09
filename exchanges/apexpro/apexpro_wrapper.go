@@ -46,10 +46,7 @@ func (ap *Apexpro) SetDefaults() {
 	}
 	ap.StarkConfig, err = starkex.NewStarkExConfig(ap.Name)
 	if err != nil {
-		println("\n\n\n Config Download Error\n\n\n", err.Error())
 		log.Errorln(log.ExchangeSys, err)
-	} else {
-		println("\n\n\n Config Donloaded Succesfully\n\n\n")
 	}
 	ap.Features = exchange.Features{
 		Supports: exchange.FeaturesSupported{

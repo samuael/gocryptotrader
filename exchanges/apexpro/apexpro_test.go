@@ -940,7 +940,7 @@ func TestWithdrawAsset(t *testing.T) {
 
 func TestUserWithdrawalV2(t *testing.T) {
 	t.Parallel()
-	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.UserWithdrawalV2(context.Background(), 1, "1231231", time.Now().Add(time.Hour*24), currency.USDC)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
