@@ -690,8 +690,10 @@ func (ap *Apexpro) GetWorstPriceV1(ctx context.Context, symbol, side string, amo
 	return ap.getWorstPrice(ctx, symbol, side, "v1/get-worst-price", amount, exchange.RestSpot)
 }
 
-// CreateOrder creates a new order.
-func (ap *Apexpro) CreateOrder(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
+func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrderParams) (url.Values, error) {
+	if arg == nil || *arg == (CreateOrderParams{}) {
+		return nil, order.ErrOrderDetailIsNil
+	}
 	if arg.Symbol.IsEmpty() {
 		return nil, currency.ErrSymbolStringEmpty
 	}
@@ -725,9 +727,7 @@ func (ap *Apexpro) CreateOrder(ctx context.Context, arg *CreateOrderParams) (*Or
 	params.Set("price", strconv.FormatFloat(arg.Price, 'f', -1, 64))
 	params.Set("limitFee", strconv.FormatFloat(arg.LimitFee, 'f', -1, 64))
 	params.Set("expiration", strconv.FormatInt(arg.ExpirationTime.UnixMilli(), 10))
-	if signature != "" {
-		params.Set("signature", signature)
-	}
+	params.Set("signature", signature)
 	if arg.TimeInForce != "" {
 		params.Set("timeInForce", arg.TimeInForce)
 	}
@@ -740,8 +740,92 @@ func (ap *Apexpro) CreateOrder(ctx context.Context, arg *CreateOrderParams) (*Or
 	if arg.ClientOrderID != 0 {
 		params.Set("clientOrderId", strconv.FormatInt(arg.ClientOrderID, 10))
 	}
+	return params, nil
+}
+
+// CreateOrderV3 creates a new order.
+func (ap *Apexpro) CreateOrderV3(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
+	params, err := ap.orderCreationParamsFilter(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
 	var resp *OrderDetail
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v3/order", request.UnAuth, params, &resp)
+}
+
+// CreateOrderV2 creates a new order through the v2 API
+func (ap *Apexpro) CreateOrderV2(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
+	params, err := ap.orderCreationParamsFilter(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	var resp *OrderDetail
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-order", request.UnAuth, params, &resp)
+}
+
+// CreateOrderV1 creates a new order through the v2 API
+func (ap *Apexpro) CreateOrderV1(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
+	params, err := ap.orderCreationParamsFilter(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	var resp *OrderDetail
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v1/create-order", request.UnAuth, params, &resp)
+}
+
+// FastWithdrawalV2 withdraws an asset
+func (ap *Apexpro) FastWithdrawalV1(ctx context.Context, arg *FastWithdrawalParams) (*WithdrawalResponse, error) {
+	return ap.fastWithdrawal(ctx, arg, "v1/fast-withdraw")
+}
+
+// FastWithdrawalV2 withdraws an asset
+func (ap *Apexpro) FastWithdrawalV2(ctx context.Context, arg *FastWithdrawalParams) (*WithdrawalResponse, error) {
+	return ap.fastWithdrawal(ctx, arg, "v2/fast-withdraw")
+}
+
+func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams, path string) (*WithdrawalResponse, error) {
+	if arg == nil || *arg == (FastWithdrawalParams{}) {
+		return nil, common.ErrNilPointer
+	}
+	if arg.Amount <= 0 {
+		return nil, order.ErrAmountBelowMin
+	}
+	if arg.ClientID != "" {
+		return nil, order.ErrClientOrderIDMustBeSet
+	}
+	if arg.Expiration.IsZero() {
+		return nil, errExpirationTimeRequired
+	}
+	if arg.Asset.IsEmpty() {
+		return nil, currency.ErrCurrencyCodeEmpty
+	}
+	if arg.ERC20Address == "" {
+		return nil, errEthereumAddressMissing
+	}
+	if arg.Fees <= 0 {
+		return nil, errLimitFeeRequired
+	}
+	if arg.ChainID == "" {
+		return nil, errChainIDMissing
+	}
+	signature, err := ap.ProcessConditionalTransfer(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{}
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+	params.Set("clientId", arg.ClientID)
+	params.Set("expiration", strconv.FormatInt(arg.Expiration.UnixMilli(), 10))
+	params.Set("asset", arg.Asset.String())
+	params.Set("erc20Address", arg.ERC20Address)
+	params.Set("fee", strconv.FormatFloat(arg.Fees, 'f', -1, 64))
+	params.Set("chainId", arg.ChainID)
+	if arg.IPAccountID != "" {
+		params.Set("lpAccountId", arg.IPAccountID)
+	}
+	params.Set("signature", signature)
+	var resp *WithdrawalResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, &resp)
 }
 
 func (ap *Apexpro) getWorstPrice(ctx context.Context, symbol, side, path string, amount float64, ePath exchange.URL) (*SymbolWorstPrice, error) {
@@ -1203,7 +1287,7 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 	}
 	params.Set("isFastWithdraw", strconv.FormatBool(arg.IsFastWithdraw))
 	params.Set("nonce", arg.Nonce)
-	signature, err := ap.ProcessWithdrawalToAddressSignature(ctx, arg)
+	signature, err := ap.ProcessWithdrawalToAddressSignatureV3(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -1213,7 +1297,7 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 	params.Set("zkAccountId", arg.ZKAccountID)
 	params.Set("signature", signature)
 	var resp *WithdrawalResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/withdraw-fee", request.UnAuth, params, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/withdrawal", request.UnAuth, params, &resp)
 }
 
 // ----------------------------------------------------- Private V2 Endpoints --------------------------------------------------------------------------------
@@ -1251,7 +1335,57 @@ func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientI
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-withdrawal", request.UnAuth, params, &resp)
 }
 
+// WithdrawalToAddressV1 withdraws as asset to an ethereum address
+func (ap *Apexpro) WithdrawalToAddressV1(ctx context.Context, arg *WithdrawalToAddressParams) (*WithdrawalResponse, error) {
+	return ap.withdrawalToAddress(ctx, arg, "v1/create-withdrawal-to-address")
+}
 
+// WithdrawalToAddressV2 withdraws as asset to an ethereum address
+func (ap *Apexpro) WithdrawalToAddressV2(ctx context.Context, arg *WithdrawalToAddressParams) (*WithdrawalResponse, error) {
+	return ap.withdrawalToAddress(ctx, arg, "v2/create-withdrawal-to-address")
+}
+
+func (ap *Apexpro) withdrawalToAddress(ctx context.Context, arg *WithdrawalToAddressParams, path string) (*WithdrawalResponse, error) {
+	if arg == nil || *arg == (WithdrawalToAddressParams{}) {
+		return nil, common.ErrNilPointer
+	}
+	if arg.Amount <= 0 {
+		return nil, order.ErrAmountBelowMin
+	}
+	if arg.ClientID == "" {
+		return nil, order.ErrClientOrderIDMustBeSet
+	}
+	if arg.ExpirationTime.IsZero() {
+		return nil, errExpirationTimeRequired
+	}
+	if arg.Asset.IsEmpty() {
+		return nil, fmt.Errorf("%w, asset is required", currency.ErrCurrencyCodeEmpty)
+	}
+	if arg.EthereumAddress == "" {
+		return nil, errEthereumAddressMissing
+	}
+	signature, err := ap.ProcessWithdrawalToAddressSignature(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{}
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+	params.Set("clientId", arg.ClientID)
+	params.Set("expiration", strconv.FormatInt(arg.ExpirationTime.UnixMilli(), 10))
+	params.Set("asset", arg.Asset.String())
+	params.Set("ethAddress", arg.EthereumAddress)
+	params.Set("signature", signature)
+	var resp *WithdrawalResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, &resp)
+}
+
+// CrossChainWithdrawals withdraws an asset through different chains
+// func (ap *Apexpro) CrossChainWithdrawals(ctx context.Context, arg *FastWithdrawalParams) (*WithdrawalResponse, error) {
+
+// 	params := url.Values{}
+// 	var resp *WithdrawalResponse
+// 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v1/cross-chain-withdraw", request.UnAuth, params, &resp)
+// }
 
 // SendHTTPRequest sends an unauthenticated request
 func (ap *Apexpro) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path string, f request.EndpointLimit, result interface{}, useAsItIs ...bool) error {

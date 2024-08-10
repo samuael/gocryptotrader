@@ -1069,6 +1069,15 @@ type UserWithdrawal struct {
 	ClientID        string               `json:"clientId"`
 }
 
+// WithdrawalToAddressParams represents a withdrawal parameter to an address through the V2 API
+type WithdrawalToAddressParams struct {
+	Amount          float64
+	ClientID        string
+	ExpirationTime  time.Time
+	Asset           currency.Code
+	EthereumAddress string
+}
+
 // AssetWithdrawalParams represents a user asset withdrawal parameter.
 type AssetWithdrawalParams struct {
 	Amount           float64
@@ -1299,8 +1308,8 @@ type WithdrawalParams struct {
 	Asset          currency.Code
 }
 
-// CrossChainWithdrawalParams represents a cross-chain withdrawal parameters
-type CrossChainWithdrawalParams struct {
+// FastWithdrawalParams represents a cross-chain withdrawal parameters
+type FastWithdrawalParams struct {
 	Amount       float64
 	ClientID     string
 	Expiration   time.Time
@@ -1310,3 +1319,19 @@ type CrossChainWithdrawalParams struct {
 	Fees         float64
 	IPAccountID  string
 }
+
+// Withdraw to Address : 7
+// /v1/create-withdrawal-to-address
+// /v2/create-withdrawal-to-address
+
+// Cross-Chain Transfer : 4
+// /v1/cross-chain-withdraw
+// /v2/cross-chain-withdraw
+
+// Create Order : 3
+// /v1/create-order
+// /v2/create-order
+
+// Conditional Transfer : 5
+// /v1/fast-withdraw
+// /v2/fast-withdraw

@@ -72,14 +72,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func (ap *Apexpro) isL2CredentialsProvided() bool {
-	_, err := ap.GetCredentials(context.Background())
-	if err != nil {
-		return false
-	}
-	return true
-}
-
 // Implement tests for API endpoints below
 
 func TestGetSystemTimeV3(t *testing.T) {
@@ -240,19 +232,6 @@ func TestGetAllConfigDataV2(t *testing.T) {
 	result, err := ap.GetAllConfigDataV2(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	for a := range result.Data.USDCConfig.Currency {
-		println("ID: ", result.Data.USDCConfig.Currency[a].ID)
-		println("StarkExAssetID: ", result.Data.USDCConfig.Currency[a].StarkExAssetID)
-		println("StarkExResolution: ", result.Data.USDCConfig.Currency[a].StarkExResolution)
-		break
-	}
-	for a := range result.Data.USDCConfig.PerpetualContract {
-		println("UnderlyingCurrencyID: ", result.Data.USDCConfig.PerpetualContract[a].UnderlyingCurrencyID)
-		println("SettleCurrencyID: ", result.Data.USDCConfig.PerpetualContract[a].SettleCurrencyID)
-		println("StarkExSyntheticAssetID: ", result.Data.USDCConfig.PerpetualContract[a].StarkExSyntheticAssetID)
-		// for b := range result.Data.
-		break
-	}
 }
 
 func TestGetCheckIfUserExistsV2(t *testing.T) {
@@ -586,7 +565,7 @@ func TestGetWorstPriceV1(t *testing.T) {
 func TestCreateOrder(t *testing.T) {
 	t.Parallel()
 	ap.Verbose = true
-	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
 	require.NoError(t, err)
 
@@ -596,7 +575,7 @@ func TestCreateOrder(t *testing.T) {
 		require.NotNil(t, ap.UserAccountDetail)
 	}
 	takerFeeRate := ap.UserAccountDetail.ContractAccount.TakerFeeRate.Float64()
-	result, err := ap.CreateOrder(context.Background(), &CreateOrderParams{
+	result, err := ap.CreateOrderV3(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
 		Side:            order.Sell.String(),
 		OrderType:       "LIMIT",
@@ -942,6 +921,166 @@ func TestUserWithdrawalV2(t *testing.T) {
 	t.Parallel()
 	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.UserWithdrawalV2(context.Background(), 1, "1231231", time.Now().Add(time.Hour*24), currency.USDC)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestWithdrawalToAddressV2(t *testing.T) {
+	t.Parallel()
+	_, err := ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	require.ErrorIs(t, err, order.ErrClientOrderIDMustBeSet)
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	require.ErrorIs(t, err, errExpirationTimeRequired)
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	require.ErrorIs(t, err, errEthereumAddressMissing)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
+		Amount:          1,
+		ClientID:        "12334",
+		ExpirationTime:  time.Now().Add(time.Hour * 50),
+		Asset:           currency.BTC,
+		EthereumAddress: ethereumAddress,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestWithdrawalToAddressV1(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.WithdrawalToAddressV1(context.Background(), &WithdrawalToAddressParams{
+		Amount:          1,
+		ClientID:        "12334",
+		ExpirationTime:  time.Now().Add(time.Hour * 50),
+		Asset:           currency.BTC,
+		EthereumAddress: ethereumAddress,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestOrderCreationParamsFilter(t *testing.T) {
+	t.Parallel()
+	_, err := ap.orderCreationParamsFilter(context.Background(), nil)
+	require.ErrorIs(t, err, order.ErrOrderDetailIsNil)
+	_, err = ap.orderCreationParamsFilter(context.Background(), &CreateOrderParams{Side: order.Buy.String()})
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
+	require.NoError(t, err)
+	arg := &CreateOrderParams{Symbol: futuresTradablePair}
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	arg.Side = order.Buy.String()
+	_, err = ap.orderCreationParamsFilter(context.Background(), &CreateOrderParams{Symbol: futuresTradablePair, Side: order.Buy.String()})
+	require.ErrorIs(t, err, order.ErrTypeIsInvalid)
+	arg.OrderType = order.Limit.String()
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	arg.Size = 2
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
+	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	arg.Price = 123
+	arg.LimitFee = -1
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
+	require.ErrorIs(t, err, errLimitFeeRequired)
+	arg.LimitFee = 0.003
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
+	require.ErrorIs(t, err, errExpirationTimeRequired)
+}
+
+func TestCreateOrderV1(t *testing.T) {
+	t.Parallel()
+	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
+	require.NoError(t, err)
+
+	if ap.UserAccountDetail == nil {
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, ap.UserAccountDetail)
+	}
+	takerFeeRate := ap.UserAccountDetail.ContractAccount.TakerFeeRate.Float64()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.CreateOrderV1(context.Background(), &CreateOrderParams{
+		Symbol:          futuresTradablePair,
+		Side:            order.Sell.String(),
+		OrderType:       "LIMIT",
+		Size:            123,
+		Price:           1,
+		LimitFee:        takerFeeRate * 123 * 1,
+		ExpirationTime:  time.Now().Add(time.Hour * 240),
+		TimeInForce:     "GTC",
+		TriggerPrice:    0,
+		TrailingPercent: 1,
+		ClientOrderID:   2312312312,
+		ReduceOnly:      true,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCreateOrderV2(t *testing.T) {
+	t.Parallel()
+	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
+	require.NoError(t, err)
+
+	if ap.UserAccountDetail == nil {
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, ap.UserAccountDetail)
+	}
+	takerFeeRate := ap.UserAccountDetail.ContractAccount.TakerFeeRate.Float64()
+	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.CreateOrderV2(context.Background(), &CreateOrderParams{
+		Symbol:          futuresTradablePair,
+		Side:            order.Sell.String(),
+		OrderType:       "LIMIT",
+		Size:            123,
+		Price:           1,
+		LimitFee:        takerFeeRate * 123 * 1,
+		ExpirationTime:  time.Now().Add(time.Hour * 240),
+		TimeInForce:     "GTC",
+		TriggerPrice:    0,
+		TrailingPercent: 1,
+		ClientOrderID:   2312312312,
+		ReduceOnly:      true,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestFastWithdrawalV2(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.FastWithdrawalV2(context.Background(), &FastWithdrawalParams{
+		Amount:       1,
+		ClientID:     "123213",
+		Expiration:   time.Now().Add(time.Hour * 45),
+		Asset:        currency.USDC,
+		ERC20Address: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
+		ChainID:      "56",
+		Fees:         0,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestFastWithdrawalV1(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.FastWithdrawalV1(context.Background(), &FastWithdrawalParams{
+		Amount:       1,
+		ClientID:     "123213",
+		Expiration:   time.Now().Add(time.Hour * 45),
+		Asset:        currency.USDC,
+		ERC20Address: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
+		ChainID:      "56",
+		Fees:         0,
+	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
