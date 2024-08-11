@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
-	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
@@ -72,14 +70,8 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// Implement tests for API endpoints below
-
 func TestGetSystemTimeV3(t *testing.T) {
 	t.Parallel()
-
-	enabledPairs, err := ap.GetEnabledPairs(asset.Futures)
-	require.NoError(t, err)
-	println(strings.Join(enabledPairs.Strings(), ","))
 	result, err := ap.GetSystemTimeV3(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -185,6 +177,7 @@ func TestGetTickerDataV3(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetTickerDataV3(context.Background(), "")
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+
 	result, err := ap.GetTickerDataV3(context.Background(), "BTCUSDT")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -281,7 +274,6 @@ func TestGenerateNonceV1(t *testing.T) {
 
 func TestGetUsersData(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUsersDataV3(context.Background())
 	require.NoError(t, err)
@@ -306,11 +298,10 @@ func TestGetUsersDataV1(t *testing.T) {
 
 func TestEditUserData(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	_, err := ap.EditUserDataV3(context.Background(), &EditUserDataParams{})
 	require.ErrorIs(t, err, common.ErrNilPointer)
 
-	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.EditUserDataV3(context.Background(), &EditUserDataParams{
 		Email:                    "someone@thrasher.io",
 		UserData:                 "",
@@ -327,7 +318,6 @@ func TestEditUserData(t *testing.T) {
 }
 func TestEditUserDataV2(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	_, err := ap.EditUserDataV2(context.Background(), &EditUserDataParams{})
 	require.ErrorIs(t, err, common.ErrNilPointer)
 
@@ -349,7 +339,6 @@ func TestEditUserDataV2(t *testing.T) {
 
 func TestGetUserAccountData(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUserAccountDataV3(context.Background())
 	require.NoError(t, err)
@@ -374,7 +363,6 @@ func TestGetUserAccountDataV1(t *testing.T) {
 
 func TestGetUserAccountBalance(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUserAccountBalance(context.Background())
 	require.NoError(t, err)
@@ -383,7 +371,6 @@ func TestGetUserAccountBalance(t *testing.T) {
 
 func TestGetUserAccountBalanceV2(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUserAccountBalanceV2(context.Background())
 	require.NoError(t, err)
@@ -392,7 +379,6 @@ func TestGetUserAccountBalanceV2(t *testing.T) {
 
 func TestGetUserAccountBalanceV1(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	result, err := ap.GetUserAccountBalanceV1(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -432,7 +418,6 @@ func TestGetUserWithdrawalListV1(t *testing.T) {
 
 func TestGetFastAndCrossChainWithdrawalFees(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	_, err := ap.GetFastAndCrossChainWithdrawalFeesV2(context.Background(), 1, "1", currency.EMPTYCODE)
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 	_, err = ap.GetFastAndCrossChainWithdrawalFeesV2(context.Background(), 1, "", currency.BTC)
@@ -476,7 +461,6 @@ func TestGetAssetWithdrawalAndTransferLimitV1(t *testing.T) {
 
 func TestGetUserDepositWithdrawData(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUserTransferData(context.Background(), 0, 10, "", "DEPOSIT", "", "", time.Now().Add(time.Hour*30), time.Now(), []string{"1"})
 	require.NoError(t, err)
@@ -485,7 +469,6 @@ func TestGetUserDepositWithdrawData(t *testing.T) {
 
 func TestGetWithdrawalFees(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetWithdrawalFees(context.Background(), 12, []string{"1"}, 140)
 	require.NoError(t, err)
@@ -502,7 +485,6 @@ func TestGetContractAccountTransferLimits(t *testing.T) {
 
 func TestGetTradeHistory(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetTradeHistory(context.Background(), "BTC-USD", order.Sell.String(), "LIMIT", time.Time{}, time.Time{}, 0, 10)
 	require.NoError(t, err)
@@ -537,7 +519,6 @@ func TestGetWorstPrice(t *testing.T) {
 
 func TestGetWorstPriceV3(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetWorstPriceV3(context.Background(), "BTC-USDT", "SELL", 1)
 	require.NoError(t, err)
@@ -546,7 +527,6 @@ func TestGetWorstPriceV3(t *testing.T) {
 
 func TestGetWorstPriceV2(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetWorstPriceV2(context.Background(), "BTC-USDT", "SELL", 1)
 	require.NoError(t, err)
@@ -555,7 +535,6 @@ func TestGetWorstPriceV2(t *testing.T) {
 
 func TestGetWorstPriceV1(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetWorstPriceV1(context.Background(), "BTC-USDT", "SELL", 1)
 	require.NoError(t, err)
@@ -564,7 +543,6 @@ func TestGetWorstPriceV1(t *testing.T) {
 
 func TestCreateOrder(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
 	require.NoError(t, err)
@@ -595,7 +573,6 @@ func TestCreateOrder(t *testing.T) {
 
 func TestCancelPerpOrder(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.CancelPerpOrder(context.Background(), "123231")
 	require.NoError(t, err)
@@ -651,7 +628,6 @@ func TestGetOpenOrdersV1(t *testing.T) {
 
 func TestGetAllOrderHistory(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetAllOrderHistory(context.Background(), "BTC-USDT", "SELL", "MARKET", "OPEN", "HISTORY", time.Time{}, time.Time{}, 0, 10)
 	require.NoError(t, err)
@@ -698,7 +674,6 @@ func TestGetSingleOrderV2(t *testing.T) {
 
 func TestGetSingleOrderByOrderIDV2(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetSingleOrderByOrderIDV2(context.Background(), "231232341", currency.USDT)
 	require.NoError(t, err)
@@ -720,7 +695,6 @@ func TestGetSingleOrderByClientOrderIDV2(t *testing.T) {
 
 func TestGetSingleOrderByOrderIDV1(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetSingleOrderByOrderIDV1(context.Background(), "231232341")
 	require.NoError(t, err)
@@ -760,7 +734,6 @@ func TestLinkDevice(t *testing.T) {
 
 func TestGetOrderClientOrderID(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	_, err := ap.GetOrderClientOrderID(context.Background(), "")
 	require.ErrorIs(t, err, order.ErrClientOrderIDMustBeSet)
 

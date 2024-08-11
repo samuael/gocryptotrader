@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -451,11 +452,13 @@ func (ap *Apexpro) GetUserTransferDataV1(ctx context.Context, ccy currency.Code,
 }
 
 func (ap *Apexpro) getUserTransferData(ctx context.Context, ccy currency.Code, startTime, endTime time.Time, transferType, path string, chainIDs []string, limit, page int64) (*UserWithdrawalsV2, error) {
-	if ccy.IsEmpty() {
-		return nil, currency.ErrCurrencyCodeEmpty
-	}
+	// if ccy.IsEmpty() {
+	// 	return nil, currency.ErrCurrencyCodeEmpty
+	// }
 	params := url.Values{}
-	params.Set("currencyId", ccy.String())
+	if !ccy.IsEmpty() {
+		params.Set("currencyId", ccy.String())
+	}
 	if limit > 0 {
 		params.Set("limit", strconv.FormatInt(limit, 10))
 	}
@@ -783,7 +786,7 @@ func (ap *Apexpro) FastWithdrawalV2(ctx context.Context, arg *FastWithdrawalPara
 	return ap.fastWithdrawal(ctx, arg, "v2/fast-withdraw")
 }
 
-func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams, path string) (*WithdrawalResponse, error) {
+func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) (url.Values, error) {
 	if arg == nil || *arg == (FastWithdrawalParams{}) {
 		return nil, common.ErrNilPointer
 	}
@@ -808,10 +811,6 @@ func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams
 	if arg.ChainID == "" {
 		return nil, errChainIDMissing
 	}
-	signature, err := ap.ProcessConditionalTransfer(ctx, arg)
-	if err != nil {
-		return nil, err
-	}
 	params := url.Values{}
 	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
 	params.Set("clientId", arg.ClientID)
@@ -822,6 +821,18 @@ func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams
 	params.Set("chainId", arg.ChainID)
 	if arg.IPAccountID != "" {
 		params.Set("lpAccountId", arg.IPAccountID)
+	}
+	return params, nil
+}
+
+func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams, path string) (*WithdrawalResponse, error) {
+	params, err := ap.fillWithdrawalParams(arg)
+	if err != nil {
+		return nil, err
+	}
+	signature, err := ap.ProcessConditionalTransfer(ctx, arg)
+	if err != nil {
+		return nil, err
 	}
 	params.Set("signature", signature)
 	var resp *WithdrawalResponse
@@ -1380,12 +1391,24 @@ func (ap *Apexpro) withdrawalToAddress(ctx context.Context, arg *WithdrawalToAdd
 }
 
 // CrossChainWithdrawals withdraws an asset through different chains
-// func (ap *Apexpro) CrossChainWithdrawals(ctx context.Context, arg *FastWithdrawalParams) (*WithdrawalResponse, error) {
+func (ap *Apexpro) CrossChainWithdrawalsV1(ctx context.Context, arg *FastWithdrawalParams) (*WithdrawalResponse, error) {
+	return ap.crossChainWithdrawals(ctx, arg, "v1/cross-chain-withdraw")
+}
 
-// 	params := url.Values{}
-// 	var resp *WithdrawalResponse
-// 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v1/cross-chain-withdraw", request.UnAuth, params, &resp)
-// }
+// CrossChainWithdrawalsV2 withdraaws an asse tthrough the v2 api
+func (ap *Apexpro) CrossChainWithdrawalsV2(ctx context.Context, arg *FastWithdrawalParams) (*WithdrawalResponse, error) {
+	return ap.crossChainWithdrawals(ctx, arg, "v2/cross-chain-withdraw")
+}
+
+func (ap *Apexpro) crossChainWithdrawals(ctx context.Context, arg *FastWithdrawalParams, path string) (*WithdrawalResponse, error) {
+	params, err := ap.fillWithdrawalParams(arg)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: signature validation and testing
+	var resp *WithdrawalResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, &resp)
+}
 
 // SendHTTPRequest sends an unauthenticated request
 func (ap *Apexpro) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path string, f request.EndpointLimit, result interface{}, useAsItIs ...bool) error {
@@ -1413,6 +1436,16 @@ func (ap *Apexpro) SendHTTPRequest(ctx context.Context, ePath exchange.URL, path
 			HTTPRecording: ap.HTTPRecording,
 		}, nil
 	}, request.UnauthenticatedRequest)
+}
+
+func paramsToMap(params url.Values) map[string]string {
+	theMap := make(map[string]string)
+	for k := range params {
+		if len(params[k]) > 0 && params[k][0] != "" {
+			theMap[k] = params[k][0]
+		}
+	}
+	return theMap
 }
 
 // SendAuthenticatedHTTPRequest sends an authenticated HTTP request.
@@ -1470,7 +1503,11 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 			HTTPRecording: ap.HTTPRecording,
 		}
 		if dataString != "" {
-			reqItem.Body = bytes.NewBuffer([]byte(dataString))
+			value, err := json.Marshal(paramsToMap(params))
+			if err != nil {
+				return nil, err
+			}
+			reqItem.Body = bytes.NewBuffer(value)
 		}
 		return reqItem, nil
 	}, request.AuthenticatedRequest)

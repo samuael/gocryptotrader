@@ -1320,18 +1320,18 @@ type FastWithdrawalParams struct {
 	IPAccountID  string
 }
 
-// Withdraw to Address : 7
+// Withdraw to Address : 7 | OK
 // /v1/create-withdrawal-to-address
 // /v2/create-withdrawal-to-address
 
-// Cross-Chain Transfer : 4
+// Cross-Chain Transfer : 4 | OK
 // /v1/cross-chain-withdraw
 // /v2/cross-chain-withdraw
 
-// Create Order : 3
+// Create Order : 3 | OK
 // /v1/create-order
 // /v2/create-order
 
-// Conditional Transfer : 5
+// Conditional Transfer : 5 | OK
 // /v1/fast-withdraw
 // /v2/fast-withdraw

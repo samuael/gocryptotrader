@@ -179,63 +179,33 @@ func (ap *Apexpro) UpdateTradablePairs(ctx context.Context, forceUpdate bool) er
 
 // UpdateTicker updates and returns the ticker for a currency pair
 func (ap *Apexpro) UpdateTicker(ctx context.Context, p currency.Pair, assetType asset.Item) (*ticker.Price, error) {
-	// NOTE: EXAMPLE FOR GETTING TICKER PRICE
-	/*
-		tickerPrice := new(ticker.Price)
-		tick, err := ap.GetTicker(p.String())
-		if err != nil {
-			return tickerPrice, err
-		}
-		tickerPrice = &ticker.Price{
-			High:    tick.High,
-			Low:     tick.Low,
-			Bid:     tick.Bid,
-			Ask:     tick.Ask,
-			Open:    tick.Open,
-			Close:   tick.Close,
-			Pair:    p,
-		}
-		err = ticker.ProcessTicker(ap.Name, tickerPrice, assetType)
-		if err != nil {
-			return tickerPrice, err
-		}
-	*/
+	pairFormat, err := ap.GetPairFormat(assetType, true)
+	if err != nil {
+		return nil, err
+	}
+	tick, err := ap.GetTickerDataV3(ctx, p.Format(pairFormat).String())
+	if err != nil {
+		return nil, err
+	}
+	tickerPrice := &ticker.Price{
+		Last:         tick[0].LastPrice.Float64(),
+		High:         tick[0].HighPrice24H.Float64(),
+		Low:          tick[0].LowPrice24H.Float64(),
+		Volume:       tick[0].Volume24H.Float64(),
+		Pair:         p.Format(pairFormat),
+		ExchangeName: ap.Name,
+		AssetType:    assetType,
+	}
+	err = ticker.ProcessTicker(tickerPrice)
+	if err != nil {
+		return tickerPrice, err
+	}
 	return ticker.GetTicker(ap.Name, p, assetType)
 }
 
 // UpdateTickers updates all currency pairs of a given asset type
 func (ap *Apexpro) UpdateTickers(ctx context.Context, assetType asset.Item) error {
-	// NOTE: EXAMPLE FOR GETTING TICKER PRICE
-	/*
-			tick, err := ap.GetTickers()
-			if err != nil {
-				return err
-			}
-		    for y := range tick {
-		        cp, err := currency.NewPairFromString(tick[y].Symbol)
-		        if err != nil {
-		            return err
-		        }
-		        err = ticker.ProcessTicker(&ticker.Price{
-		            Last:         tick[y].LastPrice,
-		            High:         tick[y].HighPrice,
-		            Low:          tick[y].LowPrice,
-		            Bid:          tick[y].BidPrice,
-		            Ask:          tick[y].AskPrice,
-		            Volume:       tick[y].Volume,
-		            QuoteVolume:  tick[y].QuoteVolume,
-		            Open:         tick[y].OpenPrice,
-		            Close:        tick[y].PrevClosePrice,
-		            Pair:         cp,
-		            ExchangeName: b.Name,
-		            AssetType:    assetType,
-		        })
-		        if err != nil {
-		            return err
-		        }
-		    }
-	*/
-	return nil
+	return common.ErrFunctionNotSupported
 }
 
 // FetchTicker returns the ticker for a currency pair
@@ -258,81 +228,153 @@ func (ap *Apexpro) FetchOrderbook(ctx context.Context, pair currency.Pair, asset
 
 // UpdateOrderbook updates and returns the orderbook for a currency pair
 func (ap *Apexpro) UpdateOrderbook(ctx context.Context, pair currency.Pair, assetType asset.Item) (*orderbook.Base, error) {
+	pairFormat, err := ap.GetPairFormat(assetType, true)
+	if err != nil {
+		return nil, err
+	}
+	orderbookNew, err := ap.GetMarketDepthV3(ctx, pairFormat.Format(pair), 1000)
+	if err != nil {
+		return nil, err
+	}
 	book := &orderbook.Base{
 		Exchange:        ap.Name,
 		Pair:            pair,
 		Asset:           assetType,
 		VerifyOrderbook: ap.CanVerifyOrderbook,
 	}
-
-	// NOTE: UPDATE ORDERBOOK EXAMPLE
-	/*
-		orderbookNew, err := ap.GetOrderBook(exchange.FormatExchangeCurrency(ap.Name, p).String(), 1000)
-		if err != nil {
-			return book, err
+	book.Bids = make([]orderbook.Tranche, len(orderbookNew.Bids))
+	for x := range orderbookNew.Bids {
+		book.Bids[x] = orderbook.Tranche{
+			Amount: orderbookNew.Bids[x][1].Float64(),
+			Price:  orderbookNew.Bids[x][0].Float64(),
 		}
-
-		book.Bids = make([]orderbook.Tranche, len(orderbookNew.Bids))
-		for x := range orderbookNew.Bids {
-			book.Bids[x] = orderbook.Tranche{
-				Amount: orderbookNew.Bids[x].Quantity,
-				Price: orderbookNew.Bids[x].Price,
-			}
-		}
-
-		book.Asks = make([]orderbook.Tranche, len(orderbookNew.Asks))
-		for x := range orderbookNew.Asks {
-			book.Asks[x] = orderbook.Tranche{
-				Amount: orderBookNew.Asks[x].Quantity,
-				Price: orderBookNew.Asks[x].Price,
-			}
-		}
-	*/
-
-	err := book.Process()
-	if err != nil {
-		return book, err
 	}
 
+	book.Asks = make([]orderbook.Tranche, len(orderbookNew.Asks))
+	for x := range orderbookNew.Asks {
+		book.Asks[x] = orderbook.Tranche{
+			Amount: orderbookNew.Asks[x][1].Float64(),
+			Price:  orderbookNew.Asks[x][0].Float64(),
+		}
+	}
+	err = book.Process()
+	if err != nil {
+		return nil, err
+	}
 	return orderbook.Get(ap.Name, pair, assetType)
 }
 
 // UpdateAccountInfo retrieves balances for all enabled currencies
 func (ap *Apexpro) UpdateAccountInfo(ctx context.Context, assetType asset.Item) (account.Holdings, error) {
-	// If fetching requires more than one asset type please set
-	// HasAssetTypeAccountSegregation to true in RESTCapabilities above.
-	return account.Holdings{}, common.ErrNotYetImplemented
+	accountInfo, err := ap.GetUserAccountDataV3(ctx)
+	if err != nil {
+		return account.Holdings{}, err
+	}
+	spotSubAccount := account.SubAccount{
+		AssetType:  assetType,
+		Currencies: []account.Balance{},
+	}
+	for a := range accountInfo.ContractWallets {
+		spotSubAccount.Currencies = append(spotSubAccount.Currencies, account.Balance{
+			Currency: currency.NewCode(accountInfo.ContractWallets[a].Asset),
+			Total:    accountInfo.ContractWallets[a].Balance.Float64(),
+			Hold:     accountInfo.ContractWallets[a].PendingWithdrawAmount.Float64(),
+		})
+	}
+	return account.Holdings{
+		Exchange: ap.Name,
+		Accounts: []account.SubAccount{spotSubAccount},
+	}, nil
 }
 
 // FetchAccountInfo retrieves balances for all enabled currencies
 func (ap *Apexpro) FetchAccountInfo(ctx context.Context, assetType asset.Item) (account.Holdings, error) {
-	// Example implementation below:
-	// 	creds, err := ap.GetCredentials(ctx)
-	// 	if err != nil {
-	// 		return account.Holdings{}, err
-	// 	}
-	// 	acc, err := account.GetHoldings(ap.Name, creds, assetType)
-	// 	if err != nil {
-	// 		return ap.UpdateAccountInfo(ctx, assetType)
-	// 	}
-	// 	return acc, nil
-	return account.Holdings{}, common.ErrNotYetImplemented
+	creds, err := ap.GetCredentials(ctx)
+	if err != nil {
+		return account.Holdings{}, err
+	}
+	acc, err := account.GetHoldings(ap.Name, creds, assetType)
+	if err != nil {
+		return ap.UpdateAccountInfo(ctx, assetType)
+	}
+	return acc, nil
 }
 
 // GetFundingHistory returns funding history, deposits and
 // withdrawals
 func (ap *Apexpro) GetAccountFundingHistory(ctx context.Context) ([]exchange.FundingHistory, error) {
-	return nil, common.ErrNotYetImplemented
+	transfers, err := ap.GetUserTransferDataV2(ctx, currency.EMPTYCODE, time.Time{}, time.Time{}, "", []string{}, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]exchange.FundingHistory, len(transfers.Transfers))
+	for x := range transfers.Transfers {
+		resp = append(resp, exchange.FundingHistory{
+			ExchangeName: ap.Name,
+			Status:       resp[x].Status,
+			Timestamp:    transfers.Transfers[x].UpdatedTime.Time(),
+			Currency:     transfers.Transfers[x].CurrencyID,
+			Amount:       transfers.Transfers[x].Amount.Float64(),
+			Fee:          transfers.Transfers[x].Fee.Float64(),
+			TransferType: transfers.Transfers[x].Type,
+			CryptoTxID:   transfers.Transfers[x].ID,
+		})
+	}
+	return resp, nil
 }
 
 // GetWithdrawalsHistory returns previous withdrawals data
 func (ap *Apexpro) GetWithdrawalsHistory(ctx context.Context, c currency.Code, a asset.Item) ([]exchange.WithdrawalHistory, error) {
-	return nil, common.ErrNotYetImplemented
+	withdrawals, err := ap.GetUserTransferDataV2(ctx, currency.EMPTYCODE, time.Time{}, time.Time{}, "WITHDRAW", []string{}, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]exchange.WithdrawalHistory, len(withdrawals.Transfers))
+	for x := range withdrawals.Transfers {
+		resp = append(resp, exchange.WithdrawalHistory{
+			Status:       resp[x].Status,
+			Timestamp:    withdrawals.Transfers[x].UpdatedTime.Time(),
+			Currency:     withdrawals.Transfers[x].CurrencyID,
+			Amount:       withdrawals.Transfers[x].Amount.Float64(),
+			TransferType: withdrawals.Transfers[x].Type,
+			CryptoTxID:   withdrawals.Transfers[x].ID,
+			Fee:          withdrawals.Transfers[x].Fee.Float64(),
+		})
+	}
+	return resp, nil
 }
 
 // GetRecentTrades returns the most recent trades for a currency and asset
 func (ap *Apexpro) GetRecentTrades(ctx context.Context, p currency.Pair, assetType asset.Item) ([]trade.Data, error) {
-	return nil, common.ErrNotYetImplemented
+	if assetType != asset.Futures {
+		return nil, fmt.Errorf("%w, asset type: %v", asset.ErrNotSupported, assetType)
+	}
+	pairFormat, err := ap.GetPairFormat(asset.Futures, true)
+	if err != nil {
+		return nil, err
+	}
+	tradeData, err := ap.GetNewestTradingDataV3(ctx, pairFormat.Format(p), 1000)
+	if err != nil {
+		return nil, err
+	}
+	var side order.Side
+	resp := make([]trade.Data, len(tradeData))
+	for i := range tradeData {
+		side, err = order.StringToOrderSide(tradeData[0].Side)
+		if err != nil {
+			return nil, err
+		}
+		resp = append(resp, trade.Data{
+			Exchange:     ap.Name,
+			CurrencyPair: p.Format(pairFormat),
+			AssetType:    asset.Futures,
+			Price:        tradeData[i].Price.Float64(),
+			Amount:       tradeData[i].Volume.Float64(),
+			Timestamp:    tradeData[i].TradeTime.Time(),
+			Side:         side,
+		})
+	}
+	return resp, nil
 }
 
 // GetHistoricTrades returns historic trade data within the timeframe provided
@@ -341,8 +383,8 @@ func (ap *Apexpro) GetHistoricTrades(ctx context.Context, p currency.Pair, asset
 }
 
 // GetServerTime returns the current exchange server time.
-func (ap *Apexpro) GetServerTime(ctx context.Context, a asset.Item) (time.Time, error) {
-	return time.Time{}, common.ErrNotYetImplemented
+func (ap *Apexpro) GetServerTime(ctx context.Context, _ asset.Item) (time.Time, error) {
+	return ap.GetSystemTimeV3(ctx)
 }
 
 // SubmitOrder submits a new order
