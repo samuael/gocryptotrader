@@ -1176,8 +1176,8 @@ type OrderDetail struct {
 	Price           types.Number         `json:"price"`
 	TriggerPrice    types.Number         `json:"triggerPrice"`
 	TrailingPercent string               `json:"trailingPercent"`
-	Size            string               `json:"size"`
-	Type            string               `json:"type"`
+	Size            types.Number         `json:"size"`
+	OrderType       string               `json:"type"`
 	CreatedAt       convert.ExchangeTime `json:"createdAt"`
 	ExpiresAt       convert.ExchangeTime `json:"expiresAt"`
 	Status          string               `json:"status"`

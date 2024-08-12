@@ -517,9 +517,6 @@ func (ap *Apexpro) GetFastAndCrossChainWithdrawalFeesV2(ctx context.Context, amo
 	if token.IsEmpty() {
 		return nil, fmt.Errorf("%w, token is required", currency.ErrCurrencyCodeEmpty)
 	}
-	if chainID == "" {
-		return nil, errChainIDMissing
-	}
 	return ap.getFastAndCrossChainWithdrawalFees(ctx, amount, chainID, "v2/uncommon-withdraw-fee", token.String())
 }
 

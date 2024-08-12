@@ -436,28 +436,96 @@ func (ap *Apexpro) CancelBatchOrders(ctx context.Context, orders []order.Cancel)
 
 // CancelAllOrders cancels all orders associated with a currency pair
 func (ap *Apexpro) CancelAllOrders(ctx context.Context, orderCancellation *order.Cancel) (order.CancelAllResponse, error) {
-	// if err := orderCancellation.Validate(); err != nil {
-	//	 return err
-	// }
+	if err := orderCancellation.Validate(); err != nil {
+		return order.CancelAllResponse{}, err
+	}
+	var symbols []string
+	if !orderCancellation.Pair.IsEmpty() {
+		symbols = append(symbols, orderCancellation.Pair.String())
+	}
+	err := ap.CancelAllOpenOrdersV3(ctx, symbols)
+	if err != nil {
+		return order.CancelAllResponse{}, err
+	}
 	return order.CancelAllResponse{}, common.ErrNotYetImplemented
 }
 
 // GetOrderInfo returns order information based on order ID
-func (ap *Apexpro) GetOrderInfo(ctx context.Context, orderID string, pair currency.Pair, assetType asset.Item) (*order.Detail, error) {
-	return nil, common.ErrNotYetImplemented
+func (ap *Apexpro) GetOrderInfo(ctx context.Context, orderID string, _ currency.Pair, _ asset.Item) (*order.Detail, error) {
+	if orderID == "" {
+		return nil, order.ErrOrderIDNotSet
+	}
+	orderDetail, err := ap.GetOrderID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	oType, err := order.StringToOrderType(orderDetail.OrderType)
+	if err != nil {
+		return nil, err
+	}
+	oStatus, err := order.StringToOrderStatus(orderDetail.Status)
+	if err != nil {
+		return nil, err
+	}
+	oSide, err := order.StringToOrderSide(orderDetail.Side)
+	if err != nil {
+		return nil, err
+	}
+	cp, err := currency.NewPairFromString(orderDetail.Symbol)
+	if err != nil {
+		return nil, err
+	}
+	return &order.Detail{
+		PostOnly:        orderDetail.PostOnly,
+		ReduceOnly:      orderDetail.ReduceOnly,
+		Price:           orderDetail.Price.Float64(),
+		Amount:          orderDetail.Size.Float64(),
+		ContractAmount:  orderDetail.Size.Float64(),
+		TriggerPrice:    orderDetail.TriggerPrice.Float64(),
+		ExecutedAmount:  orderDetail.CumMatchFillSize.Float64(),
+		RemainingAmount: orderDetail.Size.Float64() - orderDetail.TriggerPrice.Float64(),
+		Fee:             orderDetail.Fee.Float64(),
+		Exchange:        ap.Name,
+		OrderID:         orderDetail.ID,
+		ClientOrderID:   orderDetail.ClientOrderID,
+		AccountID:       orderDetail.AccountID,
+		Type:            oType,
+		Side:            oSide,
+		Status:          oStatus,
+		AssetType:       asset.Futures,
+		LastUpdated:     orderDetail.UpdatedTime.Time(),
+		Pair:            cp,
+	}, nil
 }
 
 // GetDepositAddress returns a deposit address for a specified currency
 func (ap *Apexpro) GetDepositAddress(ctx context.Context, c currency.Code, accountID string, chain string) (*deposit.Address, error) {
-	return nil, common.ErrNotYetImplemented
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
 func (ap *Apexpro) WithdrawCryptocurrencyFunds(ctx context.Context, withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
-	// if err := withdrawRequest.Validate(); err != nil {
-	//	return nil, err
-	// }
+	if err := withdrawRequest.Validate(); err != nil {
+		return nil, err
+	}
+	ap.WithdrawAsset(ctx, &AssetWithdrawalParams{
+		Amount:           withdrawRequest.Amount,
+		ClientWithdrawID: withdrawRequest.ClientOrderID,
+		// Timestamp: withdrawRequest.
+		EthereumAddress: withdrawRequest.Crypto.Address,
+		// Signature
+		// ZKAccountID
+		// SubAccountID
+		// L2Key
+
+		// ToChainID
+		// L2SourceTokenID
+		// L1TargetTokenID
+		// Fee
+		// Nonce
+		// IsFastWithdraw
+	})
 	return nil, common.ErrNotYetImplemented
 }
 
@@ -481,23 +549,143 @@ func (ap *Apexpro) WithdrawFiatFundsToInternationalBank(ctx context.Context, wit
 
 // GetActiveOrders retrieves any orders that are active/open
 func (ap *Apexpro) GetActiveOrders(ctx context.Context, getOrdersRequest *order.MultiOrderRequest) (order.FilteredOrders, error) {
-	// if err := getOrdersRequest.Validate(); err != nil {
-	//	return nil, err
-	// }
-	return nil, common.ErrNotYetImplemented
+	if err := getOrdersRequest.Validate(); err != nil {
+		return nil, err
+	}
+	orders, err := ap.GetOpenOrders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	orderFilters := make(order.FilteredOrders, len(orders))
+	for a := range orders {
+		oType, err := order.StringToOrderType(orders[a].OrderType)
+		if err != nil {
+			return nil, err
+		}
+		oStatus, err := order.StringToOrderStatus(orders[a].Status)
+		if err != nil {
+			return nil, err
+		}
+		oSide, err := order.StringToOrderSide(orders[a].Side)
+		if err != nil {
+			return nil, err
+		}
+		cp, err := currency.NewPairFromString(orders[a].Symbol)
+		if err != nil {
+			return nil, err
+		}
+		orderFilters[a] = order.Detail{
+			PostOnly:        orders[a].PostOnly,
+			ReduceOnly:      orders[a].ReduceOnly,
+			Price:           orders[a].Price.Float64(),
+			Amount:          orders[a].Size.Float64(),
+			ContractAmount:  orders[a].Size.Float64(),
+			TriggerPrice:    orders[a].TriggerPrice.Float64(),
+			ExecutedAmount:  orders[a].CumMatchFillSize.Float64(),
+			RemainingAmount: orders[a].Size.Float64() - orders[a].TriggerPrice.Float64(),
+			Fee:             orders[a].Fee.Float64(),
+			Exchange:        ap.Name,
+			OrderID:         orders[a].ID,
+			ClientOrderID:   orders[a].ClientOrderID,
+			AccountID:       orders[a].AccountID,
+			Type:            oType,
+			Side:            oSide,
+			Status:          oStatus,
+			AssetType:       asset.Futures,
+			LastUpdated:     orders[a].UpdatedTime.Time(),
+			Pair:            cp,
+		}
+	}
+	return orderFilters, nil
 }
 
 // GetOrderHistory retrieves account order information
 // Can Limit response to specific order status
 func (ap *Apexpro) GetOrderHistory(ctx context.Context, getOrdersRequest *order.MultiOrderRequest) (order.FilteredOrders, error) {
-	// if err := getOrdersRequest.Validate(); err != nil {
-	//	return nil, err
-	// }
-	return nil, common.ErrNotYetImplemented
+	if err := getOrdersRequest.Validate(); err != nil {
+		return nil, err
+	}
+	// getOrdersRequest.AssetType
+	pairFormat, err := ap.GetPairFormat(asset.Futures, true)
+	if err != nil {
+		return nil, err
+	}
+	getOrdersRequest.Pairs = getOrdersRequest.Pairs.Format(pairFormat)
+	var symbol string
+	if len(getOrdersRequest.Pairs) == 0 {
+		symbol = getOrdersRequest.Pairs[0].String()
+	}
+	orderHistoryResponse, err := ap.GetAllOrderHistory(ctx, symbol, getOrdersRequest.Side.String(), getOrdersRequest.Type.String(), "", "", getOrdersRequest.StartTime, getOrdersRequest.EndTime, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	orderFilters := make(order.FilteredOrders, 0, len(orderHistoryResponse.Orders))
+	for a := range orderHistoryResponse.Orders {
+		cp, err := currency.NewPairFromString(orderHistoryResponse.Orders[a].Symbol)
+		if err != nil {
+			return nil, err
+		}
+		if len(getOrdersRequest.Pairs) > 0 && !getOrdersRequest.Pairs.Contains(cp, true) {
+			continue
+		}
+		oType, err := order.StringToOrderType(orderHistoryResponse.Orders[a].OrderType)
+		if err != nil {
+			return nil, err
+		}
+		oStatus, err := order.StringToOrderStatus(orderHistoryResponse.Orders[a].Status)
+		if err != nil {
+			return nil, err
+		}
+		oSide, err := order.StringToOrderSide(orderHistoryResponse.Orders[a].Side)
+		if err != nil {
+			return nil, err
+		}
+		orderFilters = append(orderFilters, order.Detail{
+			PostOnly:        orderHistoryResponse.Orders[a].PostOnly,
+			ReduceOnly:      orderHistoryResponse.Orders[a].ReduceOnly,
+			Price:           orderHistoryResponse.Orders[a].Price.Float64(),
+			Amount:          orderHistoryResponse.Orders[a].Size.Float64(),
+			ContractAmount:  orderHistoryResponse.Orders[a].Size.Float64(),
+			TriggerPrice:    orderHistoryResponse.Orders[a].TriggerPrice.Float64(),
+			ExecutedAmount:  orderHistoryResponse.Orders[a].CumMatchFillSize.Float64(),
+			RemainingAmount: orderHistoryResponse.Orders[a].Size.Float64() - orderHistoryResponse.Orders[a].TriggerPrice.Float64(),
+			Fee:             orderHistoryResponse.Orders[a].Fee.Float64(),
+			Exchange:        ap.Name,
+			OrderID:         orderHistoryResponse.Orders[a].ID,
+			ClientOrderID:   orderHistoryResponse.Orders[a].ClientOrderID,
+			AccountID:       orderHistoryResponse.Orders[a].AccountID,
+			Type:            oType,
+			Side:            oSide,
+			Status:          oStatus,
+			AssetType:       asset.Futures,
+			LastUpdated:     orderHistoryResponse.Orders[a].UpdatedTime.Time(),
+			Pair:            cp,
+		})
+	}
+	return orderFilters, nil
 }
 
 // GetFeeByType returns an estimate of fee based on the type of transaction
 func (ap *Apexpro) GetFeeByType(ctx context.Context, feeBuilder *exchange.FeeBuilder) (float64, error) {
+	switch feeBuilder.FeeType {
+	case exchange.OfflineTradeFee:
+		return feeBuilder.Amount * feeBuilder.PurchasePrice * 0.002, nil
+	case exchange.CryptocurrencyTradeFee:
+		userResp, err := ap.GetUserAccountDataV3(ctx)
+		if err != nil {
+			return 0, err
+		}
+		if feeBuilder.IsMaker {
+			return userResp.ContractAccount.MakerFeeRate.Float64() * feeBuilder.Amount * feeBuilder.PurchasePrice, nil
+		}
+		return userResp.ContractAccount.TakerFeeRate.Float64() * feeBuilder.Amount * feeBuilder.PurchasePrice, nil
+	case exchange.CryptocurrencyWithdrawalFee:
+		resp, err := ap.GetFastAndCrossChainWithdrawalFeesV2(ctx, feeBuilder.Amount, "", feeBuilder.FiatCurrency)
+		if err != nil {
+			return 0, err
+		}
+		return resp.Fee.Float64(), nil
+	}
 	return 0, common.ErrNotYetImplemented
 }
 
@@ -508,22 +696,139 @@ func (ap *Apexpro) ValidateAPICredentials(ctx context.Context, assetType asset.I
 }
 
 // GetHistoricCandles returns candles between a time period for a set time interval
-func (ap *Apexpro) GetHistoricCandles(ctx context.Context, pair currency.Pair, a asset.Item, interval kline.Interval, start, end time.Time) (*kline.Item, error) {
-	return nil, common.ErrNotYetImplemented
+func (ap *Apexpro) GetHistoricCandles(ctx context.Context, pair currency.Pair, _ asset.Item, interval kline.Interval, start, end time.Time) (*kline.Item, error) {
+	req, err := ap.GetKlineRequest(pair, asset.Futures, interval, start, end, false)
+	if err != nil {
+		return nil, err
+	}
+	pairFormat, err := ap.GetPairFormat(asset.Futures, true)
+	if err != nil {
+		return nil, err
+	}
+	candles, err := ap.GetCandlestickChartDataV3(ctx, pairFormat.Format(pair), interval, start, end, 1000)
+	if err != nil {
+		return nil, err
+	}
+	for x := range candles {
+		cp, err := currency.NewPairFromString(x)
+		if err != nil {
+			return nil, err
+		}
+		if !cp.Equal(pair) {
+			continue
+		}
+		timeSeries := make([]kline.Candle, len(candles[x]))
+		for p := range candles[x] {
+			timeSeries[p] = kline.Candle{
+				Time:   candles[x][p].Start.Time(),
+				Open:   candles[x][p].Open.Float64(),
+				High:   candles[x][p].High.Float64(),
+				Low:    candles[x][p].Low.Float64(),
+				Close:  candles[x][p].Close.Float64(),
+				Volume: candles[x][p].Volume.Float64(),
+			}
+		}
+		return req.ProcessResponse(timeSeries)
+	}
+	return nil, fmt.Errorf("%w for pair: %v", kline.ErrNoTimeSeriesDataToConvert, pair)
 }
 
 // GetHistoricCandlesExtended returns candles between a time period for a set time interval
-func (ap *Apexpro) GetHistoricCandlesExtended(ctx context.Context, pair currency.Pair, a asset.Item, interval kline.Interval, start, end time.Time) (*kline.Item, error) {
-	return nil, common.ErrNotYetImplemented
+func (ap *Apexpro) GetHistoricCandlesExtended(ctx context.Context, pair currency.Pair, _ asset.Item, interval kline.Interval, start, end time.Time) (*kline.Item, error) {
+	req, err := ap.GetKlineExtendedRequest(pair, asset.Futures, interval, start, end)
+	if err != nil {
+		return nil, err
+	}
+	timeSeries := make([]kline.Candle, 0, req.Size())
+	for x := range req.RangeHolder.Ranges {
+		candles, err := ap.GetCandlestickChartDataV3(ctx, req.RequestFormatted.String(), interval, req.RangeHolder.Ranges[x].Start.Time, req.RangeHolder.Ranges[x].End.Time, 1000)
+		if err != nil {
+			return nil, err
+		}
+		for y := range candles {
+			cp, err := currency.NewPairFromString(y)
+			if err != nil {
+				return nil, err
+			}
+			if !cp.Equal(pair) {
+				continue
+			}
+			for p := range candles[y] {
+				timeSeries = append(timeSeries, kline.Candle{
+					Time:   candles[y][p].Start.Time(),
+					Open:   candles[y][p].Open.Float64(),
+					High:   candles[y][p].High.Float64(),
+					Low:    candles[y][p].Low.Float64(),
+					Close:  candles[y][p].Close.Float64(),
+					Volume: candles[y][p].Volume.Float64(),
+				})
+			}
+		}
+	}
+	return req.ProcessResponse(timeSeries)
 }
 
 // GetFuturesContractDetails returns all contracts from the exchange by asset type
-func (ap *Apexpro) GetFuturesContractDetails(context.Context, asset.Item) ([]futures.Contract, error) {
-	return nil, common.ErrNotYetImplemented
+func (ap *Apexpro) GetFuturesContractDetails(ctx context.Context, _ asset.Item) ([]futures.Contract, error) {
+	result, err := ap.GetAllConfigDataV3(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]futures.Contract, 0, len(result.ContractConfig.PerpetualContract))
+	for x := range result.ContractConfig.PerpetualContract {
+		var cp, underlying currency.Pair
+		cp, err = currency.NewPairFromString(result.ContractConfig.PerpetualContract[x].Symbol)
+		if err != nil {
+			return nil, err
+		}
+		underlying, err = currency.NewPairFromStrings(result.ContractConfig.PerpetualContract[x].Symbol, "USD")
+		if err != nil {
+			return nil, err
+		}
+		resp = append(resp, futures.Contract{
+			Exchange:             ap.Name,
+			Name:                 cp,
+			Underlying:           underlying,
+			Asset:                asset.Futures,
+			StartDate:            result.ContractConfig.PerpetualContract[x].KlineStartTime.Time(),
+			SettlementType:       futures.Linear,
+			IsActive:             result.ContractConfig.PerpetualContract[x].EnableTrade,
+			Type:                 futures.Perpetual,
+			SettlementCurrencies: currency.Currencies{currency.USD},
+		})
+	}
+	return resp, nil
+}
+
+// IsPerpetualFutureCurrency ensures a given asset and currency is a perpetual future
+func (ap *Apexpro) IsPerpetualFutureCurrency(a asset.Item, pair currency.Pair) (bool, error) {
+	if a != asset.Futures {
+		return false, futures.ErrNotFuturesAsset
+	}
+	if pair.IsEmpty() {
+		return false, currency.ErrCurrencyPairEmpty
+	}
+	var contracts []PerpetualContractDetail
+	if ap.SymbolsConfig != nil {
+		contracts = ap.SymbolsConfig.Data.PerpetualContract
+	} else {
+		resp, err := ap.GetAllSymbolsConfigDataV1(context.Background())
+		if err != nil {
+			return false, err
+		}
+		contracts = resp.Data.PerpetualContract
+	}
+	symbol := pair.String()
+	for a := range contracts {
+		if contracts[a].Symbol == symbol {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // GetLatestFundingRates returns the latest funding rates data
-func (ap *Apexpro) GetLatestFundingRates(_ context.Context, _ *fundingrate.LatestRateRequest) ([]fundingrate.LatestRateResponse, error) {
+func (ap *Apexpro) GetLatestFundingRates(ctx context.Context, _ *fundingrate.LatestRateRequest) ([]fundingrate.LatestRateResponse, error) {
 	return nil, common.ErrNotYetImplemented
 }
 
