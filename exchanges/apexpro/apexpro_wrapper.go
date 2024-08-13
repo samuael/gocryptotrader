@@ -2,9 +2,11 @@ package apexpro
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
@@ -186,6 +188,9 @@ func (ap *Apexpro) UpdateTicker(ctx context.Context, p currency.Pair, assetType 
 	tick, err := ap.GetTickerDataV3(ctx, p.Format(pairFormat).String())
 	if err != nil {
 		return nil, err
+	}
+	if len(tick) == 0 {
+		return nil, ticker.ErrNoTickerFound
 	}
 	tickerPrice := &ticker.Price{
 		Last:         tick[0].LastPrice.Float64(),
@@ -828,11 +833,80 @@ func (ap *Apexpro) IsPerpetualFutureCurrency(a asset.Item, pair currency.Pair) (
 }
 
 // GetLatestFundingRates returns the latest funding rates data
-func (ap *Apexpro) GetLatestFundingRates(ctx context.Context, _ *fundingrate.LatestRateRequest) ([]fundingrate.LatestRateResponse, error) {
-	return nil, common.ErrNotYetImplemented
+func (ap *Apexpro) GetLatestFundingRates(ctx context.Context, r *fundingrate.LatestRateRequest) ([]fundingrate.LatestRateResponse, error) {
+	if r == nil {
+		return nil, fmt.Errorf("%w LatestRateRequest", common.ErrNilPointer)
+	}
+	if r.Asset != asset.Futures {
+		return nil, fmt.Errorf("%w %v", asset.ErrNotSupported, r.Asset)
+	}
+	pairFormat, err := ap.GetPairFormat(asset.Futures, true)
+	if err != nil {
+		return nil, err
+	}
+	r.Pair = r.Pair.Format(pairFormat)
+	tickerData, err := ap.GetTickerDataV3(ctx, r.Pair.String())
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]fundingrate.LatestRateResponse, 0, len(tickerData))
+	for i := range tickerData {
+		var cp currency.Pair
+		var isEnabled bool
+		cp, isEnabled, err = ap.MatchSymbolCheckEnabled(tickerData[i].Symbol, r.Asset, false)
+		if err != nil && !errors.Is(err, currency.ErrPairNotFound) {
+			return nil, err
+		} else if !isEnabled {
+			continue
+		}
+		resp = append(resp, fundingrate.LatestRateResponse{
+			Exchange:    ap.Name,
+			TimeChecked: time.Now(),
+			Asset:       asset.Futures,
+			Pair:        cp,
+			PredictedUpcomingRate: fundingrate.Rate{
+				Time: tickerData[i].NextFundingTime.Time(),
+				Rate: decimal.NewFromFloat(tickerData[i].PredictedFundingRate.Float64()),
+			},
+			LatestRate: fundingrate.Rate{
+				Rate: decimal.NewFromFloat(tickerData[i].FundingRate.Float64()),
+			},
+			TimeOfNextRate: tickerData[i].NextFundingTime.Time(),
+		})
+	}
+	if len(resp) == 0 {
+		return nil, fmt.Errorf("%w %v %v", futures.ErrNotPerpetualFuture, r.Asset, r.Pair)
+	}
+	return resp, nil
 }
 
 // UpdateOrderExecutionLimits updates order execution limits
-func (ap *Apexpro) UpdateOrderExecutionLimits(_ context.Context, _ asset.Item) error {
-	return common.ErrNotYetImplemented
+func (ap *Apexpro) UpdateOrderExecutionLimits(ctx context.Context, _ asset.Item) error {
+	instrumentsInfo, err := ap.GetAllConfigDataV3(ctx)
+	if err != nil {
+		return err
+	}
+	// return fmt.Errorf("%s %w", aa, asset.ErrNotSupported)
+	limits := make([]order.MinMaxLevel, 0, len(instrumentsInfo.ContractConfig.PerpetualContract))
+	for x := range instrumentsInfo.ContractConfig.PerpetualContract {
+		var pair currency.Pair
+		pair, err = ap.MatchSymbolWithAvailablePairs(instrumentsInfo.ContractConfig.PerpetualContract[x].Symbol, asset.Futures, false)
+		if err != nil {
+			log.Warnf(log.ExchangeSys, "%s unable to load limits for %v, pair data missing", ap.Name, instrumentsInfo.ContractConfig.PerpetualContract[x].Symbol)
+			continue
+		}
+		limits = append(limits, order.MinMaxLevel{
+			Asset:                   asset.Futures,
+			Pair:                    pair,
+			MinimumBaseAmount:       instrumentsInfo.ContractConfig.PerpetualContract[x].MinOrderSize.Float64(),
+			MaximumBaseAmount:       instrumentsInfo.ContractConfig.PerpetualContract[x].MaxOrderSize.Float64(),
+			MaxTotalOrders:          instrumentsInfo.ContractConfig.PerpetualContract[x].MaxPositionSize.Int64(),
+			MaxPrice:                instrumentsInfo.ContractConfig.PerpetualContract[x].MaxMarketPriceRange.Float64(),
+			PriceStepIncrementSize:  instrumentsInfo.ContractConfig.PerpetualContract[x].TickSize.Float64(),
+			AmountStepIncrementSize: instrumentsInfo.ContractConfig.PerpetualContract[x].StepSize.Float64(),
+			QuoteStepIncrementSize:  instrumentsInfo.ContractConfig.PerpetualContract[x].IncrementalPositionValue.Float64(),
+			MaximumQuoteAmount:      instrumentsInfo.ContractConfig.PerpetualContract[x].MaxPositionValue.Float64(),
+		})
+	}
+	return ap.LoadLimits(limits)
 }

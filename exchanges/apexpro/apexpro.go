@@ -452,9 +452,6 @@ func (ap *Apexpro) GetUserTransferDataV1(ctx context.Context, ccy currency.Code,
 }
 
 func (ap *Apexpro) getUserTransferData(ctx context.Context, ccy currency.Code, startTime, endTime time.Time, transferType, path string, chainIDs []string, limit, page int64) (*UserWithdrawalsV2, error) {
-	// if ccy.IsEmpty() {
-	// 	return nil, currency.ErrCurrencyCodeEmpty
-	// }
 	params := url.Values{}
 	if !ccy.IsEmpty() {
 		params.Set("currencyId", ccy.String())

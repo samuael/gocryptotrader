@@ -122,13 +122,13 @@ type AllSymbolsConfigs struct {
 			FundingInterestRate              types.Number         `json:"fundingInterestRate"`
 			IncrementalInitialMarginRate     types.Number         `json:"incrementalInitialMarginRate"`
 			IncrementalMaintenanceMarginRate types.Number         `json:"incrementalMaintenanceMarginRate"`
-			IncrementalPositionValue         string               `json:"incrementalPositionValue"`
+			IncrementalPositionValue         types.Number         `json:"incrementalPositionValue"`
 			InitialMarginRate                types.Number         `json:"initialMarginRate"`
 			MaintenanceMarginRate            types.Number         `json:"maintenanceMarginRate"`
 			MaxOrderSize                     types.Number         `json:"maxOrderSize"`
 			MaxPositionSize                  types.Number         `json:"maxPositionSize"`
 			MinOrderSize                     types.Number         `json:"minOrderSize"`
-			MaxMarketPriceRange              string               `json:"maxMarketPriceRange"`
+			MaxMarketPriceRange              types.Number         `json:"maxMarketPriceRange"`
 			SettleAssetID                    string               `json:"settleAssetId"` // Collateral asset ID.
 			BaseTokenID                      string               `json:"baseTokenId"`
 			StepSize                         types.Number         `json:"stepSize"`
@@ -136,7 +136,7 @@ type AllSymbolsConfigs struct {
 			SymbolDisplayName                string               `json:"symbolDisplayName"`
 			TickSize                         types.Number         `json:"tickSize"`
 			MaxMaintenanceMarginRate         types.Number         `json:"maxMaintenanceMarginRate"`
-			MaxPositionValue                 string               `json:"maxPositionValue"`
+			MaxPositionValue                 types.Number         `json:"maxPositionValue"`
 			TagIconURL                       string               `json:"tagIconUrl"`
 			Tag                              string               `json:"tag"`
 			RiskTip                          bool                 `json:"riskTip"`
@@ -149,7 +149,7 @@ type AllSymbolsConfigs struct {
 			OpenPositionOiLimitRate          types.Number         `json:"openPositionOiLimitRate"`
 			FundingMaxRate                   types.Number         `json:"fundingMaxRate"`
 			FundingMinRate                   types.Number         `json:"fundingMinRate"`
-			FundingMaxValue                  string               `json:"fundingMaxValue"`
+			FundingMaxValue                  types.Number         `json:"fundingMaxValue"`
 			EnableFundingMxValue             bool                 `json:"enableFundingMxValue"`
 			L2PairID                         string               `json:"l2PairId"`
 			SettleTimeStamp                  convert.ExchangeTime `json:"settleTimeStamp"`
@@ -166,22 +166,22 @@ type AllSymbolsConfigs struct {
 			CrossSymbolID                    int64                `json:"crossSymbolId"`
 			CrossSymbolName                  string               `json:"crossSymbolName"`
 			DigitMerge                       string               `json:"digitMerge"`
-			DisplayMaxLeverage               string               `json:"displayMaxLeverage"`
-			DisplayMinLeverage               string               `json:"displayMinLeverage"`
+			DisplayMaxLeverage               types.Number         `json:"displayMaxLeverage"`
+			DisplayMinLeverage               types.Number         `json:"displayMinLeverage"`
 			EnableDisplay                    bool                 `json:"enableDisplay"`
 			EnableOpenPosition               bool                 `json:"enableOpenPosition"`
 			EnableTrade                      bool                 `json:"enableTrade"`
-			FundingImpactMarginNotional      string               `json:"fundingImpactMarginNotional"`
+			FundingImpactMarginNotional      types.Number         `json:"fundingImpactMarginNotional"`
 			FundingInterestRate              types.Number         `json:"fundingInterestRate"`
 			IncrementalInitialMarginRate     types.Number         `json:"incrementalInitialMarginRate"`
 			IncrementalMaintenanceMarginRate types.Number         `json:"incrementalMaintenanceMarginRate"`
-			IncrementalPositionValue         string               `json:"incrementalPositionValue"`
+			IncrementalPositionValue         types.Number         `json:"incrementalPositionValue"`
 			InitialMarginRate                types.Number         `json:"initialMarginRate"`
 			MaintenanceMarginRate            types.Number         `json:"maintenanceMarginRate"`
-			MaxOrderSize                     string               `json:"maxOrderSize"`
+			MaxOrderSize                     types.Number         `json:"maxOrderSize"`
 			MaxPositionSize                  types.Number         `json:"maxPositionSize"`
 			MinOrderSize                     types.Number         `json:"minOrderSize"`
-			MaxMarketPriceRange              string               `json:"maxMarketPriceRange"`
+			MaxMarketPriceRange              types.Number         `json:"maxMarketPriceRange"`
 			SettleAssetID                    string               `json:"settleAssetId"`
 			BaseTokenID                      string               `json:"baseTokenId"`
 			StepSize                         types.Number         `json:"stepSize"`
@@ -189,7 +189,7 @@ type AllSymbolsConfigs struct {
 			SymbolDisplayName                string               `json:"symbolDisplayName"`
 			TickSize                         types.Number         `json:"tickSize"`
 			MaxMaintenanceMarginRate         types.Number         `json:"maxMaintenanceMarginRate"`
-			MaxPositionValue                 string               `json:"maxPositionValue"`
+			MaxPositionValue                 types.Number         `json:"maxPositionValue"`
 			TagIconURL                       string               `json:"tagIconUrl"`
 			Tag                              string               `json:"tag"`
 			RiskTip                          bool                 `json:"riskTip"`
@@ -197,12 +197,12 @@ type AllSymbolsConfigs struct {
 			KlineStartTime                   convert.ExchangeTime `json:"klineStartTime"`
 			MaxMarketSizeBuffer              string               `json:"maxMarketSizeBuffer"`
 			EnableFundingSettlement          bool                 `json:"enableFundingSettlement"`
-			IndexPriceDecimals               int64                `json:"indexPriceDecimals"`
+			IndexPriceDecimals               float64              `json:"indexPriceDecimals"`
 			IndexPriceVarRate                types.Number         `json:"indexPriceVarRate"`
 			OpenPositionOiLimitRate          types.Number         `json:"openPositionOiLimitRate"`
 			FundingMaxRate                   types.Number         `json:"fundingMaxRate"`
 			FundingMinRate                   types.Number         `json:"fundingMinRate"`
-			FundingMaxValue                  string               `json:"fundingMaxValue"`
+			FundingMaxValue                  types.Number         `json:"fundingMaxValue"`
 			EnableFundingMxValue             bool                 `json:"enableFundingMxValue"`
 			L2PairID                         string               `json:"l2PairId"`
 			SettleTimeStamp                  convert.ExchangeTime `json:"settleTimeStamp"`
@@ -260,20 +260,20 @@ type CandlestickData struct {
 
 // TickerData represents a price ticker data.
 type TickerData struct {
-	Symbol               string       `json:"symbol"`
-	Price24HPcnt         types.Number `json:"price24hPcnt"`
-	LastPrice            types.Number `json:"lastPrice"`
-	HighPrice24H         types.Number `json:"highPrice24h"`
-	LowPrice24H          types.Number `json:"lowPrice24h"`
-	MarkPrice            types.Number `json:"markPrice"`
-	IndexPrice           types.Number `json:"indexPrice"`
-	OpenInterest         types.Number `json:"openInterest"`
-	Turnover24H          types.Number `json:"turnover24h"`
-	Volume24H            types.Number `json:"volume24h"`
-	FundingRate          types.Number `json:"fundingRate"`
-	PredictedFundingRate types.Number `json:"predictedFundingRate"`
-	NextFundingTime      string       `json:"nextFundingTime"`
-	TradeCount           types.Number `json:"tradeCount"`
+	Symbol               string               `json:"symbol"`
+	Price24HPcnt         types.Number         `json:"price24hPcnt"`
+	LastPrice            types.Number         `json:"lastPrice"`
+	HighPrice24H         types.Number         `json:"highPrice24h"`
+	LowPrice24H          types.Number         `json:"lowPrice24h"`
+	MarkPrice            types.Number         `json:"markPrice"`
+	IndexPrice           types.Number         `json:"indexPrice"`
+	OpenInterest         types.Number         `json:"openInterest"`
+	Turnover24H          types.Number         `json:"turnover24h"`
+	Volume24H            types.Number         `json:"volume24h"`
+	FundingRate          types.Number         `json:"fundingRate"`
+	PredictedFundingRate types.Number         `json:"predictedFundingRate"`
+	NextFundingTime      convert.ExchangeTime `json:"nextFundingTime"`
+	TradeCount           types.Number         `json:"tradeCount"`
 }
 
 // FundingRateHistory represents a funding rate history response.
@@ -330,8 +330,8 @@ type V2ConfigData struct {
 			PerpetualContract []struct {
 				Symbol                           string               `json:"symbol"`
 				BaselinePositionValue            string               `json:"baselinePositionValue"`
-				CrossID                          int                  `json:"crossId"`
-				CrossSymbolID                    int                  `json:"crossSymbolId"`
+				CrossID                          int64                `json:"crossId"`
+				CrossSymbolID                    int64                `json:"crossSymbolId"`
 				CrossSymbolName                  string               `json:"crossSymbolName"`
 				DigitMerge                       string               `json:"digitMerge"`
 				DisplayMaxLeverage               types.Number         `json:"displayMaxLeverage"`
@@ -355,13 +355,13 @@ type V2ConfigData struct {
 				StarkExResolution                string               `json:"starkExResolution"`
 				StarkExRiskFactor                string               `json:"starkExRiskFactor"`
 				StarkExSyntheticAssetID          string               `json:"starkExSyntheticAssetId"`
-				StepSize                         string               `json:"stepSize"`
+				StepSize                         types.Number         `json:"stepSize"`
 				SymbolDisplayName                string               `json:"symbolDisplayName"`
 				SymbolDisplayName2               string               `json:"symbolDisplayName2"`
-				TickSize                         string               `json:"tickSize"`
+				TickSize                         types.Number         `json:"tickSize"`
 				UnderlyingCurrencyID             string               `json:"underlyingCurrencyId"`
 				MaxMaintenanceMarginRate         types.Number         `json:"maxMaintenanceMarginRate"`
-				MaxPositionValue                 string               `json:"maxPositionValue"`
+				MaxPositionValue                 types.Number         `json:"maxPositionValue"`
 				TagIconURL                       string               `json:"tagIconUrl"`
 				Tag                              string               `json:"tag"`
 				RiskTip                          bool                 `json:"riskTip"`

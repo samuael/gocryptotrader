@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/margin"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
 )
@@ -225,6 +228,14 @@ func TestGetAllConfigDataV2(t *testing.T) {
 	result, err := ap.GetAllConfigDataV2(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, result)
+
+	for a := range result.Data.USDCConfig.PerpetualContract {
+		if strings.HasPrefix(result.Data.USDCConfig.PerpetualContract[a].Symbol, "BTC") {
+			println(result.Data.USDCConfig.PerpetualContract[a].Symbol)
+			println("MaxMarketPriceRange: ", result.Data.USDCConfig.PerpetualContract[a].MaxMarketPriceRange)
+			println("MaxPositionValue: ", result.Data.USDCConfig.PerpetualContract[a].MaxPositionValue)
+		}
+	}
 }
 
 func TestGetCheckIfUserExistsV2(t *testing.T) {
@@ -1053,6 +1064,166 @@ func TestFastWithdrawalV1(t *testing.T) {
 		ERC20Address: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
 		ChainID:      "56",
 		Fees:         0,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestUpdateOrderExecutionLimits(t *testing.T) {
+	t.Parallel()
+	pairs, err := ap.FetchTradablePairs(context.Background(), asset.Futures)
+	require.NoErrorf(t, err, "FetchTradablePairs should not error for %s", asset.Futures)
+	require.NotEmptyf(t, pairs, "Should get some pairs for %s", asset.Futures)
+
+	err = ap.UpdateOrderExecutionLimits(context.Background(), asset.Futures)
+	require.NoError(t, err)
+
+	limits, err := ap.GetOrderExecutionLimits(asset.Futures, pairs[0])
+	require.NoErrorf(t, err, "GetOrderExecutionLimits should not error for %s pair %s", asset.Futures, pairs[0])
+	require.Positivef(t, limits.MinPrice, "MinPrice must be positive for %s pair %s", asset.Futures, pairs[0])
+	require.Positivef(t, limits.MaxPrice, "MaxPrice must be positive for %s pair %s", asset.Futures, pairs[0])
+	require.Positivef(t, limits.PriceStepIncrementSize, "PriceStepIncrementSize must be positive for %s pair %s", asset.Futures, pairs[0])
+	require.Positivef(t, limits.MinimumBaseAmount, "MinimumBaseAmount must be positive for %s pair %s", asset.Futures, pairs[0])
+	require.Positivef(t, limits.MaximumBaseAmount, "MaximumBaseAmount must be positive for %s pair %s", asset.Futures, pairs[0])
+	require.Positivef(t, limits.AmountStepIncrementSize, "AmountStepIncrementSize must be positive for %s pair %s", asset.Futures, pairs[0])
+	require.Positivef(t, limits.MarketMaxQty, "MarketMaxQty must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.MaxTotalOrders, "MaxTotalOrders must be positive for %s pair %s", asset.Futures, pairs[0])
+}
+
+func TestIsPerpetualFutureCurrency(t *testing.T) {
+	t.Parallel()
+	is, err := ap.IsPerpetualFutureCurrency(asset.Futures, currency.NewPair(currency.BTC, currency.USDC))
+	require.NoError(t, err)
+	assert.True(t, is)
+}
+
+func TestGetFuturesContractDetails(t *testing.T) {
+	t.Parallel()
+	result, err := ap.GetFuturesContractDetails(context.Background(), asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetHistoricCandles(t *testing.T) {
+	t.Parallel()
+	pair, err := currency.NewPairFromString("BTC-USDC")
+	require.NoError(t, err)
+
+	result, err := ap.GetHistoricCandles(context.Background(), pair, asset.Futures, kline.OneMin, time.Now().Add(-time.Minute*3), time.Now())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetHistoricCandlesExtended(t *testing.T) {
+	t.Parallel()
+	pair, err := currency.NewPairFromString("BTC-USDC")
+	require.NoError(t, err)
+
+	result, err := ap.GetHistoricCandlesExtended(context.Background(), pair, asset.Futures, kline.OneMin, time.Now().Add(-time.Minute*3), time.Now())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestFetchTradablePairs(t *testing.T) {
+	t.Parallel()
+	result, err := ap.FetchTradablePairs(context.Background(), asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestUpdateTradablePairs(t *testing.T) {
+	t.Parallel()
+	err := ap.UpdateTradablePairs(context.Background(), true)
+	assert.NoError(t, err)
+}
+
+func TestUpdateTicker(t *testing.T) {
+	t.Parallel()
+	pair, err := currency.NewPairFromString("BTCUSD")
+	require.NoError(t, err)
+
+	result, err := ap.UpdateTicker(context.Background(), pair, asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestUpdateOrderbook(t *testing.T) {
+	t.Parallel()
+	pair, err := currency.NewPairFromString("BTCUSD")
+	require.NoError(t, err)
+
+	result, err := ap.UpdateOrderbook(context.Background(), pair, asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestUpdateAccountInfo(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.UpdateAccountInfo(context.Background(), asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetAccountFundingHistory(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetAccountFundingHistory(context.Background())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetWithdrawalsHistory(t *testing.T) {
+	t.Parallel()
+	result, err := ap.GetWithdrawalsHistory(context.Background(), currency.USDC, asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetRecentTrades(t *testing.T) {
+	t.Parallel()
+	pair, err := currency.NewPairFromString("BTCUSD")
+	require.NoError(t, err)
+
+	result, err := ap.GetRecentTrades(context.Background(), pair, asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetServerTime(t *testing.T) {
+	t.Parallel()
+	result, err := ap.GetServerTime(context.Background(), asset.Futures)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelAllOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	_, err := ap.CancelAllOrders(context.Background(), &order.Cancel{
+		AssetType:  asset.Futures,
+		MarginType: margin.Isolated,
+	})
+	assert.NotNil(t, err)
+}
+
+func TestGetOrderInfo(t *testing.T) {
+	t.Parallel()
+	pair, err := currency.NewPairFromString("BTCUSD")
+	require.NoError(t, err)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	_, err = ap.GetOrderInfo(context.Background(), "123", pair, asset.Futures)
+	assert.NotNil(t, err)
+}
+
+func TestGetActiveOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetActiveOrders(context.Background(), &order.MultiOrderRequest{
+		AssetType: asset.Futures,
+		Type:      order.Limit,
+		Side:      order.Buy,
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
