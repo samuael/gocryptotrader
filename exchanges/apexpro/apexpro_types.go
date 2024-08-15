@@ -878,6 +878,46 @@ type UserDataResponse struct {
 	PopupNotifyTradingEnable bool `json:"popupNotifyTradingEnable"`
 }
 
+// UserAccountV2 represents a V2 user account detail.
+type UserAccountV2 struct {
+	StarkKey        string `json:"starkKey"`
+	PositionID      string `json:"positionId"`
+	EthereumAddress string `json:"ethereumAddress"`
+	ID              string `json:"id"`
+	ExperienceMoney []struct {
+		AvailableAmount types.Number `json:"availableAmount"`
+		TotalNumber     types.Number `json:"totalNumber"`
+		TotalAmount     types.Number `json:"totalAmount"`
+		RecycledAmount  types.Number `json:"recycledAmount"`
+		Token           string       `json:"token"`
+	} `json:"experienceMoney"`
+	Accounts []struct {
+		CreatedAt             convert.ExchangeTime `json:"createdAt"`
+		TakerFeeRate          types.Number         `json:"takerFeeRate"`
+		MakerFeeRate          types.Number         `json:"makerFeeRate"`
+		MinInitialMarginRate  types.Number         `json:"minInitialMarginRate"`
+		Status                string               `json:"status"`
+		Token                 string               `json:"token"`
+		UnrealizePnlPriceType string               `json:"unrealizePnlPriceType"`
+	} `json:"accounts"`
+	Wallets   any `json:"wallets"`
+	Positions []struct {
+		Token                   string               `json:"token"`
+		Symbol                  string               `json:"symbol"`
+		Status                  string               `json:"status"`
+		Side                    string               `json:"side"`
+		Size                    types.Number         `json:"size"`
+		EntryPrice              types.Number         `json:"entryPrice"`
+		ExitPrice               types.Number         `json:"exitPrice"`
+		CreatedAt               convert.ExchangeTime `json:"createdAt"`
+		UpdatedTime             convert.ExchangeTime `json:"updatedTime"`
+		Fee                     types.Number         `json:"fee"`
+		FundingFee              types.Number         `json:"fundingFee"`
+		LightNumbers            string               `json:"lightNumbers"`
+		CustomInitialMarginRate types.Number         `json:"customInitialMarginRate"`
+	} `json:"positions"`
+}
+
 // UserAccountDetail represents a user account detail.
 type UserAccountDetail struct {
 	EthereumAddress string `json:"ethereumAddress"`

@@ -3,6 +3,7 @@ package apexpro
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -48,7 +49,6 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 			return "", err
 		}
 	}
-
 	var contractDetail *PerpetualContractDetail
 	for a := range ap.SymbolsConfig.Data.PerpetualContract {
 		if ap.SymbolsConfig.Data.PerpetualContract[a].Symbol == arg.Symbol.String() {
@@ -56,6 +56,7 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 			if !contractDetail.EnableTrade {
 				return "", currency.ErrPairNotEnabled
 			}
+			break
 		}
 	}
 	if contractDetail == nil {
@@ -67,59 +68,80 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 		return "", fmt.Errorf("%w, syntheticAssetId: %s", errInvalidAssetID, contractDetail.StarkExSyntheticAssetID)
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
 	}
-	var currencyInfo *V1CurrencyConfig
-	for c := range ap.SymbolsConfig.Data.Currency {
-		if ap.SymbolsConfig.Data.Currency[c].ID == contractDetail.SettleCurrencyID {
-			currencyInfo = &ap.SymbolsConfig.Data.Currency[c]
+	found := false
+	for k := range ap.UserAccountDetail.Accounts {
+		if ap.UserAccountDetail.Accounts[k].Token == contractDetail.SettleCurrencyID {
+			arg.LimitFee = ap.UserAccountDetail.Accounts[k].TakerFeeRate.Float64()
+			found = true
 			break
 		}
 	}
-	if currencyInfo == nil {
+	if !found {
+		return "", fmt.Errorf("%w, account with a settlement "+contractDetail.SettleCurrencyID+" is missing", errLimitFeeRequired)
+	}
+	var collateralAsset *V1CurrencyConfig
+	for c := range ap.SymbolsConfig.Data.Currency {
+		if ap.SymbolsConfig.Data.Currency[c].ID == contractDetail.SettleCurrencyID {
+			collateralAsset = &ap.SymbolsConfig.Data.Currency[c]
+			break
+		}
+	}
+	if collateralAsset == nil {
 		return "", errSettlementCurrencyInfoNotFound
 	}
-	currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
-	assetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 16)
+	collateralAsset.StarkExAssetID = strings.TrimPrefix(collateralAsset.StarkExAssetID, "0x")
+	assetID, ok := big.NewInt(0).SetString(collateralAsset.StarkExAssetID, 16)
 	if !ok {
-		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
+		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, collateralAsset.StarkExAssetID)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.ID, 0)
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
-	resolution, err := decimal.NewFromString(contractDetail.StarkExResolution)
+	syntheticResolution, err := decimal.NewFromString(contractDetail.StarkExResolution)
 	if err != nil {
 		return "", err
 	}
-	var quantumsAmountSynthetic = decimal.NewFromFloat(0)
+	collateralResolution, err := decimal.NewFromString(collateralAsset.StarkExResolution)
+	if err != nil {
+		return "", err
+	}
 	arg.Side = strings.ToUpper(arg.Side)
 	isBuy := arg.Side == "BUY"
+	var quantumsAmountSynthetic decimal.Decimal
 	if isBuy {
-		quantumsAmountSynthetic = size.Mul(price).Mul(resolution).RoundUp(0)
+		quantumsAmountSynthetic = size.Mul(price).Mul(syntheticResolution).RoundUp(0)
 	} else {
-		quantumsAmountSynthetic = size.Mul(price).Mul(resolution).RoundDown(0)
+		quantumsAmountSynthetic = size.Mul(price).Mul(syntheticResolution).RoundDown(0)
 	}
-	limitFeeRounded := decimal.NewFromFloat(arg.LimitFee)
+	quantumsAmountCollateral := size.Mul(collateralResolution)
+	limitFeeRounded := decimal.NewFromFloat(0.001) //arg.LimitFee)
 	if arg.Nonce == "" {
 		arg.Nonce = strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10)
 	}
-	return ap.StarkConfig.Sign(&starkex.CreateOrderWithFeeParams{
+	newArg := &starkex.CreateOrderWithFeeParams{
 		OrderType:               "LIMIT_ORDER_WITH_FEES",
 		AssetIdSynthetic:        syntheticAssetID,
 		AssetIdCollateral:       assetID,
-		AssetIdFee:              assetID,
-		QuantumAmountSynthetic:  size.Mul(resolution).BigInt(),
-		QuantumAmountCollateral: quantumsAmountSynthetic.BigInt(),
-		QuantumAmountFee:        limitFeeRounded.Mul(quantumsAmountSynthetic).RoundUp(0).BigInt(),
+		AssetIDFee:              assetID,
+		QuantumAmountSynthetic:  quantumsAmountSynthetic.BigInt(),
+		QuantumAmountCollateral: quantumsAmountCollateral.BigInt(),
+		QuantumAmountFee:        limitFeeRounded.Mul(quantumsAmountCollateral).RoundUp(0).BigInt(),
 		IsBuyingSynthetic:       isBuy,
-		PositionId:              positionID,
+		PositionID:              positionID,
 		Nonce:                   NonceByClientId(arg.Nonce),
-		ExpirationEpochHours:    big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
-	}, creds.L2Secret)
+		ExpirationEpochHours:    big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix()) / float64(3600)))), //+ ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
+	}
+
+	val, _ := json.Marshal(newArg)
+	println(string(val))
+
+	return ap.StarkConfig.Sign(newArg, creds.L2Secret)
 }
 
 // NonceByClientId generate nonce by clientId
@@ -150,13 +172,13 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 		return "", errSettlementCurrencyInfoNotFound
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
 	}
 	if arg.ZKAccountID == "" {
-		arg.ZKAccountID = ap.UserAccountDetail.SpotAccount.ZkAccountID
+		arg.ZKAccountID = ap.UserAccountDetail.ID
 	}
 	currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
 	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 16)
@@ -171,12 +193,12 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidEthereumAddress, arg.EthereumAddress)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.ID, 0)
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -213,7 +235,7 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignature(ctx context.Context, arg 
 		return "", errSettlementCurrencyInfoNotFound
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -231,12 +253,12 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignature(ctx context.Context, arg 
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidEthereumAddress, arg.EthereumAddress)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.ID, 0)
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -273,7 +295,7 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 		return "", errSettlementCurrencyInfoNotFound
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -283,12 +305,12 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.ID, 0)
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -324,7 +346,7 @@ func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *FastWithdr
 		return "", errSettlementCurrencyInfoNotFound
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -334,12 +356,12 @@ func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *FastWithdr
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.ID, 0)
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -380,7 +402,7 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		return "", errSettlementCurrencyInfoNotFound
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -390,12 +412,12 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.ID, 0)
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
 	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV3(context.Background())
+		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
 		if err != nil {
 			return "", err
 		}

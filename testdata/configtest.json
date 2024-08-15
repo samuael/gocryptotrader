@@ -275,7 +275,7 @@
             "authenticatedSupport": true,
             "authenticatedWebsocketApiSupport": true,
             "endpoints": {
-            "url": "https://pro.apex.exchange/api/",
+            "url": "NON_DEFAULT_HTTP_LINK_TO_EXCHANGE_API",
             "urlSecondary": "NON_DEFAULT_HTTP_LINK_TO_EXCHANGE_API",
             "websocketURL": "NON_DEFAULT_HTTP_LINK_TO_WEBSOCKET_EXCHANGE_API"
             },

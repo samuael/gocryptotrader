@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -33,7 +34,7 @@ type Apexpro struct {
 	SymbolsConfig *AllSymbolsV1Config
 
 	StarkConfig       *starkex.StarkConfig
-	UserAccountDetail *UserAccountDetail
+	UserAccountDetail *UserAccountV2
 }
 
 const (
@@ -402,17 +403,14 @@ func (ap *Apexpro) editUserData(ctx context.Context, arg *EditUserDataParams, pa
 
 // GetUserAccountDataV3 get an account for a user by id. Using the client, the id will be generated with client information and an Ethereum address.
 func (ap *Apexpro) GetUserAccountDataV3(ctx context.Context) (*UserAccountDetail, error) {
-	return ap.getUserAccountData(ctx, "v3/account")
+	var resp *UserAccountDetail
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "v3/account", request.UnAuth, nil, &resp)
 }
 
 // GetUserAccountDataV2 get a user account detail throught the V2 API.
-func (ap *Apexpro) GetUserAccountDataV2(ctx context.Context) (*UserAccountDetail, error) {
-	return ap.getUserAccountData(ctx, "v2/account")
-}
-
-func (ap *Apexpro) getUserAccountData(ctx context.Context, path string) (*UserAccountDetail, error) {
-	var resp *UserAccountDetail
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, path, request.UnAuth, nil, &resp)
+func (ap *Apexpro) GetUserAccountDataV2(ctx context.Context) (*UserAccountV2, error) {
+	var resp *UserAccountV2
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v2/account", request.UnAuth, nil, &resp)
 }
 
 // GetUserAccountDataV1 get an account for a user by id
@@ -424,7 +422,7 @@ func (ap *Apexpro) GetUserAccountDataV1(ctx context.Context) (*UserAccountDetail
 // GetUserAccountBalance retrieves user account balance information.
 func (ap *Apexpro) GetUserAccountBalance(ctx context.Context) (*UserAccountBalanceResponse, error) {
 	var resp *UserAccountBalanceResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/account-balance", request.UnAuth, nil, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "v3/account-balance", request.UnAuth, nil, &resp)
 }
 
 // GetUserAccountBalance retrieves user account balance information through the V2 API.
@@ -706,9 +704,9 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	if arg.Price <= 0 {
 		return nil, order.ErrPriceBelowMin
 	}
-	if arg.LimitFee < 0 {
-		return nil, errLimitFeeRequired
-	}
+	// if arg.LimitFee < 0 {
+	// 	return nil, errLimitFeeRequired
+	// }
 	if arg.ExpirationTime.IsZero() {
 		return nil, errExpirationTimeRequired
 	}
@@ -716,6 +714,7 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	if err != nil {
 		return nil, err
 	}
+	arg.LimitFee = arg.LimitFee * arg.Size * arg.Price
 	params := url.Values{}
 	params.Set("symbol", arg.Symbol.String())
 	params.Set("side", arg.Side)
@@ -724,7 +723,8 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	params.Set("price", strconv.FormatFloat(arg.Price, 'f', -1, 64))
 	params.Set("limitFee", strconv.FormatFloat(arg.LimitFee, 'f', -1, 64))
 	params.Set("expiration", strconv.FormatInt(arg.ExpirationTime.UnixMilli(), 10))
-	params.Set("signature", signature)
+	params.Set("signature", "0x"+signature)
+	// params.Set("signature", signature)
 	if arg.TimeInForce != "" {
 		params.Set("timeInForce", arg.TimeInForce)
 	}
@@ -1455,17 +1455,25 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 	response := &UserResponse{
 		Data: result,
 	}
-	var dataString string
 	if method == http.MethodGet {
 		path = common.EncodeURLValues(path, params)
-	} else {
-		dataString = params.Encode()
+	}
+	var body io.Reader
+	var payload []byte
+	if params != nil {
+		payload, err = json.Marshal(paramsToMap(params))
+		if err != nil {
+			return err
+		}
+		body = bytes.NewBuffer(payload)
 	}
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
-		timestamp := time.Now().UnixMilli()
-		message := strconv.FormatInt(timestamp, 10) + method + ("/api/" + path) + dataString
+		timestamp := time.Now().UTC().UnixMilli()
+		message := strconv.FormatInt(timestamp, 10) + method + ("/api/" + path)
+		println("\n\n\n", message, "\n\n\n")
 		encodedSecret := base64.StdEncoding.EncodeToString([]byte(creds.Secret))
 		var hmacSigned []byte
+
 		hmacSigned, err := crypto.GetHMAC(crypto.HashSHA256,
 			[]byte(message),
 			[]byte(encodedSecret))
@@ -1492,16 +1500,10 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 			Path:          endpointPath + path,
 			Headers:       headers,
 			Result:        response,
+			Body:          body,
 			Verbose:       ap.Verbose,
 			HTTPDebugging: ap.HTTPDebugging,
 			HTTPRecording: ap.HTTPRecording,
-		}
-		if dataString != "" {
-			value, err := json.Marshal(paramsToMap(params))
-			if err != nil {
-				return nil, err
-			}
-			reqItem.Body = bytes.NewBuffer(value)
 		}
 		return reqItem, nil
 	}, request.AuthenticatedRequest)

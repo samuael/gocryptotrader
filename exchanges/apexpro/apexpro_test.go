@@ -31,10 +31,9 @@ const (
 	starkKey            = ""
 	starkSecret         = ""
 	starkKeyYCoordinate = ""
+	ethereumAddress     = ""
 
-	ethereumAddress = ""
-
-	canManipulateRealOrders = false
+	canManipulateRealOrders = true
 )
 
 var ap = &Apexpro{}
@@ -96,9 +95,16 @@ func TestGetSystemTimeV1(t *testing.T) {
 
 func TestGetAllConfigDataV3(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	result, err := ap.GetAllConfigDataV3(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+
+	for a := range result.ContractConfig.Assets {
+		if result.ContractConfig.Assets[a].Token == "USDC" {
+			println(result.ContractConfig.Assets[a].Decimals)
+		}
+	}
 }
 
 func TestGetAllSymbolsConfigDataV1(t *testing.T) {
@@ -329,6 +335,7 @@ func TestEditUserData(t *testing.T) {
 }
 func TestEditUserDataV2(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	_, err := ap.EditUserDataV2(context.Background(), &EditUserDataParams{})
 	require.ErrorIs(t, err, common.ErrNilPointer)
 
@@ -336,7 +343,7 @@ func TestEditUserDataV2(t *testing.T) {
 	result, err := ap.EditUserDataV2(context.Background(), &EditUserDataParams{
 		Email:                    "samuaeladnew@gmail.com",
 		UserData:                 "",
-		Username:                 "Thrasher",
+		Username:                 "Username",
 		IsSharingUsername:        true,
 		Country:                  "Ethiopia",
 		EmailNotifyGeneralEnable: true,
@@ -350,14 +357,18 @@ func TestEditUserDataV2(t *testing.T) {
 
 func TestGetUserAccountData(t *testing.T) {
 	t.Parallel()
-	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	ap.Verbose = true
 	result, err := ap.GetUserAccountDataV3(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+
+	// println("TakerFeeRate: ", result.ContractAccount.TakerFeeRate.Float64(), result.ContractAccount.TakerFeeRate.Float64() == 0)
 }
 
 func TestGetUserAccountDataV2(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUserAccountDataV2(context.Background())
 	require.NoError(t, err)
@@ -554,29 +565,29 @@ func TestGetWorstPriceV1(t *testing.T) {
 
 func TestCreateOrder(t *testing.T) {
 	t.Parallel()
-	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	ap.Verbose = true
 	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
 	require.NoError(t, err)
 
+	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	if ap.UserAccountDetail == nil {
 		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(context.Background())
 		require.NoError(t, err)
 		require.NotNil(t, ap.UserAccountDetail)
 	}
-	takerFeeRate := ap.UserAccountDetail.ContractAccount.TakerFeeRate.Float64()
 	result, err := ap.CreateOrderV3(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
 		Side:            order.Sell.String(),
 		OrderType:       "LIMIT",
 		Size:            123,
 		Price:           1,
-		LimitFee:        takerFeeRate * 123 * 1,
-		ExpirationTime:  time.Now().Add(time.Hour * 240),
+		ExpirationTime:  time.Now().Add(time.Hour * ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
 		TimeInForce:     "GTC",
 		TriggerPrice:    0,
 		TrailingPercent: 1,
 		ClientOrderID:   2312312312,
 		ReduceOnly:      true,
+		Nonce:           "1001",
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -987,7 +998,15 @@ func TestCreateOrderV1(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ap.UserAccountDetail)
 	}
-	takerFeeRate := ap.UserAccountDetail.ContractAccount.TakerFeeRate.Float64()
+	var takerFeeRate float64
+	found := false
+	for k := range ap.UserAccountDetail.Accounts {
+		if ap.UserAccountDetail.Accounts[k].Token == "USDC" {
+			takerFeeRate = ap.UserAccountDetail.Accounts[k].TakerFeeRate.Float64()
+			found = true
+		}
+	}
+	require.True(t, found)
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.CreateOrderV1(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
@@ -1017,7 +1036,6 @@ func TestCreateOrderV2(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ap.UserAccountDetail)
 	}
-	takerFeeRate := ap.UserAccountDetail.ContractAccount.TakerFeeRate.Float64()
 	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.CreateOrderV2(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
@@ -1025,7 +1043,6 @@ func TestCreateOrderV2(t *testing.T) {
 		OrderType:       "LIMIT",
 		Size:            123,
 		Price:           1,
-		LimitFee:        takerFeeRate * 123 * 1,
 		ExpirationTime:  time.Now().Add(time.Hour * 240),
 		TimeInForce:     "GTC",
 		TriggerPrice:    0,

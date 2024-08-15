@@ -37,12 +37,12 @@ type CreateOrderWithFeeParams struct {
 	OrderType               string
 	AssetIdSynthetic        *big.Int
 	AssetIdCollateral       *big.Int
-	AssetIdFee              *big.Int
+	AssetIDFee              *big.Int
 	QuantumAmountSynthetic  *big.Int
 	QuantumAmountCollateral *big.Int
 	QuantumAmountFee        *big.Int
 	IsBuyingSynthetic       bool
-	PositionId              *big.Int // Users Account ID
+	PositionID              *big.Int // Users Account ID
 	Nonce                   *big.Int
 	ExpirationEpochHours    *big.Int
 }

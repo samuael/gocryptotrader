@@ -34,13 +34,13 @@ func (s *CreateOrderWithFeeParams) GetPedersenHash(pedersenHash func(...string) 
 	part2 := big.NewInt(ORDER_PREFIX)
 	for i := 0; i < 3; i++ {
 		part2.Lsh(part2, ORDER_FIELD_BIT_LENGTHS["position_id"])
-		part2.Add(part2, s.PositionId)
+		part2.Add(part2, s.PositionID)
 	}
 	part2.Lsh(part2, ORDER_FIELD_BIT_LENGTHS["expiration_epoch_hours"])
 	part2.Add(part2, s.ExpirationEpochHours)
 	part2.Lsh(part2, ORDER_PADDING_BITS)
 	// pedersen hash
-	assetHash := pedersenHash(pedersenHash(assetIdSell.String(), assetIdBuy.String()), s.AssetIdFee.String())
+	assetHash := pedersenHash(pedersenHash(assetIdSell.String(), assetIdBuy.String()), s.AssetIDFee.String())
 	part1Hash := pedersenHash(assetHash, part1.String())
 	return pedersenHash(part1Hash, part2.String()), nil
 }
