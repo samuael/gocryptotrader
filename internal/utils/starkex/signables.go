@@ -2,6 +2,7 @@ package starkex
 
 import "math/big"
 
+// Signable an interface for hashing and signing with starkex ware
 type Signable interface {
 	GetPedersenHash(pedersenHash func(...string) string) (string, error)
 }
@@ -10,26 +11,24 @@ type Signable interface {
 func (s *CreateOrderWithFeeParams) GetPedersenHash(pedersenHash func(...string) string) (string, error) {
 	var assetIdSell, assetIdBuy, quantumsAmountSell, quantumsAmountBuy *big.Int
 	if s.IsBuyingSynthetic {
-		assetIdSell = s.AssetIdCollateral
-		assetIdBuy = s.AssetIdSynthetic
+		assetIdSell = s.AssetIDCollateral
+		assetIdBuy = s.AssetIDSynthetic
 		quantumsAmountSell = s.QuantumAmountCollateral
 		quantumsAmountBuy = s.QuantumAmountSynthetic
 	} else {
-		assetIdSell = s.AssetIdSynthetic
-		assetIdBuy = s.AssetIdCollateral
+		assetIdSell = s.AssetIDSynthetic
+		assetIdBuy = s.AssetIDCollateral
 		quantumsAmountSell = s.QuantumAmountSynthetic
 		quantumsAmountBuy = s.QuantumAmountCollateral
 	}
-	fee := s.QuantumAmountFee
-	nonce := s.Nonce
 	// part1
 	part1 := big.NewInt(0).Set(quantumsAmountSell)
 	part1.Lsh(part1, ORDER_FIELD_BIT_LENGTHS["quantums_amount"])
 	part1.Add(part1, quantumsAmountBuy)
 	part1.Lsh(part1, ORDER_FIELD_BIT_LENGTHS["quantums_amount"])
-	part1.Add(part1, fee)
+	part1.Add(part1, s.QuantumAmountFee)
 	part1.Lsh(part1, ORDER_FIELD_BIT_LENGTHS["nonce"])
-	part1.Add(part1, nonce)
+	part1.Add(part1, s.Nonce)
 	// part2
 	part2 := big.NewInt(ORDER_PREFIX)
 	for i := 0; i < 3; i++ {

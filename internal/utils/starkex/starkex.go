@@ -11,6 +11,7 @@ import (
 	math_utils "github.com/thrasher-corp/gocryptotrader/internal/utils/math"
 )
 
+// Error declarations.
 var (
 	ErrInvalidPrivateKey  = errors.New("invalid private key")
 	ErrInvalidHashPayload = errors.New("invalid hash payload")
@@ -24,7 +25,7 @@ type StarkConfig struct {
 var zero = big.NewInt(0)
 var one = big.NewInt(1)
 
-const DefaultPedersenConfigsPath = "internal/utils/hash/pedersen_config/"
+const defaultPedersenConfigsPath = "internal/utils/hash/pedersen_config/"
 
 // NewStarkExConfig returns a stark configuration given the exchange name
 func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
@@ -32,7 +33,7 @@ func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	pedersenConfig, err := hash.LoadPedersenConfig(rootPath + "/" + DefaultPedersenConfigsPath + strings.ToLower(exchangeName) + ".json")
+	pedersenConfig, err := hash.LoadPedersenConfig(rootPath + "/" + defaultPedersenConfigsPath + strings.ToLower(exchangeName) + ".json")
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +44,9 @@ func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
 
 // Sign generates a signature out using the users private key and signable order params.
 func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string) (string, error) {
+	println(sfg.PedersenCfg.FieldPrime.String())
+	println(sfg.PedersenCfg.EcOrder.String())
+	println(sfg.PedersenCfg.BETA.String())
 	pHash, err := sgn.GetPedersenHash(sfg.PedersenCfg.PedersenHash)
 	if err != nil {
 		return pHash, err
@@ -51,13 +55,13 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string) (string, erro
 	if err != nil {
 		return "", err
 	}
+	// Concatenate the hex strings
 	return math_utils.IntToHex32(r) + math_utils.IntToHex32(s), nil
 }
 
 // ECDSAHash generates an ECDSA signature given the private key and pedersen signed hash
 func (sfg *StarkConfig) ECDSAHash(message, starkPrivateKey string) (*big.Int, *big.Int, error) {
-	starkPrivateKey = strings.TrimPrefix(starkPrivateKey, "0x")
-	priKey, okay := new(big.Int).SetString(starkPrivateKey, 16)
+	priKey, okay := big.NewInt(0).SetString(starkPrivateKey, 0)
 	if !okay {
 		return nil, nil, fmt.Errorf("%w, %v", ErrInvalidPrivateKey, starkPrivateKey)
 	}

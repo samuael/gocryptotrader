@@ -35,8 +35,8 @@ type ConditionalTransferParams struct {
 // CreateOrderWithFeeParams represents a starkex create order parameters. Order Prefix: 3
 type CreateOrderWithFeeParams struct {
 	OrderType               string
-	AssetIdSynthetic        *big.Int
-	AssetIdCollateral       *big.Int
+	AssetIDSynthetic        *big.Int
+	AssetIDCollateral       *big.Int
 	AssetIDFee              *big.Int
 	QuantumAmountSynthetic  *big.Int
 	QuantumAmountCollateral *big.Int

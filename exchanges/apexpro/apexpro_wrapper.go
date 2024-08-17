@@ -37,7 +37,7 @@ func (ap *Apexpro) SetDefaults() {
 	ap.API.CredentialsValidator.RequiresKey = true
 	ap.API.CredentialsValidator.RequiresSecret = true
 
-	requestFmt := &currency.PairFormat{Uppercase: true, Delimiter: ""}
+	requestFmt := &currency.PairFormat{Uppercase: true, Delimiter: "-"}
 	configFmt := &currency.PairFormat{Uppercase: true, Delimiter: "-"}
 	err := ap.StoreAssetPairFormat(asset.Futures, currency.PairStore{
 		RequestFormat: requestFmt,
@@ -77,12 +77,12 @@ func (ap *Apexpro) SetDefaults() {
 
 	ap.API.Endpoints = ap.NewEndpoints()
 	err = ap.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
-		exchange.RestSpotSupplementary:      apexproTestAPIURL, //apexproAPIURL,
-		exchange.RestSpot:                   apexproTestAPIURL, //apexproAPIURL,
+		exchange.RestSpotSupplementary:      apexproAPIURL,
+		exchange.RestSpot:                   apexproAPIURL,
 		exchange.WebsocketSpot:              apexProWebsocket,
 		exchange.WebsocketSpotSupplementary: apexProPrivateWebsocket,
 
-		exchange.RestFutures: apexproTestAPIURL, //apexProOmniAPIURL,
+		exchange.RestFutures: apexProOmniAPIURL,
 	})
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
@@ -185,7 +185,8 @@ func (ap *Apexpro) UpdateTicker(ctx context.Context, p currency.Pair, assetType 
 	if err != nil {
 		return nil, err
 	}
-	tick, err := ap.GetTickerDataV3(ctx, p.Format(pairFormat).String())
+	println("Pair: ", pairFormat.Format(p))
+	tick, err := ap.GetTickerDataV3(ctx, pairFormat.Format(p))
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +306,7 @@ func (ap *Apexpro) FetchAccountInfo(ctx context.Context, assetType asset.Item) (
 	return acc, nil
 }
 
-// GetFundingHistory returns funding history, deposits and
+// GetAccountFundingHistory returns funding history, deposits and
 // withdrawals
 func (ap *Apexpro) GetAccountFundingHistory(ctx context.Context) ([]exchange.FundingHistory, error) {
 	transfers, err := ap.GetUserTransferDataV2(ctx, currency.EMPTYCODE, time.Time{}, time.Time{}, "", []string{}, 0, 0)
@@ -314,7 +315,7 @@ func (ap *Apexpro) GetAccountFundingHistory(ctx context.Context) ([]exchange.Fun
 	}
 	resp := make([]exchange.FundingHistory, len(transfers.Transfers))
 	for x := range transfers.Transfers {
-		resp = append(resp, exchange.FundingHistory{
+		resp[x] = exchange.FundingHistory{
 			ExchangeName: ap.Name,
 			Status:       resp[x].Status,
 			Timestamp:    transfers.Transfers[x].UpdatedTime.Time(),
@@ -323,7 +324,7 @@ func (ap *Apexpro) GetAccountFundingHistory(ctx context.Context) ([]exchange.Fun
 			Fee:          transfers.Transfers[x].Fee.Float64(),
 			TransferType: transfers.Transfers[x].Type,
 			CryptoTxID:   transfers.Transfers[x].ID,
-		})
+		}
 	}
 	return resp, nil
 }
@@ -393,7 +394,7 @@ func (ap *Apexpro) GetServerTime(ctx context.Context, _ asset.Item) (time.Time, 
 }
 
 // SubmitOrder submits a new order
-func (ap *Apexpro) SubmitOrder(ctx context.Context, s *order.Submit) (*order.SubmitResponse, error) {
+func (ap *Apexpro) SubmitOrder(_ context.Context, s *order.Submit) (*order.SubmitResponse, error) {
 	if err := s.Validate(ap.GetTradingRequirements()); err != nil {
 		return nil, err
 	}
@@ -411,7 +412,7 @@ func (ap *Apexpro) SubmitOrder(ctx context.Context, s *order.Submit) (*order.Sub
 
 // ModifyOrder will allow of changing orderbook placement and limit to
 // market conversion
-func (ap *Apexpro) ModifyOrder(ctx context.Context, action *order.Modify) (*order.ModifyResponse, error) {
+func (ap *Apexpro) ModifyOrder(_ context.Context, action *order.Modify) (*order.ModifyResponse, error) {
 	if err := action.Validate(); err != nil {
 		return nil, err
 	}
@@ -427,7 +428,7 @@ func (ap *Apexpro) ModifyOrder(ctx context.Context, action *order.Modify) (*orde
 }
 
 // CancelOrder cancels an order by its corresponding ID number
-func (ap *Apexpro) CancelOrder(ctx context.Context, ord *order.Cancel) error {
+func (ap *Apexpro) CancelOrder(_ context.Context, _ *order.Cancel) error {
 	// if err := ord.Validate(ord.StandardCancel()); err != nil {
 	//	 return err
 	// }
@@ -435,7 +436,7 @@ func (ap *Apexpro) CancelOrder(ctx context.Context, ord *order.Cancel) error {
 }
 
 // CancelBatchOrders cancels orders by their corresponding ID numbers
-func (ap *Apexpro) CancelBatchOrders(ctx context.Context, orders []order.Cancel) (*order.CancelBatchResponse, error) {
+func (ap *Apexpro) CancelBatchOrders(_ context.Context, _ []order.Cancel) (*order.CancelBatchResponse, error) {
 	return nil, common.ErrNotYetImplemented
 }
 
@@ -463,6 +464,8 @@ func (ap *Apexpro) GetOrderInfo(ctx context.Context, orderID string, _ currency.
 	orderDetail, err := ap.GetOrderID(ctx, orderID)
 	if err != nil {
 		return nil, err
+	} else if orderDetail == nil {
+		return nil, fmt.Errorf("%w, orderId: %s", order.ErrOrderNotFound, orderID)
 	}
 	oType, err := order.StringToOrderType(orderDetail.OrderType)
 	if err != nil {
@@ -504,7 +507,7 @@ func (ap *Apexpro) GetOrderInfo(ctx context.Context, orderID string, _ currency.
 }
 
 // GetDepositAddress returns a deposit address for a specified currency
-func (ap *Apexpro) GetDepositAddress(ctx context.Context, c currency.Code, accountID string, chain string) (*deposit.Address, error) {
+func (ap *Apexpro) GetDepositAddress(ctx context.Context, c currency.Code, accountID, chain string) (*deposit.Address, error) {
 	return nil, common.ErrFunctionNotSupported
 }
 
@@ -536,19 +539,13 @@ func (ap *Apexpro) WithdrawCryptocurrencyFunds(ctx context.Context, withdrawRequ
 
 // WithdrawFiatFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (ap *Apexpro) WithdrawFiatFunds(ctx context.Context, withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
-	// if err := withdrawRequest.Validate(); err != nil {
-	//	return nil, err
-	// }
+func (ap *Apexpro) WithdrawFiatFunds(_ context.Context, _ *withdraw.Request) (*withdraw.ExchangeResponse, error) {
 	return nil, common.ErrNotYetImplemented
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a withdrawal is
 // submitted
-func (ap *Apexpro) WithdrawFiatFundsToInternationalBank(ctx context.Context, withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
-	// if err := withdrawRequest.Validate(); err != nil {
-	//	return nil, err
-	// }
+func (ap *Apexpro) WithdrawFiatFundsToInternationalBank(_ context.Context, _ *withdraw.Request) (*withdraw.ExchangeResponse, error) {
 	return nil, common.ErrNotYetImplemented
 }
 

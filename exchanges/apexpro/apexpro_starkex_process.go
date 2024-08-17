@@ -3,7 +3,6 @@ package apexpro
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -62,8 +61,7 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 	if contractDetail == nil {
 		return "", fmt.Errorf("%w, contract: %s", errContractNotFound, arg.Symbol.String())
 	}
-	contractDetail.StarkExSyntheticAssetID = strings.TrimPrefix(contractDetail.StarkExSyntheticAssetID, "0x")
-	syntheticAssetID, ok := big.NewInt(0).SetString(contractDetail.StarkExSyntheticAssetID, 16)
+	syntheticAssetID, ok := big.NewInt(0).SetString(contractDetail.StarkExSyntheticAssetID, 0)
 	if !ok {
 		return "", fmt.Errorf("%w, syntheticAssetId: %s", errInvalidAssetID, contractDetail.StarkExSyntheticAssetID)
 	}
@@ -73,17 +71,17 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 			return "", err
 		}
 	}
-	found := false
+	takerFeeRate := -1.
 	for k := range ap.UserAccountDetail.Accounts {
 		if ap.UserAccountDetail.Accounts[k].Token == contractDetail.SettleCurrencyID {
-			arg.LimitFee = ap.UserAccountDetail.Accounts[k].TakerFeeRate.Float64()
-			found = true
+			takerFeeRate = ap.UserAccountDetail.Accounts[k].TakerFeeRate.Float64()
 			break
 		}
 	}
-	if !found {
+	if takerFeeRate == -1. {
 		return "", fmt.Errorf("%w, account with a settlement "+contractDetail.SettleCurrencyID+" is missing", errLimitFeeRequired)
 	}
+	arg.LimitFee = takerFeeRate * arg.Size * arg.Price
 	var collateralAsset *V1CurrencyConfig
 	for c := range ap.SymbolsConfig.Data.Currency {
 		if ap.SymbolsConfig.Data.Currency[c].ID == contractDetail.SettleCurrencyID {
@@ -94,12 +92,11 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 	if collateralAsset == nil {
 		return "", errSettlementCurrencyInfoNotFound
 	}
-	collateralAsset.StarkExAssetID = strings.TrimPrefix(collateralAsset.StarkExAssetID, "0x")
-	assetID, ok := big.NewInt(0).SetString(collateralAsset.StarkExAssetID, 16)
+	collateralAssetID, ok := big.NewInt(0).SetString(collateralAsset.StarkExAssetID, 0)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, collateralAsset.StarkExAssetID)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
+	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 10)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
@@ -113,39 +110,35 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 	}
 	arg.Side = strings.ToUpper(arg.Side)
 	isBuy := arg.Side == "BUY"
-	var quantumsAmountSynthetic decimal.Decimal
+	var quantumsAmountCollateral decimal.Decimal
 	if isBuy {
-		quantumsAmountSynthetic = size.Mul(price).Mul(syntheticResolution).RoundUp(0)
+		quantumsAmountCollateral = size.Mul(price).Mul(collateralResolution).RoundUp(0)
 	} else {
-		quantumsAmountSynthetic = size.Mul(price).Mul(syntheticResolution).RoundDown(0)
+		quantumsAmountCollateral = size.Mul(price).Mul(collateralResolution).RoundDown(0)
 	}
-	quantumsAmountCollateral := size.Mul(collateralResolution)
-	limitFeeRounded := decimal.NewFromFloat(0.001) //arg.LimitFee)
-	if arg.Nonce == "" {
-		arg.Nonce = strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10)
-	}
+	quantumsAmountSynthetic := size.Mul(syntheticResolution)
+	limitFeeRounded := decimal.NewFromFloat(takerFeeRate)
+	nonce := strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10)
+	expEpoch := big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS)
+	arg.ExpEpoch = expEpoch.Int64()
 	newArg := &starkex.CreateOrderWithFeeParams{
 		OrderType:               "LIMIT_ORDER_WITH_FEES",
-		AssetIdSynthetic:        syntheticAssetID,
-		AssetIdCollateral:       assetID,
-		AssetIDFee:              assetID,
+		AssetIDSynthetic:        syntheticAssetID,
+		AssetIDCollateral:       collateralAssetID,
+		AssetIDFee:              collateralAssetID,
 		QuantumAmountSynthetic:  quantumsAmountSynthetic.BigInt(),
 		QuantumAmountCollateral: quantumsAmountCollateral.BigInt(),
 		QuantumAmountFee:        limitFeeRounded.Mul(quantumsAmountCollateral).RoundUp(0).BigInt(),
 		IsBuyingSynthetic:       isBuy,
 		PositionID:              positionID,
-		Nonce:                   NonceByClientId(arg.Nonce),
-		ExpirationEpochHours:    big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix()) / float64(3600)))), //+ ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
+		Nonce:                   NonceByClientID(nonce),
+		ExpirationEpochHours:    expEpoch,
 	}
-
-	val, _ := json.Marshal(newArg)
-	println(string(val))
-
 	return ap.StarkConfig.Sign(newArg, creds.L2Secret)
 }
 
-// NonceByClientId generate nonce by clientId
-func NonceByClientId(clientId string) *big.Int {
+// NonceByClientID generate nonce by clientId
+func NonceByClientID(clientId string) *big.Int {
 	h := sha256.New()
 	h.Write([]byte(clientId))
 
@@ -213,7 +206,7 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 		EthAddress:           ethereumAddress,
 		PositionID:           positionID,
 		Amount:               amount.Mul(resolution).BigInt(),
-		Nonce:                NonceByClientId(arg.Nonce),
+		Nonce:                NonceByClientID(arg.Nonce),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Timestamp.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
 	}, creds.L2Secret)
 }
@@ -267,14 +260,16 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignature(ctx context.Context, arg 
 	if err != nil {
 		return "", err
 	}
+	expEpoch := big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS)
+	arg.ExpEpoch = expEpoch.Int64()
 	amount := decimal.NewFromFloat(arg.Amount)
 	return ap.StarkConfig.Sign(&starkex.WithdrawalToAddressParams{
 		AssetIDCollateral:    collateralAssetID,
 		EthAddress:           ethereumAddress,
 		PositionID:           positionID,
 		Amount:               amount.Mul(resolution).BigInt(),
-		Nonce:                NonceByClientId(arg.ClientID),
-		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
+		Nonce:                NonceByClientID(arg.ClientID),
+		ExpirationEpochHours: expEpoch,
 	}, creds.L2Secret)
 }
 
@@ -284,14 +279,14 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 	if err != nil {
 		return "", err
 	}
-	var currencyInfo *V1CurrencyConfig
+	var collateralInfo *V1CurrencyConfig
 	for c := range ap.SymbolsConfig.Data.Currency {
 		if ap.SymbolsConfig.Data.Currency[c].ID == arg.Asset.String() {
-			currencyInfo = &ap.SymbolsConfig.Data.Currency[c]
+			collateralInfo = &ap.SymbolsConfig.Data.Currency[c]
 			break
 		}
 	}
-	if currencyInfo == nil {
+	if collateralInfo == nil {
 		return "", errSettlementCurrencyInfoNotFound
 	}
 	if ap.UserAccountDetail == nil {
@@ -300,32 +295,27 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 			return "", err
 		}
 	}
-	currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
-	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 16)
+	collateralAssetID, ok := big.NewInt(0).SetString(collateralInfo.StarkExAssetID, 0)
 	if !ok {
-		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
+		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, collateralInfo.StarkExAssetID)
 	}
 	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
-	if ap.UserAccountDetail == nil {
-		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(ctx)
-		if err != nil {
-			return "", err
-		}
-	}
-	resolution, err := decimal.NewFromString(currencyInfo.StarkExResolution)
+	collateralResolution, err := decimal.NewFromString(collateralInfo.StarkExResolution)
 	if err != nil {
 		return "", err
 	}
 	amount := decimal.NewFromFloat(arg.Amount)
+	expEpoch := big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS)
+	arg.ExpEpoch = expEpoch.Int64()
 	return ap.StarkConfig.Sign(&starkex.WithdrawalParams{
 		AssetIDCollateral:    collateralAssetID,
 		PositionID:           positionID,
-		Amount:               amount.Mul(resolution).BigInt(),
-		Nonce:                NonceByClientId(arg.ClientID),
-		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
+		Amount:               amount.Mul(collateralResolution).BigInt(),
+		Nonce:                NonceByClientID(arg.ClientID),
+		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix()) / float64(3600)))),
 	}, creds.L2Secret)
 }
 
@@ -372,16 +362,12 @@ func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *FastWithdr
 	}
 	amount := decimal.NewFromFloat(arg.Amount)
 	return ap.StarkConfig.Sign(&starkex.TransferParams{
-		AssetID:          collateralAssetID,
-		AssetIDFee:       big.NewInt(0),
-		SenderPositionID: positionID,
-		// ReceiverPositionID:
+		AssetID:              collateralAssetID,
+		AssetIDFee:           big.NewInt(0),
+		SenderPositionID:     positionID,
 		QuantumsAmount:       amount.Mul(resolution).BigInt(),
-		Nonce:                NonceByClientId(arg.ClientID),
+		Nonce:                NonceByClientID(arg.ClientID),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Expiration.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
-		// ReceiverPublicKey
-		// MaxAmountFee
-		// SrcFeePositionID: positionID,
 	}, creds.L2Secret)
 }
 
@@ -440,7 +426,7 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		// SrcFeePositionID
 
 		QuantumsAmount: amount.Mul(resolution).BigInt(),
-		Nonce:          NonceByClientId(arg.ClientID),
+		Nonce:          NonceByClientID(arg.ClientID),
 		// ExpTimestampHrs
 		// ReceiverPositionID
 		// ReceiverPublicKey

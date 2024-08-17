@@ -85,11 +85,10 @@ func (ap *Apexpro) WsConnect() error {
 // GenerateDefaultSubscriptions generates a default subscription list.
 func (ap *Apexpro) GenerateDefaultSubscriptions() (subscription.List, error) {
 	subscriptions := subscription.List{}
-	// enabledPairs, err := ap.GetEnabledPairs(asset.Futures)
-	// if err != nil {
-	// 	return subscriptions, err
-	// }
-	enabledPairs := []currency.Pair{{Base: currency.BTC, Quote: currency.USDT}}
+	enabledPairs, err := ap.GetEnabledPairs(asset.Futures)
+	if err != nil {
+		return subscriptions, err
+	}
 	for a := range defaultChannels {
 		switch defaultChannels[a] {
 		case chOrderbook:
