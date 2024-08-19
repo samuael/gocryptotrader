@@ -22,17 +22,17 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey    = ""
-	apiSecret = ""
-	clientID  = ""
+	apiKey    = "5f6e832f-3bca-993f-7738-b9d169ec7688"
+	apiSecret = "4y40B5HIB6UQAz_iPBRPVjWmgszetrI_k55qShiJ"
+	clientID  = "LtYeWSxVRTK3G49TY5PO"
 
-	starkKey            = ""
-	starkSecret         = ""
-	starkKeyYCoordinate = ""
+	starkKey            = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
+	starkSecret         = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
+	starkKeyYCoordinate = "0x0207d57867e0820e0f7588339e8b7491ce1da964260044340e3fd27c718f2a91"
 
 	ethereumAddress = ""
 
-	canManipulateRealOrders = false
+	canManipulateRealOrders = true
 )
 
 var ap = &Apexpro{}
@@ -552,6 +552,7 @@ func TestGetWorstPriceV1(t *testing.T) {
 
 func TestCreateOrder(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
 	require.NoError(t, err)
 

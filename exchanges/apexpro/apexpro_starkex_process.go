@@ -418,12 +418,12 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		AssetIDFee:       big.NewInt(0),
 		SenderPositionID: positionID,
 		// ReceiverPositionID:
-		// Nonce
+		// Nonce:
 		// QuantumsAmount:
-		// ExpirationEpochHours
-		// ReceiverPublicKey
-		// MaxAmountFee
-		// SrcFeePositionID
+		// ExpirationEpochHours:
+		// ReceiverPublicKey:
+		// MaxAmountFee:
+		// SrcFeePositionID:
 
 		QuantumsAmount: amount.Mul(resolution).BigInt(),
 		Nonce:          NonceByClientID(arg.ClientID),

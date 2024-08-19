@@ -44,9 +44,6 @@ func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
 
 // Sign generates a signature out using the users private key and signable order params.
 func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string) (string, error) {
-	println(sfg.PedersenCfg.FieldPrime.String())
-	println(sfg.PedersenCfg.EcOrder.String())
-	println(sfg.PedersenCfg.BETA.String())
 	pHash, err := sgn.GetPedersenHash(sfg.PedersenCfg.PedersenHash)
 	if err != nil {
 		return pHash, err

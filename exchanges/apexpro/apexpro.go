@@ -689,7 +689,6 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	// arg.LimitFee = arg.LimitFee * arg.Size * arg.Price
 	arg.ExpEpoch *= 3600 * 1000
 	arg.Signature = signature
-	// params.Set("signature", signature)
 	return nil
 }
 
