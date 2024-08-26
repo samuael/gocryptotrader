@@ -172,7 +172,7 @@ func GenerateKRfc6979(msgHash, priKey *big.Int, EC_ORDER *big.Int, seed int) *bi
 		_ = binary.Write(buf, binary.BigEndian, data)
 		extra = buf.Bytes()
 	}
-	return generateSecret(EC_ORDER, priKey, sha256.New, msgHash.Bytes(), extra)
+	return GenerateSecret(EC_ORDER, priKey, sha256.New, msgHash.Bytes(), extra)
 }
 
 // IntToHex32 Normalize to a 32-byte hex string without 0x prefix.

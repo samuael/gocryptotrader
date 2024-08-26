@@ -185,7 +185,6 @@ func (ap *Apexpro) UpdateTicker(ctx context.Context, p currency.Pair, assetType 
 	if err != nil {
 		return nil, err
 	}
-	println("Pair: ", pairFormat.Format(p))
 	tick, err := ap.GetTickerDataV3(ctx, pairFormat.Format(p))
 	if err != nil {
 		return nil, err
@@ -520,19 +519,7 @@ func (ap *Apexpro) WithdrawCryptocurrencyFunds(ctx context.Context, withdrawRequ
 	ap.WithdrawAsset(ctx, &AssetWithdrawalParams{
 		Amount:           withdrawRequest.Amount,
 		ClientWithdrawID: withdrawRequest.ClientOrderID,
-		// Timestamp: withdrawRequest.
-		EthereumAddress: withdrawRequest.Crypto.Address,
-		// Signature
-		// ZKAccountID
-		// SubAccountID
-		// L2Key
-
-		// ToChainID
-		// L2SourceTokenID
-		// L1TargetTokenID
-		// Fee
-		// Nonce
-		// IsFastWithdraw
+		EthereumAddress:  withdrawRequest.Crypto.Address,
 	})
 	return nil, common.ErrNotYetImplemented
 }

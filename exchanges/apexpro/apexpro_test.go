@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -22,12 +21,12 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey    = "5f6e832f-3bca-993f-7738-b9d169ec7688"
-	apiSecret = "4y40B5HIB6UQAz_iPBRPVjWmgszetrI_k55qShiJ"
-	clientID  = "LtYeWSxVRTK3G49TY5PO"
+	apiKey    = "015eb8e0-236f-9abd-dfad-f04b429b1516"
+	apiSecret = "MUH1_90mc0-8Kgc5-fpWG0VgPFV7JNzCYcixgnJh"
+	clientID  = "CqF_I2BBzatbMHCO1GhA"
 
 	starkKey            = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
-	starkSecret         = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
+	starkSecret         = "0x074bcbe7f64f95e8d3f1afda4c338775702b4d1db3651fc70bad95a160b7f9ae"
 	starkKeyYCoordinate = "0x0207d57867e0820e0f7588339e8b7491ce1da964260044340e3fd27c718f2a91"
 
 	ethereumAddress = ""
@@ -97,12 +96,6 @@ func TestGetAllConfigDataV3(t *testing.T) {
 	result, err := ap.GetAllConfigDataV3(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-
-	for a := range result.ContractConfig.Assets {
-		if result.ContractConfig.Assets[a].Token == "USDC" {
-			println(result.ContractConfig.Assets[a].Decimals)
-		}
-	}
 }
 
 func TestGetAllSymbolsConfigDataV1(t *testing.T) {
@@ -232,14 +225,6 @@ func TestGetAllConfigDataV2(t *testing.T) {
 	result, err := ap.GetAllConfigDataV2(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, result)
-
-	for a := range result.Data.USDCConfig.PerpetualContract {
-		if strings.HasPrefix(result.Data.USDCConfig.PerpetualContract[a].Symbol, "BTC") {
-			println(result.Data.USDCConfig.PerpetualContract[a].Symbol)
-			println("MaxMarketPriceRange: ", result.Data.USDCConfig.PerpetualContract[a].MaxMarketPriceRange)
-			println("MaxPositionValue: ", result.Data.USDCConfig.PerpetualContract[a].MaxPositionValue)
-		}
-	}
 }
 
 func TestGetCheckIfUserExistsV2(t *testing.T) {
@@ -368,7 +353,6 @@ func TestGetUserAccountDataV1(t *testing.T) {
 	result, err := ap.GetUserAccountDataV1(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-	println("result.TakerFeeRate: ", result.TakerFeeRate)
 }
 
 func TestGetUserAccountBalance(t *testing.T) {
@@ -552,7 +536,6 @@ func TestGetWorstPriceV1(t *testing.T) {
 
 func TestCreateOrder(t *testing.T) {
 	t.Parallel()
-	ap.Verbose = true
 	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
 	require.NoError(t, err)
 
@@ -566,13 +549,11 @@ func TestCreateOrder(t *testing.T) {
 		Symbol:          futuresTradablePair,
 		Side:            order.Sell.String(),
 		OrderType:       "LIMIT",
-		Size:            0.01,
-		Price:           20000,
-		ExpirationTime:  time.Now().Add(time.Hour * ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
-		TimeInForce:     "GTC",
+		Size:            0.0001,
+		Price:           40000,
+		TimeInForce:     "GOOD_TIL_CANCEL",
 		TriggerPrice:    0,
 		TrailingPercent: 0,
-		ClientOrderID:   2312312312,
 		ReduceOnly:      false,
 	})
 	require.NoError(t, err)
@@ -999,11 +980,9 @@ func TestCreateOrderV1(t *testing.T) {
 		Size:            123,
 		Price:           1,
 		LimitFee:        takerFeeRate * 123 * 1,
-		ExpirationTime:  time.Now().Add(time.Hour * 240),
 		TimeInForce:     "GTC",
 		TriggerPrice:    0,
 		TrailingPercent: 1,
-		ClientOrderID:   2312312312,
 		ReduceOnly:      true,
 	})
 	require.NoError(t, err)
@@ -1027,11 +1006,9 @@ func TestCreateOrderV2(t *testing.T) {
 		OrderType:       "LIMIT",
 		Size:            0.01,
 		Price:           20000,
-		ExpirationTime:  time.Now().Add(time.Hour * 45),
 		TimeInForce:     "GTC",
 		TriggerPrice:    0,
 		TrailingPercent: 0,
-		ClientOrderID:   2312312312,
 		ReduceOnly:      false,
 	})
 	require.NoError(t, err)
@@ -1213,7 +1190,8 @@ func TestCancelAllOrders(t *testing.T) {
 func TestGetOrderInfo(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GetOrderInfo(context.Background(), "123", currency.EMPTYPAIR, asset.Futures)
+	ap.Verbose = true
+	result, err := ap.GetOrderInfo(context.Background(), "614463889001677573", currency.EMPTYPAIR, asset.Futures)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -1221,6 +1199,7 @@ func TestGetOrderInfo(t *testing.T) {
 func TestGetActiveOrders(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	ap.Verbose = true
 	result, err := ap.GetActiveOrders(context.Background(), &order.MultiOrderRequest{
 		AssetType: asset.Futures,
 		Type:      order.Limit,

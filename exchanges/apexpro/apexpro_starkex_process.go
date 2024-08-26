@@ -2,13 +2,12 @@ package apexpro
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/thrasher-corp/gocryptotrader/currency"
@@ -34,9 +33,6 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 	}
 	if creds.L2Secret == "" {
 		return "", starkex.ErrInvalidPrivateKey
-	}
-	if arg.ExpirationTime.IsZero() {
-		return "", errExpirationTimeRequired
 	}
 	price := decimal.NewFromFloat(arg.Price)
 	size := decimal.NewFromFloat(arg.Size)
@@ -118,9 +114,10 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 	}
 	quantumsAmountSynthetic := size.Mul(syntheticResolution)
 	limitFeeRounded := decimal.NewFromFloat(takerFeeRate)
-	nonce := strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10)
-	expEpoch := big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS)
-	arg.ExpEpoch = expEpoch.Int64()
+	arg.ClientOrderID = randomClientID()
+	expEpoch := big.NewInt(int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000))))
+	// expEpoch := big.NewInt(1100000)
+	arg.ExpirationTime = expEpoch.Int64() * 3600 * 1000
 	newArg := &starkex.CreateOrderWithFeeParams{
 		OrderType:               "LIMIT_ORDER_WITH_FEES",
 		AssetIDSynthetic:        syntheticAssetID,
@@ -131,21 +128,10 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 		QuantumAmountFee:        limitFeeRounded.Mul(quantumsAmountCollateral).RoundUp(0).BigInt(),
 		IsBuyingSynthetic:       isBuy,
 		PositionID:              positionID,
-		Nonce:                   NonceByClientID(nonce),
+		Nonce:                   nonceFromClientID(arg.ClientOrderID),
 		ExpirationEpochHours:    expEpoch,
 	}
 	return ap.StarkConfig.Sign(newArg, creds.L2Secret)
-}
-
-// NonceByClientID generate nonce by clientId
-func NonceByClientID(clientId string) *big.Int {
-	h := sha256.New()
-	h.Write([]byte(clientId))
-
-	a := new(big.Int)
-	a.SetBytes(h.Sum(nil))
-	res := a.Mod(a, big.NewInt(NONCE_UPPER_BOUND_EXCLUSIVE))
-	return res
 }
 
 // ProcessWithdrawalToAddressSignatureV3 processes withdrawal to specified ethereum address request parameter and generates a starkEx signature
@@ -206,7 +192,7 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 		EthAddress:           ethereumAddress,
 		PositionID:           positionID,
 		Amount:               amount.Mul(resolution).BigInt(),
-		Nonce:                NonceByClientID(arg.Nonce),
+		Nonce:                nonceFromClientID(arg.Nonce),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Timestamp.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
 	}, creds.L2Secret)
 }
@@ -268,7 +254,7 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignature(ctx context.Context, arg 
 		EthAddress:           ethereumAddress,
 		PositionID:           positionID,
 		Amount:               amount.Mul(resolution).BigInt(),
-		Nonce:                NonceByClientID(arg.ClientID),
+		Nonce:                nonceFromClientID(arg.ClientID),
 		ExpirationEpochHours: expEpoch,
 	}, creds.L2Secret)
 }
@@ -314,7 +300,7 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 		AssetIDCollateral:    collateralAssetID,
 		PositionID:           positionID,
 		Amount:               amount.Mul(collateralResolution).BigInt(),
-		Nonce:                NonceByClientID(arg.ClientID),
+		Nonce:                nonceFromClientID(arg.ClientID),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix()) / float64(3600)))),
 	}, creds.L2Secret)
 }
@@ -366,7 +352,7 @@ func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *FastWithdr
 		AssetIDFee:           big.NewInt(0),
 		SenderPositionID:     positionID,
 		QuantumsAmount:       amount.Mul(resolution).BigInt(),
-		Nonce:                NonceByClientID(arg.ClientID),
+		Nonce:                nonceFromClientID(arg.ClientID),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Expiration.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
 	}, creds.L2Secret)
 }
@@ -417,24 +403,7 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		AssetID:          collateralAssetID,
 		AssetIDFee:       big.NewInt(0),
 		SenderPositionID: positionID,
-		// ReceiverPositionID:
-		// Nonce:
-		// QuantumsAmount:
-		// ExpirationEpochHours:
-		// ReceiverPublicKey:
-		// MaxAmountFee:
-		// SrcFeePositionID:
-
-		QuantumsAmount: amount.Mul(resolution).BigInt(),
-		Nonce:          NonceByClientID(arg.ClientID),
-		// ExpTimestampHrs
-		// ReceiverPositionID
-		// ReceiverPublicKey
-		// SenderPositionID
-		// SenderPublicKey
-		// MaxAmountFee
-		// AssetIDFee
-		// SrcFeePositionID
-		// Condition
+		QuantumsAmount:   amount.Mul(resolution).BigInt(),
+		Nonce:            nonceFromClientID(arg.ClientID),
 	}, creds.L2Secret)
 }

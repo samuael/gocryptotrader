@@ -25,15 +25,15 @@ Package rfc6979 is an implementation of RFC 6979's deterministic DSA.
 Provides functions similar to crypto/dsa and crypto/ecdsa.
 */
 
-// mac returns an HMAC of the given key and message.
-func mac(alg func() hash.Hash, k, m, buf []byte) []byte {
+// Mac returns an HMAC of the given key and message.
+func Mac(alg func() hash.Hash, k, m, buf []byte) []byte {
 	h := hmac.New(alg, k)
 	h.Write(m)
 	return h.Sum(buf[:0])
 }
 
 // https://tools.ietf.org/html/rfc6979#section-2.3.2
-func bits2int(in []byte, qlen int) *big.Int {
+func Bits2Int(in []byte, qlen int) *big.Int {
 	vlen := len(in) * 8
 	v := new(big.Int).SetBytes(in)
 	if vlen > qlen {
@@ -43,7 +43,7 @@ func bits2int(in []byte, qlen int) *big.Int {
 }
 
 // https://tools.ietf.org/html/rfc6979#section-2.3.3
-func int2octets(v *big.Int, rolen int) []byte {
+func Int2Octets(v *big.Int, rolen int) []byte {
 	out := v.Bytes()
 
 	// pad with zeros if it's too short
@@ -64,21 +64,21 @@ func int2octets(v *big.Int, rolen int) []byte {
 }
 
 // https://tools.ietf.org/html/rfc6979#section-2.3.4
-func bits2octets(in []byte, q *big.Int, qlen, rolen int) []byte {
-	z1 := bits2int(in, qlen)
+func Bits2Octets(in []byte, q *big.Int, qlen, rolen int) []byte {
+	z1 := Bits2Int(in, qlen)
 	z2 := new(big.Int).Sub(z1, q)
 	if z2.Sign() < 0 {
-		return int2octets(z1, rolen)
+		return Int2Octets(z1, rolen)
 	}
-	return int2octets(z2, rolen)
+	return Int2Octets(z2, rolen)
 }
 
 // https://tools.ietf.org/html/rfc6979#section-3.2
-func generateSecret(q, x *big.Int, alg func() hash.Hash, hash []byte, extraEntropy []byte) *big.Int {
+func GenerateSecret(q, x *big.Int, alg func() hash.Hash, hash []byte, extraEntropy []byte) *big.Int {
 	qlen := q.BitLen()
 	holen := alg().Size()
 	rolen := (qlen + 7) >> 3
-	bx := append(int2octets(x, rolen), bits2octets(hash, q, qlen, rolen)...)
+	bx := append(Int2Octets(x, rolen), Bits2Octets(hash, q, qlen, rolen)...)
 	// extra_entropy - extra added data in binary form as per section-3.6 of rfc6979
 	if len(extraEntropy) > 0 {
 		bx = append(bx, extraEntropy...)
@@ -91,16 +91,16 @@ func generateSecret(q, x *big.Int, alg func() hash.Hash, hash []byte, extraEntro
 	k := bytes.Repeat([]byte{0x00}, holen)
 
 	// Step D
-	k = mac(alg, k, append(append(v, 0x00), bx...), k)
+	k = Mac(alg, k, append(append(v, 0x00), bx...), k)
 
 	// Step E
-	v = mac(alg, k, v, v)
+	v = Mac(alg, k, v, v)
 
 	// Step F
-	k = mac(alg, k, append(append(v, 0x01), bx...), k)
+	k = Mac(alg, k, append(append(v, 0x01), bx...), k)
 
 	// Step G
-	v = mac(alg, k, v, v)
+	v = Mac(alg, k, v, v)
 
 	// Step H
 	for {
@@ -109,16 +109,16 @@ func generateSecret(q, x *big.Int, alg func() hash.Hash, hash []byte, extraEntro
 
 		// Step H2
 		for len(t) < qlen/8 {
-			v = mac(alg, k, v, v)
+			v = Mac(alg, k, v, v)
 			t = append(t, v...)
 		}
 
 		// Step H3
-		secret := bits2int(t, qlen)
+		secret := Bits2Int(t, qlen)
 		if secret.Cmp(one) >= 0 && secret.Cmp(q) < 0 {
 			return secret
 		}
-		k = mac(alg, k, append(v, 0x00), k)
-		v = mac(alg, k, v, v)
+		k = Mac(alg, k, append(v, 0x00), k)
+		v = Mac(alg, k, v, v)
 	}
 }

@@ -3,11 +3,14 @@ package apexpro
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -24,6 +27,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/internal/utils/starkex"
 	"github.com/thrasher-corp/gocryptotrader/types"
+	"golang.org/x/exp/rand"
 )
 
 // Apexpro is the overarching type across this package
@@ -679,15 +683,10 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	if arg.Price <= 0 {
 		return order.ErrPriceBelowMin
 	}
-	if arg.ExpirationTime.IsZero() {
-		return errExpirationTimeRequired
-	}
 	signature, err := ap.ProcessOrderSignature(ctx, arg)
 	if err != nil {
 		return err
 	}
-	// arg.LimitFee = arg.LimitFee * arg.Size * arg.Price
-	arg.ExpEpoch *= 3600 * 1000
 	arg.Signature = signature
 	return nil
 }
@@ -714,6 +713,7 @@ func (ap *Apexpro) CreateOrderV2(ctx context.Context, arg *CreateOrderParams) (*
 
 // CreateOrderV1 creates a new order through the v2 API
 func (ap *Apexpro) CreateOrderV1(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
+	arg.ClientOrderID = randomClientID()
 	err := ap.orderCreationParamsFilter(ctx, arg)
 	if err != nil {
 		return nil, err
@@ -806,9 +806,8 @@ func (ap *Apexpro) cancelOrderByID(ctx context.Context, id int64, path string) (
 	if id == 0 {
 		return 0, order.ErrOrderIDNotSet
 	}
-
 	var resp types.Number
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, map[string]interface{}{"id": id}, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, map[string]interface{}{"id": strconv.FormatInt(id, 10)}, &resp)
 }
 
 // CancelAllOpenOrdersV3 cancels all open orders
@@ -1451,4 +1450,18 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 		return fmt.Errorf("code: %d msg: %q", response.Code, response.Message)
 	}
 	return nil
+}
+
+func randomClientID() string {
+	rand.Seed(uint64(time.Now().UnixNano()))
+	return strconv.FormatFloat(rand.Float64(), 'f', -1, 64)[2:]
+}
+
+func nonceFromClientID(clientID string) *big.Int {
+	hasher := sha256.New()
+	hasher.Write([]byte(clientID))
+	hashBytes := hasher.Sum(nil)
+	hashHex := hex.EncodeToString(hashBytes)
+	nonce, _ := strconv.ParseUint(hashHex[0:8], 16, 64)
+	return big.NewInt(int64(nonce))
 }

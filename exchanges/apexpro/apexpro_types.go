@@ -1318,16 +1318,15 @@ type CreateOrderParams struct {
 	Symbol          currency.Pair `json:"symbol,omitempty"`
 	Side            string        `json:"side,omitempty"`
 	OrderType       string        `json:"type,omitempty"`
-	Size            float64       `json:"size,omitempty"`
-	Price           float64       `json:"price,omitempty"`
-	LimitFee        float64       `json:"limitFee,omitempty"`
-	ExpirationTime  time.Time     `json:"expiration,omitempty"`
-	ExpEpoch        int64         `json:"-"`
+	Size            float64       `json:"size,omitempty,string"`
+	Price           float64       `json:"price,omitempty,string"`
+	LimitFee        float64       `json:"limitFee,omitempty,string"`
+	ExpirationTime  int64         `json:"expiration,omitempty,string"`
 	TimeInForce     string        `json:"timeInForce,omitempty"`
-	TriggerPrice    float64       `json:"triggerPrice,omitempty"`
-	TrailingPercent float64       `json:"trailingPercent,omitempty"`
-	ClientOrderID   int64         `json:"clientOrderId,omitempty"`
-	ReduceOnly      bool          `json:"reduceOnly,omitempty"`
+	TriggerPrice    float64       `json:"triggerPrice,omitempty,string"`
+	TrailingPercent float64       `json:"trailingPercent,omitempty,string"`
+	ClientOrderID   string        `json:"clientOrderId,omitempty"`
+	ReduceOnly      bool          `json:"reduceOnly,omitempty,string"`
 	Signature       string        `json:"signature,omitempty"`
 }
 
