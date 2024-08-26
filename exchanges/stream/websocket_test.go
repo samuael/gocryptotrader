@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -724,8 +725,7 @@ func TestSendMessage(t *testing.T) {
 	}
 }
 
-// TestSendMessageWithResponse logic test
-func TestSendMessageWithResponse(t *testing.T) {
+func TestSendMessageReturnResponse(t *testing.T) {
 	t.Parallel()
 	wc := &WebsocketConnection{
 		Verbose:          true,
@@ -753,10 +753,20 @@ func TestSendMessageWithResponse(t *testing.T) {
 		RequestID: wc.GenerateMessageID(false),
 	}
 
-	_, err = wc.SendMessageReturnResponse(request.RequestID, request)
+	_, err = wc.SendMessageReturnResponse(context.Background(), request.RequestID, request)
 	if err != nil {
 		t.Error(err)
 	}
+
+	cancelledCtx, fn := context.WithDeadline(context.Background(), time.Now())
+	fn()
+	_, err = wc.SendMessageReturnResponse(cancelledCtx, "123", request)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+
+	// with timeout
+	wc.ResponseMaxLimit = 1
+	_, err = wc.SendMessageReturnResponse(context.Background(), "123", request)
+	assert.ErrorIs(t, err, ErrSignatureTimeout, "SendMessageReturnResponse should error when request ID not found")
 }
 
 type reporter struct {
@@ -901,6 +911,9 @@ func TestGenerateMessageID(t *testing.T) {
 		assert.NotContains(t, ids, id, "GenerateMessageID must not generate the same ID twice")
 		ids[i] = id
 	}
+
+	wc.bespokeGenerateMessageID = func(bool) int64 { return 42 }
+	assert.EqualValues(t, 42, wc.GenerateMessageID(true), "GenerateMessageID must use bespokeGenerateMessageID")
 }
 
 // BenchmarkGenerateMessageID-8   	 2850018	       408 ns/op	      56 B/op	       4 allocs/op
@@ -1182,7 +1195,7 @@ func TestLatency(t *testing.T) {
 		RequestID: wc.GenerateMessageID(false),
 	}
 
-	_, err = wc.SendMessageReturnResponse(request.RequestID, request)
+	_, err = wc.SendMessageReturnResponse(context.Background(), request.RequestID, request)
 	if err != nil {
 		t.Error(err)
 	}
