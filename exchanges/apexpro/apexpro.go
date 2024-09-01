@@ -687,7 +687,7 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	if err != nil {
 		return err
 	}
-	arg.Signature = signature
+	arg.Signature = "0x" + signature
 	return nil
 }
 
@@ -739,9 +739,9 @@ func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) error {
 	if arg.Amount <= 0 {
 		return order.ErrAmountBelowMin
 	}
-	if arg.ClientID != "" {
-		return order.ErrClientOrderIDMustBeSet
-	}
+	// if arg.ClientID != "" {
+	// 	return order.ErrClientOrderIDMustBeSet
+	// }
 	if arg.Expiration.IsZero() {
 		return errExpirationTimeRequired
 	}

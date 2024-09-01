@@ -116,7 +116,6 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 	limitFeeRounded := decimal.NewFromFloat(takerFeeRate)
 	arg.ClientOrderID = randomClientID()
 	expEpoch := big.NewInt(int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000))))
-	// expEpoch := big.NewInt(1100000)
 	arg.ExpirationTime = expEpoch.Int64() * 3600 * 1000
 	newArg := &starkex.CreateOrderWithFeeParams{
 		OrderType:               "LIMIT_ORDER_WITH_FEES",
@@ -131,7 +130,11 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 		Nonce:                   nonceFromClientID(arg.ClientOrderID),
 		ExpirationEpochHours:    expEpoch,
 	}
-	return ap.StarkConfig.Sign(newArg, creds.L2Secret)
+
+	// val, _ := json.Marshal(newArg)
+	// println(string(val))
+
+	return ap.StarkConfig.Sign(newArg, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
 }
 
 // ProcessWithdrawalToAddressSignatureV3 processes withdrawal to specified ethereum address request parameter and generates a starkEx signature
@@ -187,6 +190,8 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 		return "", err
 	}
 	amount := decimal.NewFromFloat(arg.Amount)
+	// expEpoch := big.NewInt(int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000))))
+	// arg.E = expEpoch.Int64() * 3600 * 1000
 	return ap.StarkConfig.Sign(&starkex.WithdrawalToAddressParams{
 		AssetIDCollateral:    collateralAssetID,
 		EthAddress:           ethereumAddress,
@@ -194,7 +199,7 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 		Amount:               amount.Mul(resolution).BigInt(),
 		Nonce:                nonceFromClientID(arg.Nonce),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Timestamp.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
-	}, creds.L2Secret)
+	}, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
 }
 
 // ProcessWithdrawalToAddressSignature processes withdrawal to specified ethereum address request parameter and generates a starkEx signature for V1 and V2 api endpoints
@@ -219,7 +224,6 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignature(ctx context.Context, arg 
 			return "", err
 		}
 	}
-	currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
 	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 16)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
@@ -227,7 +231,6 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignature(ctx context.Context, arg 
 	if arg.EthereumAddress == "" {
 		return "", errEthereumAddressMissing
 	}
-	arg.EthereumAddress = strings.TrimPrefix(arg.EthereumAddress, "0x")
 	ethereumAddress, ok := big.NewInt(0).SetString(arg.EthereumAddress, 16)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidEthereumAddress, arg.EthereumAddress)
@@ -256,7 +259,7 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignature(ctx context.Context, arg 
 		Amount:               amount.Mul(resolution).BigInt(),
 		Nonce:                nonceFromClientID(arg.ClientID),
 		ExpirationEpochHours: expEpoch,
-	}, creds.L2Secret)
+	}, creds.L2Secret, "", "")
 }
 
 // ProcessWithdrawalSignature processes withdrawal request parameter and generates a starkEx signature
@@ -293,6 +296,7 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 	if err != nil {
 		return "", err
 	}
+	arg.ClientID = randomClientID()
 	amount := decimal.NewFromFloat(arg.Amount)
 	expEpoch := big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS)
 	arg.ExpEpoch = expEpoch.Int64()
@@ -302,7 +306,7 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 		Amount:               amount.Mul(collateralResolution).BigInt(),
 		Nonce:                nonceFromClientID(arg.ClientID),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.ExpirationTime.Unix()) / float64(3600)))),
-	}, creds.L2Secret)
+	}, creds.L2Secret, "", "")
 }
 
 // ProcessTransferSignature processes withdrawal request parameter and generates a starkEx signature
@@ -327,7 +331,6 @@ func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *FastWithdr
 			return "", err
 		}
 	}
-	currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
 	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 16)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
@@ -346,6 +349,7 @@ func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *FastWithdr
 	if err != nil {
 		return "", err
 	}
+	arg.ClientID = randomClientID()
 	amount := decimal.NewFromFloat(arg.Amount)
 	return ap.StarkConfig.Sign(&starkex.TransferParams{
 		AssetID:              collateralAssetID,
@@ -354,7 +358,7 @@ func (ap *Apexpro) ProcessTransferSignature(ctx context.Context, arg *FastWithdr
 		QuantumsAmount:       amount.Mul(resolution).BigInt(),
 		Nonce:                nonceFromClientID(arg.ClientID),
 		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Expiration.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
-	}, creds.L2Secret)
+	}, creds.L2Secret, "", "")
 }
 
 // ProcessConditionalTransfer processes conditional transfer request parameter and generates a starkEx signature
@@ -379,7 +383,7 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 			return "", err
 		}
 	}
-	currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
+	// currencyInfo.StarkExAssetID = strings.TrimPrefix(currencyInfo.StarkExAssetID, "0x")
 	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 16)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
@@ -399,11 +403,12 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		return "", err
 	}
 	amount := decimal.NewFromFloat(arg.Amount)
+	arg.ClientID = randomClientID()
 	return ap.StarkConfig.Sign(&starkex.ConditionalTransferParams{
 		AssetID:          collateralAssetID,
 		AssetIDFee:       big.NewInt(0),
 		SenderPositionID: positionID,
 		QuantumsAmount:   amount.Mul(resolution).BigInt(),
 		Nonce:            nonceFromClientID(arg.ClientID),
-	}, creds.L2Secret)
+	}, creds.L2Secret, "", "")
 }

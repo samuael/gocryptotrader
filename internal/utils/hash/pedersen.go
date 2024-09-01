@@ -20,11 +20,16 @@ func LoadPedersenConfig(path string) (*PedersenCfg, error) {
 	return resp, json.Unmarshal([]byte(file), &resp)
 }
 
+// PedersenHash hashed the
 func (cfg *PedersenCfg) PedersenHash(str ...string) string {
 	NElementBitsHash := cfg.FieldPrime.BitLen()
 	point := cfg.ConstantPoints[0]
 	for i, s := range str {
-		x, _ := big.NewInt(0).SetString(s, 10)
+		x, ok := big.NewInt(0).SetString(s, 0)
+		if !ok {
+			panic("invalid value")
+			return "" //, errors.New("invalid value")
+		}
 		pointList := cfg.ConstantPoints[2+i*NElementBitsHash : 2+(i+1)*NElementBitsHash]
 		n := big.NewInt(0)
 		for _, pt := range pointList {

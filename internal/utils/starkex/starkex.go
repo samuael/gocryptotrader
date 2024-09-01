@@ -1,9 +1,7 @@
 package starkex
 
 import (
-	"bytes"
 	"crypto/elliptic"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
@@ -16,8 +14,10 @@ import (
 
 // Error declarations.
 var (
-	ErrInvalidPrivateKey  = errors.New("invalid private key")
-	ErrInvalidHashPayload = errors.New("invalid hash payload")
+	ErrInvalidPrivateKey         = errors.New("invalid private key")
+	ErrInvalidPublicKey          = errors.New("invalid public key")
+	ErrFailedToGenerateSignature = errors.New("failed to generate signature")
+	ErrInvalidHashPayload        = errors.New("invalid hash payload")
 )
 
 // StarkConfig represents a stark configuration
@@ -69,7 +69,7 @@ func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
 }
 
 // Sign generates a signature out using the users private key and signable order params.
-func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string) (string, error) {
+func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKey, starkPublicKeyYCoordinate string) (string, error) {
 	pHash, err := sgn.GetPedersenHash(sfg.PedersenHash)
 	if err != nil {
 		return pHash, err
@@ -78,94 +78,40 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string) (string, erro
 	if !okay {
 		return "", fmt.Errorf("%w, %v", ErrInvalidPrivateKey, starkPrivateKey)
 	}
-	msgHash, okay := new(big.Int).SetString(pHash, 10)
+	msgHash, okay := new(big.Int).SetString(pHash, 0)
 	if !okay {
 		return "", ErrInvalidHashPayload
 	}
+	println("msgHash.Text(16): ", msgHash.Text(16))
 	r, s, err := sfg.SignECDSA(msgHash, priKey)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("0x%x", append(r.Bytes(), s.Bytes()...)), nil
-}
-
-// Add computes the sum of two points on the StarkCurve.
-func (sc StarkConfig) Add(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
-	yDelta := new(big.Int).Sub(y1, y2)
-	xDelta := new(big.Int).Sub(x1, x2)
-
-	m := math_utils.DivMod(yDelta, xDelta, sc.P)
-
-	xm := new(big.Int).Mul(m, m)
-
-	x = new(big.Int).Sub(xm, x1)
-	x = x.Sub(x, x2)
-	x = x.Mod(x, sc.P)
-
-	y = new(big.Int).Sub(x1, x)
-	y = y.Mul(m, y)
-	y = y.Sub(y, y1)
-	y = y.Mod(y, sc.P)
-
-	return x, y
-}
-
-// Double calculates the double of a point on a StarkCurve (equation y^2 = x^3 + alpha*x + beta mod p).
-func (sc StarkConfig) Double(x1, y1 *big.Int) (x, y *big.Int) {
-	xin := new(big.Int).Mul(big.NewInt(3), x1)
-	xin = xin.Mul(xin, x1)
-	xin = xin.Add(xin, sc.Alpha)
-
-	yin := new(big.Int).Mul(y1, big.NewInt(2))
-
-	m := math_utils.DivMod(xin, yin, sc.P)
-
-	xout := new(big.Int).Mul(m, m)
-	xmed := new(big.Int).Mul(big.NewInt(2), x1)
-	xout = xout.Sub(xout, xmed)
-	xout = xout.Mod(xout, sc.P)
-
-	yout := new(big.Int).Sub(x1, xout)
-	yout = yout.Mul(m, yout)
-	yout = yout.Sub(yout, y1)
-	yout = yout.Mod(yout, sc.P)
-
-	return xout, yout
-}
-
-// ScalarMult performs scalar multiplication on a point (x1, y1) with a scalar value k.
-func (sc StarkConfig) ScalarMult(x1, y1 *big.Int, k []byte) (x, y *big.Int) {
-	m := new(big.Int).SetBytes(k)
-	x, y = sc.EcMult(m, x1, y1)
-	return x, y
-}
-
-// ScalarBaseMult returns the result of multiplying the base point of the StarkCurve
-// by the given scalar value.
-func (sc StarkConfig) ScalarBaseMult(k []byte) (x, y *big.Int) {
-	return sc.ScalarMult(sc.Gx, sc.Gy, k)
-}
-
-// IsOnCurve checks if the given point (x, y) lies on the curve defined by the StarkCurve instance.
-func (sc StarkConfig) IsOnCurve(x, y *big.Int) bool {
-	left := new(big.Int).Mul(y, y)
-	left = left.Mod(left, sc.P)
-
-	right := new(big.Int).Mul(x, x)
-	right = right.Mul(right, x)
-	right = right.Mod(right, sc.P)
-
-	ri := new(big.Int).Mul(big.NewInt(1), x)
-
-	right = right.Add(right, ri)
-	right = right.Add(right, sc.B)
-	right = right.Mod(right, sc.P)
-
-	if left.Cmp(right) == 0 {
-		return true
-	} else {
-		return false
+	publicKey, ok := big.NewInt(0).SetString(starkPublicKey, 0)
+	if !ok {
+		return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
 	}
+	publicKeyYCoordinate, ok := big.NewInt(0).SetString(starkPublicKeyYCoordinate, 0)
+	if !ok {
+		publicKeyYCoordinate = sfg.GetYCoordinate(publicKey)
+		if publicKeyYCoordinate.Cmp(big.NewInt(0)) == 0 {
+			return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
+		}
+	}
+	ok = sfg.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
+	if !ok {
+		return "", ErrFailedToGenerateSignature
+	}
+	return math_utils.IntToHex32(r) + math_utils.IntToHex32(s), nil
+}
+
+// GetYCoordinate generates the y-coordinate of starkEx Public key from the x coordinate
+func (sc StarkConfig) GetYCoordinate(starkKeyXCoordinate *big.Int) *big.Int {
+	x := starkKeyXCoordinate
+	xpow3 := new(big.Int).Exp(x, big.NewInt(3), nil)
+	alphaXPlusB := new(big.Int).Add(new(big.Int).Mul(sc.Alpha, x), sc.B)
+	agg := new(big.Int).Mod(new(big.Int).Add(xpow3, alphaXPlusB), sc.P)
+	return new(big.Int).ModSqrt(agg, sc.P)
 }
 
 // InvModCurveSize calculates the inverse modulus of a given big integer 'x' with respect to the StarkCurve 'sc'.
@@ -173,21 +119,64 @@ func (sc StarkConfig) InvModCurveSize(x *big.Int) *big.Int {
 	return math_utils.DivMod(big.NewInt(1), x, sc.N)
 }
 
-// GetYCoordinate calculates the y-coordinate of a point on the StarkCurve.
-func (sc StarkConfig) GetYCoordinate(starkX *big.Int) *big.Int {
-	y := new(big.Int).Mul(starkX, starkX)
-	y = y.Mul(y, starkX)
-	yin := new(big.Int).Mul(sc.Alpha, starkX)
+// Sign calculates the signature of a message using the StarkCurve algorithm.
+func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (*big.Int, *big.Int, error) {
+	if msgHash == nil {
+		return nil, nil, fmt.Errorf("nil msgHash")
+	}
+	if privKey == nil {
+		return nil, nil, fmt.Errorf("nil privKey")
+	}
+	if msgHash.Cmp(big.NewInt(0)) != 1 || msgHash.Cmp(sc.Max) != -1 {
+		return nil, nil, fmt.Errorf("invalid bit length")
+	}
 
-	y = y.Add(y, yin)
-	y = y.Add(y, sc.B)
-	y = y.Mod(y, sc.P)
+	inSeed := big.NewInt(0)
+	if len(seed) == 1 {
+		inSeed = seed[0]
+	}
+	for {
+		// k := sc.GenerateSecret(big.NewInt(0).Set(msgHash), big.NewInt(0).Set(privKey), big.NewInt(0).Set(inSeed))
+		k := math_utils.GenerateKRfc6979(msgHash, privKey, sc.N, int(inSeed.Int64()))
+		// In case r is rejected k shall be generated with new seed
+		inSeed = inSeed.Add(inSeed, big.NewInt(1))
+		// ----------------------------------------------------------------
+		r := math_utils.ECMult(k, [2]*big.Int{sc.EcGenX, sc.EcGenY}, int(sc.Alpha.Int64()), sc.P)[0]
+		// DIFF: in classic ECDSA, we take int(x) % n.
+		if r.Cmp(big.NewInt(0)) != 1 || r.Cmp(sc.Max) != -1 {
+			// Bad value. This fails with negligible probability.
+			continue
+		}
+		agg := new(big.Int).Mul(r, privKey)
+		agg = agg.Add(agg, msgHash)
 
-	y = y.ModSqrt(y, sc.P)
-	return y
+		// Added:
+		agg = new(big.Int).Mod(agg, sc.N)
+
+		// if new(big.Int).Mod(agg, sc.N).Cmp(big.NewInt(0)) == 0 {
+		// 	// Bad value. This fails with negligible probability.
+		// 	continue
+		// }
+		if agg.Cmp(big.NewInt(0)) == 0 {
+			continue
+		}
+
+		w := math_utils.DivMod(k, agg, sc.N)
+		// if w.Cmp(big.NewInt(0)) != 1 || w.Cmp(sc.Max) != -1 {
+		if w.Cmp(big.NewInt(0)) != 1 || w.Cmp(sc.N) != -1 {
+			// Bad value. This fails with negligible probability.
+			continue
+		}
+
+		s := sc.InvModCurveSize(w)
+		return r, s, nil
+	}
 }
 
-// MimicEcMultAir performs a computation on the StarkCurve struct (m * point + shift_point)
+// Computes m * point + shift_point using the same steps like the AIR and throws an exception if
+// and only if the AIR errors.
+//
+// (ref: https://github.com/starkware-libs/cairo-lang/blob/master/src/starkware/crypto/starkware/crypto/signature/signature.py)
 func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int, y *big.Int, err error) {
 	m := new(big.Int).Set(mout)
 	if m.Cmp(big.NewInt(0)) != 1 || m.Cmp(sc.Max) != -1 {
@@ -201,9 +190,11 @@ func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int,
 			return x, y, fmt.Errorf("xs are the same")
 		}
 		if m.Bit(0) == 1 {
-			psx, psy = sc.Add(psx, psy, x1, y1)
+			point1 := math_utils.ECCAdd([2]*big.Int{psx, psy}, [2]*big.Int{x1, y1}, sc.P)
+			psx, psy = point1[0], point1[1]
 		}
-		x1, y1 = sc.Double(x1, y1)
+		point := math_utils.ECDouble([2]*big.Int{x1, y1}, int(sc.Alpha.Int64()), sc.P)
+		x1, y1 = point[0], point[1]
 		m = m.Rsh(m, 1)
 	}
 	if m.Cmp(big.NewInt(0)) != 0 {
@@ -212,203 +203,35 @@ func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int,
 	return psx, psy, nil
 }
 
-// EcMult multiplies a point (equation y^2 = x^3 + alpha*x + beta mod p) on the StarkCurve by a scalar value.
-func (sc StarkConfig) EcMult(m, x1, y1 *big.Int) (x, y *big.Int) {
-	var _ecMult func(m, x1, y1 *big.Int) (x, y *big.Int)
-
-	_add := func(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
-		yDelta := new(big.Int).Sub(y1, y2)
-		xDelta := new(big.Int).Sub(x1, x2)
-
-		m := math_utils.DivMod(yDelta, xDelta, sc.P)
-
-		xm := new(big.Int).Mul(m, m)
-
-		x = new(big.Int).Sub(xm, x1)
-		x = x.Sub(x, x2)
-		x = x.Mod(x, sc.P)
-
-		y = new(big.Int).Sub(x1, x)
-		y = y.Mul(m, y)
-		y = y.Sub(y, y1)
-		y = y.Mod(y, sc.P)
-
-		return x, y
+// Verify Verifies
+func (sc *StarkConfig) Verify(msgHash *big.Int, r *big.Int, s *big.Int, publicKey [2]*big.Int) bool {
+	publicKeyPow2 := new(big.Int).Exp(publicKey[1], big.NewInt(2), nil)
+	publicKeyPow3 := new(big.Int).Exp(publicKey[0], big.NewInt(3), nil)
+	alphaPublicKey := new(big.Int).Mul(sc.Alpha, publicKey[0])
+	add := new(big.Int).Add(publicKeyPow3, new(big.Int).Add(alphaPublicKey, sc.B))
+	sub := new(big.Int).Sub(publicKeyPow2, add)
+	mod := new(big.Int).Mod(sub, sc.P)
+	if mod.Cmp(big.NewInt(0)) != 0 {
+		println("\n\nA\n\n")
+		return false
 	}
-
-	// alpha is our Y
-	_ecMult = func(m, x1, y1 *big.Int) (x, y *big.Int) {
-		if m.BitLen() == 1 {
-			return x1, y1
-		}
-		mk := new(big.Int).Mod(m, big.NewInt(2))
-		if mk.Cmp(big.NewInt(0)) == 0 {
-			h := new(big.Int).Div(m, big.NewInt(2))
-			c, d := sc.Double(x1, y1)
-			return _ecMult(h, c, d)
-		}
-		n := new(big.Int).Sub(m, big.NewInt(1))
-		e, f := _ecMult(n, x1, y1)
-		return _add(e, f, x1, y1)
+	zGx, zGy, err := sc.MimicEcMultAir(msgHash, sc.Gx, sc.Gy, sc.MinusShiftPointX, sc.MinusShiftPointY)
+	if err != nil {
+		println("\n\nB\n\n")
+		return false
 	}
-
-	x, y = _ecMult(m, x1, y1)
-	return x, y
-}
-
-// Verify verifies the validity of the signature for a given message hash using the StarkCurve.
-func (sc StarkConfig) Verify(msgHash, r, s, pubX, pubY *big.Int) bool {
+	rQx, rQy, err := sc.MimicEcMultAir(r, publicKey[0], publicKey[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
+	if err != nil {
+		println("\n\nC\n\n")
+		return false
+	}
+	eccAddzqp := math_utils.ECCAdd([2]*big.Int{zGx, zGy}, [2]*big.Int{rQx, rQy}, sc.P)
 	w := sc.InvModCurveSize(s)
-
-	if s.Cmp(big.NewInt(0)) != 1 || s.Cmp(sc.N) != -1 {
-		return false
-	}
-	if r.Cmp(big.NewInt(0)) != 1 || r.Cmp(sc.Max) != -1 {
-		return false
-	}
-	if w.Cmp(big.NewInt(0)) != 1 || w.Cmp(sc.Max) != -1 {
-		return false
-	}
-	if msgHash.Cmp(big.NewInt(0)) != 1 || msgHash.Cmp(sc.Max) != -1 {
-		return false
-	}
-	if !sc.IsOnCurve(pubX, pubY) {
-		return false
-	}
-
-	zGx, zGy, err := sc.MimicEcMultAir(msgHash, sc.EcGenX, sc.EcGenY, sc.MinusShiftPointX, sc.MinusShiftPointY)
+	wBx, wBy, err := sc.MimicEcMultAir(w, eccAddzqp[0], eccAddzqp[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
 	if err != nil {
+		println("\n\nD\n\n")
 		return false
 	}
-
-	rQx, rQy, err := sc.MimicEcMultAir(r, pubX, pubY, sc.Gx, sc.Gy)
-	if err != nil {
-		return false
-	}
-	inX, inY := sc.Add(zGx, zGy, rQx, rQy)
-	wBx, wBy, err := sc.MimicEcMultAir(w, inX, inY, sc.Gx, sc.Gy)
-	if err != nil {
-		return false
-	}
-
-	outX, _ := sc.Add(wBx, wBy, sc.MinusShiftPointX, sc.MinusShiftPointY)
-	if r.Cmp(outX) == 0 {
-		return true
-	} else {
-		altY := new(big.Int).Neg(pubY)
-
-		zGx, zGy, err = sc.MimicEcMultAir(msgHash, sc.EcGenX, sc.EcGenY, sc.MinusShiftPointX, sc.MinusShiftPointY)
-		if err != nil {
-			return false
-		}
-
-		rQx, rQy, err = sc.MimicEcMultAir(r, pubX, new(big.Int).Set(altY), sc.Gx, sc.Gy)
-		if err != nil {
-			return false
-		}
-		inX, inY = sc.Add(zGx, zGy, rQx, rQy)
-		wBx, wBy, err = sc.MimicEcMultAir(w, inX, inY, sc.Gx, sc.Gy)
-		if err != nil {
-			return false
-		}
-
-		outX, _ = sc.Add(wBx, wBy, sc.MinusShiftPointX, sc.MinusShiftPointY)
-		if r.Cmp(outX) == 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// Sign calculates the signature of a message using the StarkCurve algorithm.
-func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (x, y *big.Int, err error) {
-	if msgHash == nil {
-		return x, y, fmt.Errorf("nil msgHash")
-	}
-	if privKey == nil {
-		return x, y, fmt.Errorf("nil privKey")
-	}
-	if msgHash.Cmp(big.NewInt(0)) != 1 || msgHash.Cmp(sc.Max) != -1 {
-		return x, y, fmt.Errorf("invalid bit length")
-	}
-
-	inSeed := big.NewInt(0)
-	if len(seed) == 1 && inSeed != nil {
-		inSeed = seed[0]
-	}
-	for {
-		k := sc.GenerateSecret(big.NewInt(0).Set(msgHash), big.NewInt(0).Set(privKey), big.NewInt(0).Set(inSeed))
-		// In case r is rejected k shall be generated with new seed
-		inSeed = inSeed.Add(inSeed, big.NewInt(1))
-
-		r, _ := sc.EcMult(k, sc.EcGenX, sc.EcGenY)
-
-		// DIFF: in classic ECDSA, we take int(x) % n.
-		if r.Cmp(big.NewInt(0)) != 1 || r.Cmp(sc.Max) != -1 {
-			// Bad value. This fails with negligible probability.
-			continue
-		}
-
-		agg := new(big.Int).Mul(r, privKey)
-		agg = agg.Add(agg, msgHash)
-
-		if new(big.Int).Mod(agg, sc.N).Cmp(big.NewInt(0)) == 0 {
-			// Bad value. This fails with negligible probability.
-			continue
-		}
-
-		w := math_utils.DivMod(k, agg, sc.N)
-		if w.Cmp(big.NewInt(0)) != 1 || w.Cmp(sc.Max) != -1 {
-			// Bad value. This fails with negligible probability.
-			continue
-		}
-
-		s := sc.InvModCurveSize(w)
-		return r, s, nil
-	}
-}
-
-// GenerateSecret generates a secret using the StarkCurve struct.
-func (sc StarkConfig) GenerateSecret(msgHash, privKey, seed *big.Int) (secret *big.Int) {
-	alg := sha256.New
-	holen := alg().Size()
-	rolen := (sc.BitSize + 7) >> 3
-
-	if msgHash.BitLen()%8 <= 4 && msgHash.BitLen() >= 248 {
-		msgHash = msgHash.Mul(msgHash, big.NewInt(16))
-	}
-
-	by := append(math_utils.Int2Octets(privKey, rolen), math_utils.Bits2Octets(msgHash.Bytes(), sc.N, sc.BitSize, rolen)...)
-
-	if seed.Cmp(big.NewInt(0)) == 1 {
-		by = append(by, seed.Bytes()...)
-	}
-
-	v := bytes.Repeat([]byte{0x01}, holen)
-
-	k := bytes.Repeat([]byte{0x00}, holen)
-
-	k = math_utils.Mac(alg, k, append(append(v, 0x00), by...), k)
-
-	v = math_utils.Mac(alg, k, v, v)
-
-	k = math_utils.Mac(alg, k, append(append(v, 0x01), by...), k)
-
-	v = math_utils.Mac(alg, k, v, v)
-
-	for {
-		var t []byte
-
-		for len(t) < rolen {
-			v = math_utils.Mac(alg, k, v, v)
-			t = append(t, v...)
-		}
-
-		secret = math_utils.Bits2Int(t, sc.BitSize)
-		if secret.Cmp(big.NewInt(0)) == 1 && secret.Cmp(sc.N) == -1 {
-			return secret
-		}
-		k = math_utils.Mac(alg, k, append(v, 0x00), k)
-		v = math_utils.Mac(alg, k, v, v)
-	}
+	x := math_utils.ECCAdd([2]*big.Int{wBx, wBy}, [2]*big.Int{sc.MinusShiftPointX, sc.MinusShiftPointY}, sc.P)
+	return r == (x[0])
 }

@@ -77,12 +77,12 @@ func (ap *Apexpro) SetDefaults() {
 
 	ap.API.Endpoints = ap.NewEndpoints()
 	err = ap.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
-		exchange.RestSpotSupplementary:      apexproAPIURL,
-		exchange.RestSpot:                   apexproAPIURL,
+		exchange.RestSpotSupplementary:      apexproTestAPIURL, //apexproAPIURL,
+		exchange.RestSpot:                   apexproTestAPIURL, //apexproAPIURL,
 		exchange.WebsocketSpot:              apexProWebsocket,
 		exchange.WebsocketSpotSupplementary: apexProPrivateWebsocket,
 
-		exchange.RestFutures: apexProOmniAPIURL,
+		exchange.RestFutures: apexproTestAPIURL, //apexProOmniAPIURL,
 	})
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)

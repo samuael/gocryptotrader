@@ -25,8 +25,9 @@ const (
 	apiSecret = ""
 	clientID  = ""
 
-	starkKey            = ""
-	starkSecret         = ""
+	starkKey    = ""
+	starkSecret = ""
+
 	starkKeyYCoordinate = ""
 
 	ethereumAddress = ""
@@ -538,13 +539,13 @@ func TestCreateOrder(t *testing.T) {
 	t.Parallel()
 	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
 	require.NoError(t, err)
-
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	if ap.UserAccountDetail == nil {
 		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(context.Background())
 		require.NoError(t, err)
 		require.NotNil(t, ap.UserAccountDetail)
 	}
+	ap.Verbose = true
 	result, err := ap.CreateOrderV3(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
 		Side:            order.Sell.String(),
@@ -1190,7 +1191,6 @@ func TestCancelAllOrders(t *testing.T) {
 func TestGetOrderInfo(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	ap.Verbose = true
 	result, err := ap.GetOrderInfo(context.Background(), "614463889001677573", currency.EMPTYPAIR, asset.Futures)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -1199,7 +1199,6 @@ func TestGetOrderInfo(t *testing.T) {
 func TestGetActiveOrders(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	ap.Verbose = true
 	result, err := ap.GetActiveOrders(context.Background(), &order.MultiOrderRequest{
 		AssetType: asset.Futures,
 		Type:      order.Limit,
