@@ -52,8 +52,8 @@ func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
 			P:       pedersenConfig.FieldPrime,
 			N:       pedersenConfig.EcOrder,
 			B:       pedersenConfig.BETA,
-			Gx:      pedersenConfig.ConstantPoints[0][0],
-			Gy:      pedersenConfig.ConstantPoints[0][1],
+			Gx:      pedersenConfig.ConstantPoints[1][0],
+			Gy:      pedersenConfig.ConstantPoints[1][1],
 			BitSize: 252,
 		},
 		EcGenX:         pedersenConfig.ConstantPoints[1][0],
@@ -82,26 +82,25 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKe
 	if !okay {
 		return "", ErrInvalidHashPayload
 	}
-	println("msgHash.Text(16): ", msgHash.Text(16))
 	r, s, err := sfg.SignECDSA(msgHash, priKey)
 	if err != nil {
 		return "", err
 	}
-	publicKey, ok := big.NewInt(0).SetString(starkPublicKey, 0)
-	if !ok {
-		return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
-	}
-	publicKeyYCoordinate, ok := big.NewInt(0).SetString(starkPublicKeyYCoordinate, 0)
-	if !ok {
-		publicKeyYCoordinate = sfg.GetYCoordinate(publicKey)
-		if publicKeyYCoordinate.Cmp(big.NewInt(0)) == 0 {
-			return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
-		}
-	}
-	ok = sfg.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
-	if !ok {
-		return "", ErrFailedToGenerateSignature
-	}
+	// publicKey, ok := big.NewInt(0).SetString(starkPublicKey, 0)
+	// if !ok {
+	// 	return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
+	// }
+	// publicKeyYCoordinate, ok := big.NewInt(0).SetString(starkPublicKeyYCoordinate, 0)
+	// if !ok {
+	// 	publicKeyYCoordinate = sfg.GetYCoordinate(publicKey)
+	// 	if publicKeyYCoordinate.Cmp(big.NewInt(0)) == 0 {
+	// 		return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
+	// 	}
+	// }
+	// ok = sfg.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
+	// if !ok {
+	// 	return "", ErrFailedToGenerateSignature
+	// }
 	return math_utils.IntToHex32(r) + math_utils.IntToHex32(s), nil
 }
 
@@ -116,7 +115,7 @@ func (sc StarkConfig) GetYCoordinate(starkKeyXCoordinate *big.Int) *big.Int {
 
 // InvModCurveSize calculates the inverse modulus of a given big integer 'x' with respect to the StarkCurve 'sc'.
 func (sc StarkConfig) InvModCurveSize(x *big.Int) *big.Int {
-	return math_utils.DivMod(big.NewInt(1), x, sc.N)
+	return math_utils.DivMod(one, x, sc.N)
 }
 
 // Sign calculates the signature of a message using the StarkCurve algorithm.
@@ -130,18 +129,23 @@ func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (*b
 	if msgHash.Cmp(big.NewInt(0)) != 1 || msgHash.Cmp(sc.Max) != -1 {
 		return nil, nil, fmt.Errorf("invalid bit length")
 	}
-
 	inSeed := big.NewInt(0)
 	if len(seed) == 1 {
 		inSeed = seed[0]
 	}
+	nBit := big.NewInt(0).Exp(big.NewInt(2), N_ELEMENT_BITS_ECDSA, nil)
 	for {
 		// k := sc.GenerateSecret(big.NewInt(0).Set(msgHash), big.NewInt(0).Set(privKey), big.NewInt(0).Set(inSeed))
 		k := math_utils.GenerateKRfc6979(msgHash, privKey, sc.N, int(inSeed.Int64()))
 		// In case r is rejected k shall be generated with new seed
-		inSeed = inSeed.Add(inSeed, big.NewInt(1))
+		if inSeed.Int64() == 0 {
+			inSeed = big.NewInt(1)
+		} else {
+			inSeed = inSeed.Add(inSeed, big.NewInt(1))
+		}
 		// ----------------------------------------------------------------
-		r := math_utils.ECMult(k, [2]*big.Int{sc.EcGenX, sc.EcGenY}, int(sc.Alpha.Int64()), sc.P)[0]
+		x := math_utils.ECMult(k, [2]*big.Int{sc.EcGenX, sc.EcGenY}, int(sc.Alpha.Int64()), sc.P)[0]
+		r := big.NewInt(0).Set(x)
 		// DIFF: in classic ECDSA, we take int(x) % n.
 		if r.Cmp(big.NewInt(0)) != 1 || r.Cmp(sc.Max) != -1 {
 			// Bad value. This fails with negligible probability.
@@ -150,21 +154,13 @@ func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (*b
 		agg := new(big.Int).Mul(r, privKey)
 		agg = agg.Add(agg, msgHash)
 
-		// Added:
-		agg = new(big.Int).Mod(agg, sc.N)
-
-		// if new(big.Int).Mod(agg, sc.N).Cmp(big.NewInt(0)) == 0 {
-		// 	// Bad value. This fails with negligible probability.
-		// 	continue
-		// }
-		if agg.Cmp(big.NewInt(0)) == 0 {
+		if new(big.Int).Mod(agg, sc.N).Cmp(big.NewInt(0)) == 0 {
 			continue
 		}
 
 		w := math_utils.DivMod(k, agg, sc.N)
 		// if w.Cmp(big.NewInt(0)) != 1 || w.Cmp(sc.Max) != -1 {
-		if w.Cmp(big.NewInt(0)) != 1 || w.Cmp(sc.N) != -1 {
-			// Bad value. This fails with negligible probability.
+		if !(w.Cmp(one) > 0 && w.Cmp(nBit) < 0) {
 			continue
 		}
 
@@ -203,7 +199,7 @@ func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int,
 	return psx, psy, nil
 }
 
-// Verify Verifies
+// Verifies a an ECDSA signature
 func (sc *StarkConfig) Verify(msgHash *big.Int, r *big.Int, s *big.Int, publicKey [2]*big.Int) bool {
 	publicKeyPow2 := new(big.Int).Exp(publicKey[1], big.NewInt(2), nil)
 	publicKeyPow3 := new(big.Int).Exp(publicKey[0], big.NewInt(3), nil)
@@ -212,24 +208,20 @@ func (sc *StarkConfig) Verify(msgHash *big.Int, r *big.Int, s *big.Int, publicKe
 	sub := new(big.Int).Sub(publicKeyPow2, add)
 	mod := new(big.Int).Mod(sub, sc.P)
 	if mod.Cmp(big.NewInt(0)) != 0 {
-		println("\n\nA\n\n")
 		return false
 	}
 	zGx, zGy, err := sc.MimicEcMultAir(msgHash, sc.Gx, sc.Gy, sc.MinusShiftPointX, sc.MinusShiftPointY)
 	if err != nil {
-		println("\n\nB\n\n")
 		return false
 	}
 	rQx, rQy, err := sc.MimicEcMultAir(r, publicKey[0], publicKey[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
 	if err != nil {
-		println("\n\nC\n\n")
 		return false
 	}
 	eccAddzqp := math_utils.ECCAdd([2]*big.Int{zGx, zGy}, [2]*big.Int{rQx, rQy}, sc.P)
 	w := sc.InvModCurveSize(s)
 	wBx, wBy, err := sc.MimicEcMultAir(w, eccAddzqp[0], eccAddzqp[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
 	if err != nil {
-		println("\n\nD\n\n")
 		return false
 	}
 	x := math_utils.ECCAdd([2]*big.Int{wBx, wBy}, [2]*big.Int{sc.MinusShiftPointX, sc.MinusShiftPointY}, sc.P)

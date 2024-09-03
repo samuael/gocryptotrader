@@ -23,8 +23,6 @@ func (s *CreateOrderWithFeeParams) GetPedersenHash(pedersenHash func(...string) 
 	}
 	// Part 1
 	part1 := big.NewInt(0)
-	part1.Lsh(part1, uint(64-quantumsAmountSell.BitLen()))
-	part1.Add(part1, big.NewInt(0))
 	part1.Add(part1, quantumsAmountSell)
 	part1.Lsh(part1, ORDER_FIELD_BIT_LENGTHS["quantums_amount"])
 	part1.Add(part1, quantumsAmountBuy)
@@ -33,39 +31,8 @@ func (s *CreateOrderWithFeeParams) GetPedersenHash(pedersenHash func(...string) 
 	part1.Lsh(part1, ORDER_FIELD_BIT_LENGTHS["nonce"])
 	part1.Add(part1, s.Nonce)
 
-	println("part1: ", part1.BitLen())
-
 	// Part 2
-	orderPrefix := big.NewInt(ORDER_PREFIX)
-
-	// Step 1: Calculate the shift needed to make the bit length 10
-	shift := uint(10 - orderPrefix.BitLen())
-
-	p := big.NewInt(4)
-	// sz := 10 - p.BitLen()
-	// println("sz: ", sz)
-	n := big.NewInt(0)
-	n = n.Or(n, new(big.Int).Lsh(p, 10))
-	println("\n Value: ", p.Int64(), "- Size: ", p.BitLen())
-	println("\nC Value: ", n.Int64(), "- Size: ", n.BitLen())
-
-	// sr = new(big.Int).Rsh(sr, uint(sz))
-	// println("\nB Value: ", sr.Int64(), "- Size: ", sr.BitLen())
-	// println(sr.Int64())
-
-	// Step 2: Shift orderPrefix left by the required amount
-	shiftedOrderPrefix := new(big.Int).Lsh(orderPrefix, shift)
-	println("shiftedOrderPrefix Bit Lengths: ", shiftedOrderPrefix.BitLen(), "orderPrefix: ", orderPrefix.BitLen(),
-		"\norderPrefix value: ", orderPrefix.Int64(), "shiftedOrderPrefix value: ", shiftedOrderPrefix.Int64())
-
-	part2 := big.NewInt(0)
-	part2.Set(shiftedOrderPrefix)
-	// part2.Lsh(part2, uint(orderPrefix.BitLen()))
-	if part2.Cmp(orderPrefix) != 0 {
-		panic("Differentoooo" + " " + orderPrefix.String() + " " + part2.String())
-	}
-	println("Part 2: A", part2.BitLen())
-
+	part2 := big.NewInt(ORDER_PREFIX)
 	for i := 0; i < 3; i++ {
 		part2.Lsh(part2, uint(ORDER_FIELD_BIT_LENGTHS["position_id"]))
 		part2.Add(part2, s.PositionID)
@@ -73,8 +40,6 @@ func (s *CreateOrderWithFeeParams) GetPedersenHash(pedersenHash func(...string) 
 	part2.Lsh(part2, uint(ORDER_FIELD_BIT_LENGTHS["expiration_epoch_hours"]))
 	part2.Add(part2, s.ExpirationEpochHours)
 	part2.Lsh(part2, uint(ORDER_PADDING_BITS))
-
-	println("part2: ", part2.BitLen())
 
 	assetHash := pedersenHash(
 		pedersenHash(
@@ -89,7 +54,8 @@ func (s *CreateOrderWithFeeParams) GetPedersenHash(pedersenHash func(...string) 
 	)
 	return pedersenHash(
 		part1Hash,
-		part2.String()), nil
+		part2.String(),
+	), nil
 }
 
 // GetPedersenHash implements the Signable interface and generates a pedersen hash of WithdrawalToAddressParams

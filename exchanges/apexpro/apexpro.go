@@ -691,7 +691,7 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	return nil
 }
 
-// CreateOrderV3 creates a new order.
+// CreateOrderV3 creates a new order
 func (ap *Apexpro) CreateOrderV3(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
 	err := ap.orderCreationParamsFilter(ctx, arg)
 	if err != nil {

@@ -2,6 +2,7 @@ package apexpro
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -114,7 +115,9 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 	}
 	quantumsAmountSynthetic := size.Mul(syntheticResolution)
 	limitFeeRounded := decimal.NewFromFloat(takerFeeRate)
+	// arg.ClientOrderID = "10001"
 	arg.ClientOrderID = randomClientID()
+	// expEpoch, _ := big.NewInt(0).SetString("1100000", 0)
 	expEpoch := big.NewInt(int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000))))
 	arg.ExpirationTime = expEpoch.Int64() * 3600 * 1000
 	newArg := &starkex.CreateOrderWithFeeParams{
@@ -131,8 +134,8 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 		ExpirationEpochHours:    expEpoch,
 	}
 
-	// val, _ := json.Marshal(newArg)
-	// println(string(val))
+	val, _ := json.Marshal(newArg)
+	println(string(val))
 
 	return ap.StarkConfig.Sign(newArg, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
 }

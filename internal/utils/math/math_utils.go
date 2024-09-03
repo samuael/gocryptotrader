@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	"github.com/huandu/xstrings"
@@ -73,8 +74,11 @@ func ECCAdd(point1 [2]*big.Int, point2 [2]*big.Int, p *big.Int) [2]*big.Int {
 
 // DivMod Finds a nonnegative integer 0 <= x < p such that (m * x) % p == n
 func DivMod(n, m, p *big.Int) *big.Int {
-	a, _, _ := IGCdex(m, p)
+	a, _, c := IGCdex(m, p)
 	// (n * a) % p
+	if c.Int64() != 1 {
+		panic(fmt.Sprintf("expected c to be equal to 1, but found %d", c.Int64()))
+	}
 	tmp := big.NewInt(0).Mul(n, a)
 	return tmp.Mod(tmp, p)
 }
@@ -150,6 +154,9 @@ func IGCdex(a, b *big.Int) (*big.Int, *big.Int, *big.Int) {
 	return x.Mul(x, xSign), y.Mul(y, ySign), a
 }
 
+// GenerateKRfc6979 generates a deterministic 'k' value as specified in RFC 6979 for use in ECDSA signatures.
+// This method ensures that the same private key and message will always produce the same 'k', providing
+// a defense against certain attacks that exploit poor randomness in 'k' values.
 func GenerateKRfc6979(msgHash, priKey *big.Int, EC_ORDER *big.Int, seed int) *big.Int {
 	msgHash = big.NewInt(0).Set(msgHash) // copy
 	bitMod := msgHash.BitLen() % 8
@@ -173,6 +180,7 @@ func GenerateKRfc6979(msgHash, priKey *big.Int, EC_ORDER *big.Int, seed int) *bi
 		extra = buf.Bytes()
 	}
 	return GenerateSecret(EC_ORDER, priKey, sha256.New, msgHash.Bytes(), extra)
+	// return GenerateK(EC_ORDER, priKey, sha256.New(), msgHash.Bytes(), extra)
 }
 
 // IntToHex32 Normalize to a 32-byte hex string without 0x prefix.

@@ -27,8 +27,7 @@ func (cfg *PedersenCfg) PedersenHash(str ...string) string {
 	for i, s := range str {
 		x, ok := big.NewInt(0).SetString(s, 0)
 		if !ok {
-			panic("invalid value")
-			return "" //, errors.New("invalid value")
+			return ""
 		}
 		pointList := cfg.ConstantPoints[2+i*NElementBitsHash : 2+(i+1)*NElementBitsHash]
 		n := big.NewInt(0)
