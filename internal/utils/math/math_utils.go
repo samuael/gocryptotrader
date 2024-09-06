@@ -27,7 +27,7 @@ func ECMult(m *big.Int, point [2]*big.Int, alpha int, p *big.Int) [2]*big.Int {
 	return ECCAdd(ECMult(big.NewInt(0).Sub(m, one), point, alpha, p), point, p)
 }
 
-// ECDouble Doubles a point on an elliptic curve with the equation y^2 = x^3 + alpha*x + beta mod p.
+// ECDouble doubles a point on an elliptic curve with the equation y^2 = x^3 + alpha*x + beta mod p
 func ECDouble(point [2]*big.Int, alpha int, p *big.Int) [2]*big.Int {
 	// m = div_mod(3 * point[0] * point[0] + alpha, 2 * point[1], p)
 	p1 := big.NewInt(3)

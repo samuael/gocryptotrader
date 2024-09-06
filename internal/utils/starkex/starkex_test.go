@@ -11,6 +11,13 @@ import (
 const MOCK_PUBLIC_KEY = "0x3b865a18323b8d147a12c556bfb1d502516c325b1477a23ba6c77af31f020fd"
 const MOCK_PRIVATE_KEY = "0x58c7d5a90b1776bde86ebac077e053ed85b0f7164f53b080304a531947f46e3"
 
+func TestNewStarkExConfig(t *testing.T) {
+	t.Parallel()
+	result, err := NewStarkExConfig("apexpro")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func TestECDSASignature(t *testing.T) {
 	t.Parallel()
 	magHash, ok := big.NewInt(0).SetString("0x011049f4032190ec4b5a9420cc77006d13a260df46bfcacf60a53f447a5a925d", 0)

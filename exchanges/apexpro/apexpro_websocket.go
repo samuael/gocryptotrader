@@ -1,6 +1,8 @@
 package apexpro
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
@@ -16,6 +19,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
+	"github.com/thrasher-corp/gocryptotrader/log"
 )
 
 const (
@@ -28,7 +32,8 @@ const (
 	chAllTickers  = "instrumentInfo.all"
 	chCandlestick = "candle"
 
-	// Authenticated websocket channels
+	chNotify      = "ws_notify_v1"
+	chZKAccountV3 = "ws_zk_accounts_v3"
 )
 
 var defaultChannels = []string{
@@ -57,12 +62,6 @@ func (ap *Apexpro) WsConnect() error {
 			ap.Name,
 			err)
 	}
-	if ap.Websocket.CanUseAuthenticatedEndpoints() {
-		err = ap.WsAuthConnect()
-		if err != nil {
-			ap.Websocket.SetCanUseAuthenticatedEndpoints(false)
-		}
-	}
 	payload, err := generatePingMessage()
 	if err != nil {
 		return err
@@ -74,12 +73,60 @@ func (ap *Apexpro) WsConnect() error {
 	})
 	ap.Websocket.Wg.Add(1)
 	go ap.wsReadData(ap.Websocket.Conn)
-	subscriptions, err := ap.GenerateDefaultSubscriptions()
+	if ap.Websocket.CanUseAuthenticatedEndpoints() {
+		err := ap.WsAuth(&dialer)
+		ap.Websocket.SetCanUseAuthenticatedEndpoints(err == nil)
+		if err != nil {
+			log.Debugf(log.ExchangeSys, err.Error())
+		}
+	}
+	return nil
+}
+
+// WsAuth authenticates the websocket connection
+func (ap *Apexpro) WsAuth(dialer *websocket.Dialer) error {
+	creds, err := ap.GetCredentials(context.Background())
 	if err != nil {
 		return err
 	}
-	return ap.Subscribe(subscriptions)
-	// return nil
+	err = ap.Websocket.AuthConn.Dial(dialer, http.Header{})
+	if err != nil {
+		return err
+	}
+	timestamp := time.Now().UnixMilli()
+	req := WsInput{
+		Type:        "login",
+		RequestPath: "/ws/accounts",
+		Timestamp:   timestamp,
+		HTTPMethod:  http.MethodGet,
+		Topics:      []string{chNotify, chZKAccountV3},
+		Passphrase:  creds.ClientID,
+		APIKey:      creds.Key,
+	}
+	encodedSecret := base64.StdEncoding.EncodeToString([]byte(creds.Secret))
+	var hmacSigned []byte
+	messageString := strconv.FormatInt(timestamp, 10) + req.HTTPMethod + req.RequestPath
+	hmacSigned, err = crypto.GetHMAC(crypto.HashSHA256,
+		[]byte(messageString),
+		[]byte(encodedSecret))
+	if err != nil {
+		return err
+	}
+	signature := base64.StdEncoding.EncodeToString(hmacSigned)
+	req.Signature = signature
+	value, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	ap.Websocket.Wg.Add(1)
+	go ap.wsReadData(ap.Websocket.AuthConn)
+	return ap.Websocket.AuthConn.SendJSONMessage(context.Background(), struct {
+		Operation string        `json:"op"`
+		Arguments []interface{} `json:"args"`
+	}{
+		Operation: "login",
+		Arguments: []interface{}{string(value)},
+	})
 }
 
 // GenerateDefaultSubscriptions generates a default subscription list.
@@ -119,18 +166,13 @@ func (ap *Apexpro) GenerateDefaultSubscriptions() (subscription.List, error) {
 	return subscriptions, nil
 }
 
-// WsAuthConnect creates a websocket connection and authenticates the private stream connection.
-func (ap *Apexpro) WsAuthConnect() error {
-	return nil
-}
-
 // Subscribe sends a websocket channel subscription.
 func (ap *Apexpro) Subscribe(subscriptions subscription.List) error {
 	payload, err := ap.handleSubscriptionPayload("subscribe", subscriptions)
 	if err != nil {
 		return err
 	}
-	err = ap.Websocket.Conn.SendJSONMessage(payload)
+	err = ap.Websocket.Conn.SendJSONMessage(context.Background(), payload)
 	if err != nil {
 		return err
 	}
@@ -143,7 +185,7 @@ func (ap *Apexpro) Unsubscribe(subscriptions subscription.List) error {
 	if err != nil {
 		return err
 	}
-	return ap.Websocket.Conn.SendJSONMessage(payload)
+	return ap.Websocket.Conn.SendJSONMessage(context.Background(), payload)
 }
 
 func (ap *Apexpro) handleSubscriptionPayload(operation string, subscriptions subscription.List) (*WsMessage, error) {
@@ -202,6 +244,7 @@ func (ap *Apexpro) wsReadData(conn stream.Connection) {
 }
 
 func (ap *Apexpro) wsHandleData(respRaw []byte) error {
+	println(string(respRaw))
 	var response WsMessage
 	err := json.Unmarshal(respRaw, &response)
 	if err != nil {
@@ -219,6 +262,28 @@ func (ap *Apexpro) wsHandleData(respRaw []byte) error {
 		return ap.processCandlestickData(respRaw)
 	case chAllTickers:
 		return ap.processAllTickers(respRaw)
+	default:
+		var authResp *WsAuthResponse
+		err = json.Unmarshal(respRaw, &authResp)
+		if err != nil {
+			ap.Websocket.DataHandler <- stream.UnhandledMessageWarning{Message: string(respRaw)}
+		}
+		switch authResp.Topic {
+		case chZKAccountV3:
+			var resp *AuthWebsocketAccountResponse
+			err = json.Unmarshal(authResp.Contents, &resp)
+			if err != nil {
+				return err
+			}
+			// TODO: handle each account information detail
+		case chNotify:
+			var resp *WsAccountNotificationsResponse
+			err = json.Unmarshal(authResp.Contents, &resp)
+			if err != nil {
+				return err
+			}
+			ap.Websocket.DataHandler <- resp
+		}
 	}
 	return nil
 }

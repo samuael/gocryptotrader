@@ -86,21 +86,21 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKe
 	if err != nil {
 		return "", err
 	}
-	// publicKey, ok := big.NewInt(0).SetString(starkPublicKey, 0)
-	// if !ok {
-	// 	return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
-	// }
-	// publicKeyYCoordinate, ok := big.NewInt(0).SetString(starkPublicKeyYCoordinate, 0)
-	// if !ok {
-	// 	publicKeyYCoordinate = sfg.GetYCoordinate(publicKey)
-	// 	if publicKeyYCoordinate.Cmp(big.NewInt(0)) == 0 {
-	// 		return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
-	// 	}
-	// }
-	// ok = sfg.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
-	// if !ok {
-	// 	return "", ErrFailedToGenerateSignature
-	// }
+	publicKey, ok := big.NewInt(0).SetString(starkPublicKey, 0)
+	if !ok {
+		return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
+	}
+	publicKeyYCoordinate, ok := big.NewInt(0).SetString(starkPublicKeyYCoordinate, 0)
+	if !ok {
+		publicKeyYCoordinate = sfg.GetYCoordinate(publicKey)
+		if publicKeyYCoordinate.Cmp(big.NewInt(0)) == 0 {
+			return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
+		}
+	}
+	ok = sfg.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
+	if !ok {
+		return "", ErrFailedToGenerateSignature
+	}
 	return math_utils.IntToHex32(r) + math_utils.IntToHex32(s), nil
 }
 
@@ -135,7 +135,6 @@ func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (*b
 	}
 	nBit := big.NewInt(0).Exp(big.NewInt(2), N_ELEMENT_BITS_ECDSA, nil)
 	for {
-		// k := sc.GenerateSecret(big.NewInt(0).Set(msgHash), big.NewInt(0).Set(privKey), big.NewInt(0).Set(inSeed))
 		k := math_utils.GenerateKRfc6979(msgHash, privKey, sc.N, int(inSeed.Int64()))
 		// In case r is rejected k shall be generated with new seed
 		if inSeed.Int64() == 0 {
@@ -201,29 +200,36 @@ func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int,
 
 // Verifies a an ECDSA signature
 func (sc *StarkConfig) Verify(msgHash *big.Int, r *big.Int, s *big.Int, publicKey [2]*big.Int) bool {
-	publicKeyPow2 := new(big.Int).Exp(publicKey[1], big.NewInt(2), nil)
-	publicKeyPow3 := new(big.Int).Exp(publicKey[0], big.NewInt(3), nil)
-	alphaPublicKey := new(big.Int).Mul(sc.Alpha, publicKey[0])
-	add := new(big.Int).Add(publicKeyPow3, new(big.Int).Add(alphaPublicKey, sc.B))
-	sub := new(big.Int).Sub(publicKeyPow2, add)
-	mod := new(big.Int).Mod(sub, sc.P)
-	if mod.Cmp(big.NewInt(0)) != 0 {
-		return false
+	calc := func(pubX, pubY *big.Int) *big.Int {
+		publicKeyPow2 := new(big.Int).Exp(pubY, big.NewInt(2), nil)
+		publicKeyPow3 := new(big.Int).Exp(pubX, big.NewInt(3), nil)
+		alphaPublicKey := new(big.Int).Mul(sc.Alpha, pubX)
+		aggr := new(big.Int).Add(publicKeyPow3, new(big.Int).Add(alphaPublicKey, sc.B))
+		sub := new(big.Int).Sub(publicKeyPow2, aggr)
+		mod := new(big.Int).Mod(sub, sc.P)
+		if mod.Cmp(big.NewInt(0)) != 0 {
+			println("\n\nA\n\n")
+			return nil
+		}
+		zGx, zGy, err := sc.MimicEcMultAir(msgHash, sc.Gx, sc.Gy, sc.MinusShiftPointX, sc.MinusShiftPointY)
+		if err != nil {
+			println("\n\nB\n\n")
+			return nil
+		}
+		rQx, rQy, err := sc.MimicEcMultAir(r, pubX, pubY, sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
+		if err != nil {
+			println("\n\nC\n\n")
+			return nil
+		}
+		eccAddzqp := math_utils.ECCAdd([2]*big.Int{zGx, zGy}, [2]*big.Int{rQx, rQy}, sc.P)
+		w := sc.InvModCurveSize(s)
+		wBx, wBy, err := sc.MimicEcMultAir(w, eccAddzqp[0], eccAddzqp[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
+		if err != nil {
+			println("\n\nD\n\n")
+			return nil
+		}
+		return math_utils.ECCAdd([2]*big.Int{wBx, wBy}, [2]*big.Int{sc.MinusShiftPointX, sc.MinusShiftPointY}, sc.P)[0]
 	}
-	zGx, zGy, err := sc.MimicEcMultAir(msgHash, sc.Gx, sc.Gy, sc.MinusShiftPointX, sc.MinusShiftPointY)
-	if err != nil {
-		return false
-	}
-	rQx, rQy, err := sc.MimicEcMultAir(r, publicKey[0], publicKey[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
-	if err != nil {
-		return false
-	}
-	eccAddzqp := math_utils.ECCAdd([2]*big.Int{zGx, zGy}, [2]*big.Int{rQx, rQy}, sc.P)
-	w := sc.InvModCurveSize(s)
-	wBx, wBy, err := sc.MimicEcMultAir(w, eccAddzqp[0], eccAddzqp[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
-	if err != nil {
-		return false
-	}
-	x := math_utils.ECCAdd([2]*big.Int{wBx, wBy}, [2]*big.Int{sc.MinusShiftPointX, sc.MinusShiftPointY}, sc.P)
-	return r == (x[0])
+	return r == calc(publicKey[0], publicKey[1]) ||
+		r == calc(publicKey[0], big.NewInt(0).Sub(big.NewInt(0), publicKey[1]))
 }

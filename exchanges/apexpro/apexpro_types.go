@@ -3,6 +3,8 @@ package apexpro
 import (
 	"time"
 
+	"encoding/json"
+
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/types"
@@ -812,14 +814,7 @@ type RegistrationAndOnboardingResponse struct {
 			RecycledAmount  types.Number `json:"recycledAmount"`
 			Token           string       `json:"token"`
 		} `json:"experienceMoney"`
-		ContractAccount struct {
-			CreatedAt             convert.ExchangeTime `json:"createdAt"`
-			TakerFeeRate          types.Number         `json:"takerFeeRate"`
-			MakerFeeRate          types.Number         `json:"makerFeeRate"`
-			MinInitialMarginRate  types.Number         `json:"minInitialMarginRate"`
-			Status                string               `json:"status"`
-			UnrealizePnlPriceType string               `json:"unrealizePnlPriceType"`
-		} `json:"contractAccount"`
+		ContractAccount AccountInfo `json:"contractAccount"`
 		ContractWallets []struct {
 			UserID                   string       `json:"userId"`
 			AccountID                string       `json:"accountId"`
@@ -891,16 +886,8 @@ type UserAccountV2 struct {
 		RecycledAmount  types.Number `json:"recycledAmount"`
 		Token           string       `json:"token"`
 	} `json:"experienceMoney"`
-	Accounts []struct {
-		CreatedAt             convert.ExchangeTime `json:"createdAt"`
-		TakerFeeRate          types.Number         `json:"takerFeeRate"`
-		MakerFeeRate          types.Number         `json:"makerFeeRate"`
-		MinInitialMarginRate  types.Number         `json:"minInitialMarginRate"`
-		Status                string               `json:"status"`
-		Token                 string               `json:"token"`
-		UnrealizePnlPriceType string               `json:"unrealizePnlPriceType"`
-	} `json:"accounts"`
-	Wallets   any `json:"wallets"`
+	Accounts  []AccountInfo `json:"accounts"`
+	Wallets   any           `json:"wallets"`
 	Positions []struct {
 		Token                   string               `json:"token"`
 		Symbol                  string               `json:"symbol"`
@@ -960,15 +947,7 @@ type UserAccountDetail struct {
 		RecycledAmount  types.Number `json:"recycledAmount"`
 		Token           string       `json:"token"`
 	} `json:"experienceMoney"`
-	ContractAccount struct {
-		CreatedAt             convert.ExchangeTime `json:"createdAt"`
-		TakerFeeRate          types.Number         `json:"takerFeeRate"`
-		MakerFeeRate          types.Number         `json:"makerFeeRate"`
-		MinInitialMarginRate  types.Number         `json:"minInitialMarginRate"`
-		Status                string               `json:"status"`
-		UnrealizePnlPriceType string               `json:"unrealizePnlPriceType"`
-		Token                 string               `json:"token"`
-	} `json:"contractAccount"`
+	ContractAccount AccountInfo `json:"contractAccount"`
 	ContractWallets []struct {
 		UserID                   string       `json:"userId"`
 		AccountID                string       `json:"accountId"`
@@ -1196,7 +1175,7 @@ type SymbolWorstPrice struct {
 	AskOnePrice types.Number `json:"askOnePrice"`
 }
 
-// OrderDetail represents an order detail.
+// OrderDetail represents an order detail
 type OrderDetail struct {
 	ID              string               `json:"id"`
 	ClientOrderID   string               `json:"clientOrderId"`
@@ -1230,6 +1209,11 @@ type OrderDetail struct {
 	// used by the V1 API endpoint response.
 	UnfillableAt convert.ExchangeTime `json:"unfillableAt"`
 	CancelReason string               `json:"cancelReason"`
+
+	IsDeleverage  bool   `json:"isDeleverage"`
+	UpdatedAt     int64  `json:"updatedAt"`
+	IsLiquidate   bool   `json:"isLiquidate"`
+	RemainingSize string `json:"remainingSize"`
 }
 
 // OrderHistoryResponse represents list of order.
@@ -1354,18 +1338,148 @@ type FastWithdrawalParams struct {
 	Signature string `json:"signature"`
 }
 
-// Withdraw to Address : 7 | OK
-// /v1/create-withdrawal-to-address
-// /v2/create-withdrawal-to-address
+// WsInput represents a websocket input data
+type WsInput struct {
+	Type        string   `json:"type"`
+	Topics      []string `json:"topics,omitempty"`
+	HTTPMethod  string   `json:"httpMethod,omitempty"`
+	RequestPath string   `json:"requestPath,omitempty"`
+	APIKey      string   `json:"apiKey,omitempty"`
+	Passphrase  string   `json:"passphrase,omitempty"`
+	Timestamp   int64    `json:"timestamp,omitempty"`
+	Signature   string   `json:"signature,omitempty"`
+}
 
-// Cross-Chain Transfer : 4 | OK
-// /v1/cross-chain-withdraw
-// /v2/cross-chain-withdraw
+// WsAuthResponse represents a response through the websocket channel
+type WsAuthResponse struct {
+	Type      string               `json:"type"`
+	Timestamp convert.ExchangeTime `json:"timestamp"`
+	Topic     string               `json:"topic"`
+	Contents  json.RawMessage      `json:"contents,omitempty"`
+}
 
-// Create Order : 3 | OK
-// /v1/create-order
-// /v2/create-order
+// AccountDeleverage represents an account deleverage details
+type AccountDeleverage struct {
+	Symbol      string       `json:"symbol"`
+	LightNumber types.Number `json:"lightNumber"`
+	Side        string       `json:"side"`
+}
 
-// Conditional Transfer : 5 | OK
-// /v1/fast-withdraw
-// /v2/fast-withdraw
+// ContractWalletInfo represents a contract account wallet information
+type ContractWalletInfo struct {
+	PendingDepositAmount     types.Number `json:"pendingDepositAmount"`
+	Balance                  types.Number `json:"balance"`
+	PendingWithdrawAmount    types.Number `json:"pendingWithdrawAmount"`
+	PendingTransferInAmount  types.Number `json:"pendingTransferInAmount"`
+	PendingTransferOutAmount types.Number `json:"pendingTransferOutAmount"`
+	Token                    string       `json:"token"`
+}
+
+// ExperiancedMoney represents an experianced money detail
+type ExperiancedMoney struct {
+	TotalAmount     string `json:"totalAmount"`
+	TotalNumber     string `json:"totalNumber"`
+	RecycledAmount  string `json:"recycledAmount"`
+	AvailableAmount string `json:"availableAmount"`
+	Token           string `json:"token"`
+}
+
+// WsAccountOrderFill represents a websocket account order fill detail
+type WsAccountOrderFill struct {
+	Symbol      string               `json:"symbol"`
+	Side        string               `json:"side"`
+	OrderID     string               `json:"orderId"`
+	Fee         types.Number         `json:"fee"`
+	Liquidity   string               `json:"liquidity"`
+	AccountID   string               `json:"accountId"`
+	CreatedAt   convert.ExchangeTime `json:"createdAt"`
+	IsOpen      bool                 `json:"isOpen"`
+	Size        types.Number         `json:"size"`
+	Price       types.Number         `json:"price"`
+	QuoteAmount types.Number         `json:"quoteAmount"`
+	ID          string               `json:"id"`
+	UpdatedAt   convert.ExchangeTime `json:"updatedAt"`
+}
+
+// AuthWebsocketAccountResponse represents a detailed response of websocket account detail
+type AuthWebsocketAccountResponse struct {
+	Deleverages     []AccountDeleverage    `json:"deleverages"`
+	ContractWallets []ContractWalletInfo   `json:"contractWallets"`
+	ExperienceMoney []ExperiancedMoney     `json:"experienceMoney"`
+	Orders          []OrderDetail          `json:"orders"`
+	Fills           []WsAccountOrderFill   `json:"fills,omitempty"`
+	Positions       []AccountPositionInfo  `json:"positions,omitempty"`
+	Accounts        []AccountInfo          `json:"accounts,omitempty"`
+	Transfers       []AccountAssetTransfer `json:"transfers,omitempty"`
+	Wallets         []struct {
+		Balance types.Number `json:"balance"`
+		Asset   string       `json:"asset"`
+	} `json:"wallets,omitempty"`
+}
+
+// AccountPositionInfo represents an account's position details
+type AccountPositionInfo struct {
+	AccountID   string               `json:"accountId"`
+	Symbol      string               `json:"symbol"`
+	Side        string               `json:"side"`
+	SumOpen     string               `json:"sumOpen"`
+	RealizedPNL string               `json:"realizedPnl"`
+	ExitPrice   types.Number         `json:"exitPrice"`
+	MaxSize     types.Number         `json:"maxSize"`
+	SumClose    types.Number         `json:"sumClose"`
+	NetFunding  types.Number         `json:"netFunding"`
+	EntryPrice  types.Number         `json:"entryPrice"`
+	CreatedAt   convert.ExchangeTime `json:"createdAt"`
+	Size        types.Number         `json:"size"`
+	ClosedAt    convert.ExchangeTime `json:"closedAt"`
+	UpdatedAt   convert.ExchangeTime `json:"updatedAt"`
+	OpenValue   types.Number         `json:"openValue"`
+	FundingFee  types.Number         `json:"fundingFee"`
+	CustomImr   string               `json:"customImr"`
+}
+
+// AccountInfo represents an account's basic informations
+type AccountInfo struct {
+	CreatedAt             convert.ExchangeTime `json:"createdAt"`
+	TakerFeeRate          types.Number         `json:"takerFeeRate"`
+	MakerFeeRate          types.Number         `json:"makerFeeRate"`
+	MinInitialMarginRate  types.Number         `json:"minInitialMarginRate"`
+	Status                string               `json:"status"`
+	Token                 string               `json:"token"`
+	UnrealizePnlPriceType string               `json:"unrealizePnlPriceType"`
+}
+
+// AccountAssetTransfer represents an account's asset transfer details
+type AccountAssetTransfer struct {
+	ID              string               `json:"id"`
+	Type            string               `json:"type"`
+	Status          string               `json:"status"`
+	TransactionID   string               `json:"transactionId"`
+	CreditAsset     string               `json:"creditAsset"`
+	CreditAmount    convert.ExchangeTime `json:"creditAmount"`
+	TransactionHash convert.ExchangeTime `json:"transactionHash"`
+	ConfirmedAt     convert.ExchangeTime `json:"confirmedAt"`
+	CreatedAt       convert.ExchangeTime `json:"createdAt"`
+	ExpiresAt       convert.ExchangeTime `json:"expiresAt"`
+}
+
+// WsAccountNotificationsResponse represents an account's notification responses
+type WsAccountNotificationsResponse struct {
+	UnreadNum     int                       `json:"unreadNum"`
+	NotifyMsgList []AccountNotificationInfo `json:"notifyMsgList"`
+	NotifyList    []AccountNotificationInfo `json:"notify_list"`
+}
+
+// AccountNotificationInfo represents an account notification detail
+type AccountNotificationInfo struct {
+	ID          string               `json:"id"`
+	Category    int64                `json:"category"`
+	Lang        string               `json:"lang"`
+	Title       string               `json:"title"`
+	Content     string               `json:"content"`
+	AndroidLink string               `json:"androidLink"`
+	IosLink     string               `json:"iosLink"`
+	WebLink     string               `json:"webLink"`
+	Read        bool                 `json:"read"`
+	CreatedTime convert.ExchangeTime `json:"createdTime"`
+}

@@ -21,13 +21,13 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey    = "4fb09fca-2fdc-343b-e633-39aa5c615876"
-	apiSecret = "QoQt9lhqDeydPaey_r2sIUtNqREaQADb1HwJBx1D"
-	clientID  = "a25m-1N-NAshF0V5xO38"
+	apiKey    = ""
+	apiSecret = ""
+	clientID  = ""
 
-	starkKey            = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
-	starkSecret         = "0x074bcbe7f64f95e8d3f1afda4c338775702b4d1db3651fc70bad95a160b7f9ae"
-	starkKeyYCoordinate = "0x0207d57867e0820e0f7588339e8b7491ce1da964260044340e3fd27c718f2a91"
+	starkKey            = ""
+	starkSecret         = ""
+	starkKeyYCoordinate = ""
 
 	ethereumAddress = ""
 
@@ -1205,4 +1205,11 @@ func TestGetActiveOrders(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+}
+
+func TestWsConnect(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	err := ap.WsConnect()
+	require.NoError(t, err)
 }
