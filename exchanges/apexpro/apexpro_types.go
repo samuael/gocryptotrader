@@ -1210,10 +1210,10 @@ type OrderDetail struct {
 	UnfillableAt convert.ExchangeTime `json:"unfillableAt"`
 	CancelReason string               `json:"cancelReason"`
 
-	IsDeleverage  bool   `json:"isDeleverage"`
-	UpdatedAt     int64  `json:"updatedAt"`
-	IsLiquidate   bool   `json:"isLiquidate"`
-	RemainingSize string `json:"remainingSize"`
+	IsDeleverage  bool         `json:"isDeleverage"`
+	UpdatedAt     int64        `json:"updatedAt"`
+	IsLiquidate   bool         `json:"isLiquidate"`
+	RemainingSize types.Number `json:"remainingSize"`
 }
 
 // OrderHistoryResponse represents list of order.
@@ -1407,14 +1407,14 @@ type AuthWebsocketAccountResponse struct {
 	ContractWallets []ContractWalletInfo   `json:"contractWallets"`
 	ExperienceMoney []ExperiancedMoney     `json:"experienceMoney"`
 	Orders          []OrderDetail          `json:"orders"`
-	Fills           []WsAccountOrderFill   `json:"fills,omitempty"`
-	Positions       []AccountPositionInfo  `json:"positions,omitempty"`
-	Accounts        []AccountInfo          `json:"accounts,omitempty"`
-	Transfers       []AccountAssetTransfer `json:"transfers,omitempty"`
+	Fills           []WsAccountOrderFill   `json:"fills"`
+	Positions       []AccountPositionInfo  `json:"positions"`
+	Accounts        []AccountInfo          `json:"accounts"`
+	Transfers       []AccountAssetTransfer `json:"transfers"`
 	Wallets         []struct {
 		Balance types.Number `json:"balance"`
 		Asset   string       `json:"asset"`
-	} `json:"wallets,omitempty"`
+	} `json:"wallets"`
 }
 
 // AccountPositionInfo represents an account's position details

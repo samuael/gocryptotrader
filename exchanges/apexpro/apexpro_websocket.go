@@ -13,7 +13,9 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/fill"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
@@ -276,6 +278,14 @@ func (ap *Apexpro) wsHandleData(respRaw []byte) error {
 				return err
 			}
 			// TODO: handle each account information detail
+			err := ap.processAccountOrders(resp.Orders)
+			if err != nil {
+				log.Warnf(log.ExchangeSys, err.Error())
+			}
+			err = ap.processAccountFills(resp.Fills)
+			if err != nil {
+				log.Warnf(log.ExchangeSys, err.Error())
+			}
 		case chNotify:
 			var resp *WsAccountNotificationsResponse
 			err = json.Unmarshal(authResp.Contents, &resp)
@@ -285,6 +295,98 @@ func (ap *Apexpro) wsHandleData(respRaw []byte) error {
 			ap.Websocket.DataHandler <- resp
 		}
 	}
+	return nil
+}
+
+func (ap *Apexpro) processAccountOrders(respOrders []OrderDetail) error {
+	orders := make([]order.Detail, len(respOrders))
+	for o := range respOrders {
+		pair, err := currency.NewPairFromString(respOrders[o].Symbol)
+		if err != nil {
+			return err
+		}
+		oType, err := order.StringToOrderType(respOrders[o].OrderType)
+		if err != nil {
+			return err
+		}
+		oSide, err := order.StringToOrderSide(respOrders[o].Side)
+		if err != nil {
+			return err
+		}
+		oStatus, err := order.StringToOrderStatus(respOrders[o].Status)
+		if err != nil {
+			return err
+		}
+		switch respOrders[o].Status {
+		case "PENDING":
+			oStatus = order.Pending
+		case "OPEN":
+			oStatus = order.Open
+		case "FILLED":
+			oStatus = order.Filled
+		case "CANCELED":
+			oStatus = order.Cancelled
+		case "EXPIRED":
+			oStatus = order.Expired
+		case "UNTRIGGERED":
+			oStatus = order.Hidden
+		}
+		orders[o] = order.Detail{
+			PostOnly:           respOrders[o].PostOnly,
+			ReduceOnly:         respOrders[o].ReduceOnly,
+			Price:              respOrders[o].Price.Float64(),
+			Amount:             respOrders[o].Size.Float64(),
+			ContractAmount:     respOrders[o].Size.Float64(),
+			TriggerPrice:       respOrders[o].TriggerPrice.Float64(),
+			ExecutedAmount:     respOrders[o].Size.Float64() - respOrders[o].RemainingSize.Float64(),
+			RemainingAmount:    respOrders[o].RemainingSize.Float64(),
+			Cost:               respOrders[o].Size.Float64() * respOrders[o].Price.Float64(),
+			Fee:                respOrders[o].Fee.Float64(),
+			FeeAsset:           pair.Quote,
+			Exchange:           ap.Name,
+			OrderID:            respOrders[o].ID,
+			ClientOrderID:      respOrders[o].ClientOrderID,
+			AccountID:          respOrders[o].AccountID,
+			Type:               oType,
+			Side:               oSide,
+			Status:             oStatus,
+			AssetType:          asset.Futures,
+			Date:               respOrders[o].CreatedAt.Time(),
+			CloseTime:          respOrders[o].ExpiresAt.Time(),
+			LastUpdated:        respOrders[o].UpdatedTime.Time(),
+			Pair:               pair,
+			SettlementCurrency: pair.Quote,
+		}
+		ap.Websocket.DataHandler <- &orders
+	}
+	return nil
+}
+
+func (ap *Apexpro) processAccountFills(orderFills []WsAccountOrderFill) error {
+	fillsList := make([]fill.Data, len(orderFills))
+	for f := range orderFills {
+		pair, err := currency.NewPairFromString(orderFills[f].Symbol)
+		if err != nil {
+			return err
+		}
+		oSide, err := order.StringToOrderSide(orderFills[f].Side)
+		if err != nil {
+			return err
+		}
+		fillsList[f] = fill.Data{
+			ID:           orderFills[f].ID,
+			Timestamp:    orderFills[f].UpdatedAt.Time(),
+			Exchange:     ap.Name,
+			AssetType:    asset.Futures,
+			CurrencyPair: pair,
+			Side:         oSide,
+			OrderID:      orderFills[f].OrderID,
+			TradeID:      orderFills[f].ID,
+			Price:        orderFills[f].Price.Float64(),
+			Amount:       orderFills[f].Size.Float64(),
+		}
+	}
+	ap.Websocket.DataHandler <- fillsList
 	return nil
 }
 
