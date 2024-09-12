@@ -69,39 +69,39 @@ func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
 }
 
 // Sign generates a signature out using the users private key and signable order params.
-func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKey, starkPublicKeyYCoordinate string) (string, error) {
+func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKey, starkPublicKeyYCoordinate string) (*big.Int, *big.Int, error) {
 	pHash, err := sgn.GetPedersenHash(sfg.PedersenHash)
 	if err != nil {
-		return pHash, err
+		return nil, nil, err
 	}
 	priKey, okay := big.NewInt(0).SetString(starkPrivateKey, 0)
 	if !okay {
-		return "", fmt.Errorf("%w, %v", ErrInvalidPrivateKey, starkPrivateKey)
+		return nil, nil, fmt.Errorf("%w, %v", ErrInvalidPrivateKey, starkPrivateKey)
 	}
 	msgHash, okay := new(big.Int).SetString(pHash, 0)
 	if !okay {
-		return "", ErrInvalidHashPayload
+		return nil, nil, ErrInvalidHashPayload
 	}
 	r, s, err := sfg.SignECDSA(msgHash, priKey)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 	publicKey, ok := big.NewInt(0).SetString(starkPublicKey, 0)
 	if !ok {
-		return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
+		return nil, nil, fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
 	}
 	publicKeyYCoordinate, ok := big.NewInt(0).SetString(starkPublicKeyYCoordinate, 0)
 	if !ok {
 		publicKeyYCoordinate = sfg.GetYCoordinate(publicKey)
 		if publicKeyYCoordinate.Cmp(big.NewInt(0)) == 0 {
-			return "", fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
+			return nil, nil, fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
 		}
 	}
 	ok = sfg.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
 	if !ok {
-		return "", ErrFailedToGenerateSignature
+		return nil, nil, ErrFailedToGenerateSignature
 	}
-	return math_utils.IntToHex32(r) + math_utils.IntToHex32(s), nil
+	return r, s, nil
 }
 
 // GetYCoordinate generates the y-coordinate of starkEx Public key from the x coordinate
@@ -142,7 +142,6 @@ func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (*b
 		} else {
 			inSeed = inSeed.Add(inSeed, big.NewInt(1))
 		}
-		// ----------------------------------------------------------------
 		x := math_utils.ECMult(k, [2]*big.Int{sc.EcGenX, sc.EcGenY}, int(sc.Alpha.Int64()), sc.P)[0]
 		r := big.NewInt(0).Set(x)
 		// DIFF: in classic ECDSA, we take int(x) % n.
@@ -198,7 +197,7 @@ func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int,
 	return psx, psy, nil
 }
 
-// Verifies a an ECDSA signature
+// Verifies an ECDSA signature
 func (sc *StarkConfig) Verify(msgHash *big.Int, r *big.Int, s *big.Int, publicKey [2]*big.Int) bool {
 	calc := func(pubX, pubY *big.Int) *big.Int {
 		publicKeyPow2 := new(big.Int).Exp(pubY, big.NewInt(2), nil)
@@ -208,28 +207,29 @@ func (sc *StarkConfig) Verify(msgHash *big.Int, r *big.Int, s *big.Int, publicKe
 		sub := new(big.Int).Sub(publicKeyPow2, aggr)
 		mod := new(big.Int).Mod(sub, sc.P)
 		if mod.Cmp(big.NewInt(0)) != 0 {
-			println("\n\nA\n\n")
 			return nil
 		}
 		zGx, zGy, err := sc.MimicEcMultAir(msgHash, sc.Gx, sc.Gy, sc.MinusShiftPointX, sc.MinusShiftPointY)
 		if err != nil {
-			println("\n\nB\n\n")
 			return nil
 		}
 		rQx, rQy, err := sc.MimicEcMultAir(r, pubX, pubY, sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
 		if err != nil {
-			println("\n\nC\n\n")
 			return nil
 		}
 		eccAddzqp := math_utils.ECCAdd([2]*big.Int{zGx, zGy}, [2]*big.Int{rQx, rQy}, sc.P)
 		w := sc.InvModCurveSize(s)
 		wBx, wBy, err := sc.MimicEcMultAir(w, eccAddzqp[0], eccAddzqp[1], sc.ConstantPoints[0][0], sc.ConstantPoints[0][1])
 		if err != nil {
-			println("\n\nD\n\n")
 			return nil
 		}
 		return math_utils.ECCAdd([2]*big.Int{wBx, wBy}, [2]*big.Int{sc.MinusShiftPointX, sc.MinusShiftPointY}, sc.P)[0]
 	}
-	return r == calc(publicKey[0], publicKey[1]) ||
-		r == calc(publicKey[0], big.NewInt(0).Sub(big.NewInt(0), publicKey[1]))
+
+	return r.Cmp(
+		calc(publicKey[0], publicKey[1])) == 0 ||
+		r.Cmp(
+			calc(
+				publicKey[0],
+				big.NewInt(0).Sub(big.NewInt(0), publicKey[1]))) == 0
 }

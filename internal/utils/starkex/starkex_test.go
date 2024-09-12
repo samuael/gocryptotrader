@@ -1,7 +1,11 @@
 package starkex
 
 import (
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,6 +46,43 @@ func TestECDSASignature(t *testing.T) {
 		ErrFailedToGenerateSignature)
 }
 
+func TestECDSAWithout(t *testing.T) {
+	sfg, err := NewStarkExConfig("apexpro")
+	require.NoError(t, err)
+	require.NotNil(t, sfg)
+
+	resp := &struct {
+		PrivateKey string `json:"private_key"`
+		Messages   []struct {
+			Hash string   `json:"hash"`
+			R    *big.Int `json:"r"`
+			S    *big.Int `json:"s"`
+		} `json:"messages"`
+	}{}
+	file, err := os.Open("ref6979_signature_test_vector.json")
+	require.NoError(t, err)
+
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+
+	err = decoder.Decode(&resp)
+	require.NoError(t, err)
+
+	privateKey, ok := big.NewInt(0).SetString(resp.PrivateKey, 0)
+	require.True(t, ok)
+
+	for a := range resp.Messages {
+		hashMessage, ok := big.NewInt(0).SetString(resp.Messages[a].Hash, 0)
+		require.True(t, ok)
+
+		r, s, err := sfg.SignECDSA(hashMessage, privateKey)
+		require.NoError(t, err)
+		require.True(t, r.Cmp(resp.Messages[a].R) == 0)
+		require.True(t, s.Cmp(resp.Messages[a].S) == 0)
+	}
+}
+
 func TestOrderSign(t *testing.T) {
 	t.Parallel()
 	sfg, err := NewStarkExConfig("apexpro")
@@ -67,9 +108,10 @@ func TestOrderSign(t *testing.T) {
 		Nonce:                   big.NewInt(3762202436),
 		ExpirationEpochHours:    big.NewInt(479941),
 	}
-	signature, err := sfg.Sign(arg, MOCK_PRIVATE_KEY, MOCK_PUBLIC_KEY, "")
+	r, s, err := sfg.Sign(arg, MOCK_PRIVATE_KEY, MOCK_PUBLIC_KEY, "")
 	require.NoError(t, err)
-	assert.NotEmpty(t, signature)
+	assert.NotEmpty(t, r)
+	assert.NotEmpty(t, s)
 }
 
 func TestGetYCoordinate(t *testing.T) {
@@ -79,8 +121,44 @@ func TestGetYCoordinate(t *testing.T) {
 	require.NotNil(t, sfg)
 
 	publicX, ok := big.NewInt(0).SetString(MOCK_PUBLIC_KEY, 0)
-	require.True(t, ok)
+	assert.True(t, ok)
 
 	result := sfg.GetYCoordinate(publicX)
-	require.NotNil(t, result)
+	assert.NotNil(t, result)
+}
+
+func TestMarshali(t *testing.T) {
+	t.Parallel()
+	// r and s values as hexadecimal strings
+	rHex := "07a15838aad9b20368dc4ba27613fd35ceec3b34be7a2cb913bca0fb06e98107"
+	sHex := "05007f40fddd9babae0c7362d3b4e9c152ed3fced7fe78435b302d825489298f"
+
+	// Convert r and s from hex to big.Int
+	r := new(big.Int)
+	r.SetString(rHex, 16)
+
+	s := new(big.Int)
+	s.SetString(sHex, 16)
+
+	// Convert r and s to 32-byte fixed length byte slices
+	rBytes := r.FillBytes(make([]byte, 32))
+	sBytes := s.FillBytes(make([]byte, 32))
+
+	// Concatenate rBytes and sBytes to create a single 64-byte signature
+	signature := append(rBytes, sBytes...)
+
+	// Print the result as a hexadecimal string
+	fmt.Printf("64-byte ANS signature: %s\n", hex.EncodeToString(signature))
+}
+
+func TestXPeriment(t *testing.T) {
+	t.Parallel()
+	// r, _ := big.NewInt(0).SetString("0x07a15838aad9b20368dc4ba27613fd35ceec3b34be7a2cb913bca0fb06e98107", 0)
+	// s, _ := big.NewInt(0).SetString("0x05007f40fddd9babae0c7362d3b4e9c152ed3fced7fe78435b302d825489298f", 0)
+	// val := new(big.Int).Mod(r, s)
+	// println("Val(16): ", val.Text(16))
+	// val := r.Append(s.Bytes(), 0)
+
+	// vals := sha256.Sum256(val)
+	// big.NewInt(0).SetBytes(vals)
 }

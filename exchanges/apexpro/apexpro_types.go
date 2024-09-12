@@ -1084,7 +1084,8 @@ type WithdrawalToAddressParams struct {
 	Asset           currency.Code `json:"asset"`
 	EthereumAddress string        `json:"ethAddress"`
 
-	Signature string `json:"signature"`
+	// Signature string `json:"signature"`
+	Signature *SignatureInfo `json:"signature"`
 }
 
 // AssetWithdrawalParams represents a user asset withdrawal parameter.
@@ -1311,7 +1312,14 @@ type CreateOrderParams struct {
 	TrailingPercent float64       `json:"trailingPercent,omitempty,string"`
 	ClientOrderID   string        `json:"clientOrderId,omitempty"`
 	ReduceOnly      bool          `json:"reduceOnly,omitempty,string"`
-	Signature       string        `json:"signature,omitempty"`
+	// Signature       string        `json:"signature"`
+	Signature *SignatureInfo `json:"signature,omitempty"`
+}
+
+// SignatureInfo holds the r and s signature string of ECDSA signature
+type SignatureInfo struct {
+	R string `json:"r,omitempty"`
+	S string `json:"s,omitempty"`
 }
 
 // WithdrawalParams represents an asset withdrawal parameters
@@ -1335,7 +1343,8 @@ type FastWithdrawalParams struct {
 	Fees         float64       `json:"chainId"`
 	IPAccountID  string        `json:"lpAccountId,omitempty"`
 
-	Signature string `json:"signature"`
+	// Signature string `json:"signature"`
+	Signature *SignatureInfo `json:"signature"`
 }
 
 // WsInput represents a websocket input data

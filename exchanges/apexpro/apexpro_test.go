@@ -159,6 +159,7 @@ func TestGetCandlestickChartDataV2(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetCandlestickChartDataV2(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+
 	result, err := ap.GetCandlestickChartDataV2(context.Background(), "BTC-USDC", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -541,13 +542,13 @@ func TestCreateOrder(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	if ap.UserAccountDetail == nil {
 		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(context.Background())
-		require.NoError(t, err)
-		require.NotNil(t, ap.UserAccountDetail)
+		assert.NoError(t, err)
+		assert.NotNil(t, ap.UserAccountDetail)
 	}
 	ap.Verbose = true
 	result, err := ap.CreateOrderV3(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
-		Side:            order.Sell.String(),
+		Side:            order.Buy.String(),
 		OrderType:       "LIMIT",
 		Size:            0.0001,
 		Price:           40000,
@@ -1000,12 +1001,13 @@ func TestCreateOrderV2(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ap.UserAccountDetail)
 	}
+	ap.Verbose = true
 	result, err := ap.CreateOrderV2(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
-		Side:            order.Buy.String(),
+		Side:            order.Sell.String(),
 		OrderType:       "LIMIT",
-		Size:            0.01,
-		Price:           20000,
+		Size:            0.0001,
+		Price:           40000,
 		TimeInForce:     "GTC",
 		TriggerPrice:    0,
 		TrailingPercent: 0,
@@ -1050,21 +1052,21 @@ func TestFastWithdrawalV1(t *testing.T) {
 func TestUpdateOrderExecutionLimits(t *testing.T) {
 	t.Parallel()
 	pairs, err := ap.FetchTradablePairs(context.Background(), asset.Futures)
-	require.NoErrorf(t, err, "FetchTradablePairs should not error for %s", asset.Futures)
-	require.NotEmptyf(t, pairs, "Should get some pairs for %s", asset.Futures)
+	assert.NoErrorf(t, err, "FetchTradablePairs should not error for %s", asset.Futures)
+	assert.NotEmptyf(t, pairs, "Should get some pairs for %s", asset.Futures)
 
 	err = ap.UpdateOrderExecutionLimits(context.Background(), asset.Futures)
 	require.NoError(t, err)
 
 	limits, err := ap.GetOrderExecutionLimits(asset.Futures, pairs[0])
-	require.NoErrorf(t, err, "GetOrderExecutionLimits should not error for %s pair %s", asset.Futures, pairs[0])
-	require.Positivef(t, limits.MinPrice, "MinPrice must be positive for %s pair %s", asset.Futures, pairs[0])
-	require.Positivef(t, limits.MaxPrice, "MaxPrice must be positive for %s pair %s", asset.Futures, pairs[0])
-	require.Positivef(t, limits.PriceStepIncrementSize, "PriceStepIncrementSize must be positive for %s pair %s", asset.Futures, pairs[0])
-	require.Positivef(t, limits.MinimumBaseAmount, "MinimumBaseAmount must be positive for %s pair %s", asset.Futures, pairs[0])
-	require.Positivef(t, limits.MaximumBaseAmount, "MaximumBaseAmount must be positive for %s pair %s", asset.Futures, pairs[0])
-	require.Positivef(t, limits.AmountStepIncrementSize, "AmountStepIncrementSize must be positive for %s pair %s", asset.Futures, pairs[0])
-	require.Positivef(t, limits.MarketMaxQty, "MarketMaxQty must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.NoErrorf(t, err, "GetOrderExecutionLimits should not error for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.MinPrice, "MinPrice must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.MaxPrice, "MaxPrice must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.PriceStepIncrementSize, "PriceStepIncrementSize must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.MinimumBaseAmount, "MinimumBaseAmount must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.MaximumBaseAmount, "MaximumBaseAmount must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.AmountStepIncrementSize, "AmountStepIncrementSize must be positive for %s pair %s", asset.Futures, pairs[0])
+	assert.Positivef(t, limits.MarketMaxQty, "MarketMaxQty must be positive for %s pair %s", asset.Futures, pairs[0])
 	assert.Positivef(t, limits.MaxTotalOrders, "MaxTotalOrders must be positive for %s pair %s", asset.Futures, pairs[0])
 }
 

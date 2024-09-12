@@ -683,11 +683,14 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	if arg.Price <= 0 {
 		return order.ErrPriceBelowMin
 	}
-	signature, err := ap.ProcessOrderSignature(ctx, arg)
+	r, s, err := ap.ProcessOrderSignature(ctx, arg)
 	if err != nil {
 		return err
 	}
-	arg.Signature = "0x" + signature
+	arg.Signature = &SignatureInfo{
+		R: "0x" + r,
+		S: "0x" + s,
+	}
 	return nil
 }
 
@@ -765,11 +768,14 @@ func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams
 	if err != nil {
 		return nil, err
 	}
-	signature, err := ap.ProcessConditionalTransfer(ctx, arg)
+	r, s, err := ap.ProcessConditionalTransfer(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	arg.Signature = signature
+	arg.Signature = &SignatureInfo{
+		R: "0x" + r,
+		S: "0x" + s,
+	}
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, arg, &resp)
 }
@@ -1234,7 +1240,7 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 	}
 	params.Set("isFastWithdraw", strconv.FormatBool(arg.IsFastWithdraw))
 	params.Set("nonce", arg.Nonce)
-	signature, err := ap.ProcessWithdrawalToAddressSignatureV3(ctx, arg)
+	r, s, err := ap.ProcessWithdrawalToAddressSignatureV3(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -1242,7 +1248,7 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 		return nil, errZeroKnowledgeAccountIDMissing
 	}
 	params.Set("zkAccountId", arg.ZKAccountID)
-	params.Set("signature", signature)
+	params.Set("signature", "0x"+r+s)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/withdrawal", request.UnAuth, params, nil, &resp)
 }
@@ -1263,7 +1269,7 @@ func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientI
 	if asset.IsEmpty() {
 		return nil, currency.ErrCurrencyCodeEmpty
 	}
-	signature, err := ap.ProcessWithdrawalSignature(ctx, &WithdrawalParams{
+	r, s, err := ap.ProcessWithdrawalSignature(ctx, &WithdrawalParams{
 		Amount:         amount,
 		ClientID:       strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10),
 		ExpirationTime: expiration,
@@ -1272,12 +1278,12 @@ func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientI
 	if err != nil {
 		return nil, err
 	}
-	arg := &map[string]string{
+	arg := &map[string]interface{}{
 		"amount":   strconv.FormatFloat(amount, 'f', -1, 64),
 		"clientId": clientID,
 		// "expiration", )
 		"asset":     asset.String(),
-		"signature": signature,
+		"signature": map[string]string{"r": "0x" + r, "s": "0x" + s},
 	}
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-withdrawal", request.UnAuth, nil, arg, &resp)
@@ -1313,9 +1319,13 @@ func (ap *Apexpro) withdrawalToAddress(ctx context.Context, arg *WithdrawalToAdd
 		return nil, errEthereumAddressMissing
 	}
 	var err error
-	arg.Signature, err = ap.ProcessWithdrawalToAddressSignature(ctx, arg)
+	r, s, err := ap.ProcessWithdrawalToAddressSignature(ctx, arg)
 	if err != nil {
 		return nil, err
+	}
+	arg.Signature = &SignatureInfo{
+		R: "0x" + r,
+		S: "0x" + s,
 	}
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, arg, &resp)
