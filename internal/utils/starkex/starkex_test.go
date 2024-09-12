@@ -1,9 +1,7 @@
 package starkex
 
 import (
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -125,40 +123,4 @@ func TestGetYCoordinate(t *testing.T) {
 
 	result := sfg.GetYCoordinate(publicX)
 	assert.NotNil(t, result)
-}
-
-func TestMarshali(t *testing.T) {
-	t.Parallel()
-	// r and s values as hexadecimal strings
-	rHex := "07a15838aad9b20368dc4ba27613fd35ceec3b34be7a2cb913bca0fb06e98107"
-	sHex := "05007f40fddd9babae0c7362d3b4e9c152ed3fced7fe78435b302d825489298f"
-
-	// Convert r and s from hex to big.Int
-	r := new(big.Int)
-	r.SetString(rHex, 16)
-
-	s := new(big.Int)
-	s.SetString(sHex, 16)
-
-	// Convert r and s to 32-byte fixed length byte slices
-	rBytes := r.FillBytes(make([]byte, 32))
-	sBytes := s.FillBytes(make([]byte, 32))
-
-	// Concatenate rBytes and sBytes to create a single 64-byte signature
-	signature := append(rBytes, sBytes...)
-
-	// Print the result as a hexadecimal string
-	fmt.Printf("64-byte ANS signature: %s\n", hex.EncodeToString(signature))
-}
-
-func TestXPeriment(t *testing.T) {
-	t.Parallel()
-	// r, _ := big.NewInt(0).SetString("0x07a15838aad9b20368dc4ba27613fd35ceec3b34be7a2cb913bca0fb06e98107", 0)
-	// s, _ := big.NewInt(0).SetString("0x05007f40fddd9babae0c7362d3b4e9c152ed3fced7fe78435b302d825489298f", 0)
-	// val := new(big.Int).Mod(r, s)
-	// println("Val(16): ", val.Text(16))
-	// val := r.Append(s.Bytes(), 0)
-
-	// vals := sha256.Sum256(val)
-	// big.NewInt(0).SetBytes(vals)
 }

@@ -1384,8 +1384,8 @@ type ContractWalletInfo struct {
 	Token                    string       `json:"token"`
 }
 
-// ExperiancedMoney represents an experianced money detail
-type ExperiancedMoney struct {
+// ExperiencedMoney represents an experienced money detail
+type ExperiencedMoney struct {
 	TotalAmount     string `json:"totalAmount"`
 	TotalNumber     string `json:"totalNumber"`
 	RecycledAmount  string `json:"recycledAmount"`
@@ -1414,7 +1414,7 @@ type WsAccountOrderFill struct {
 type AuthWebsocketAccountResponse struct {
 	Deleverages     []AccountDeleverage    `json:"deleverages"`
 	ContractWallets []ContractWalletInfo   `json:"contractWallets"`
-	ExperienceMoney []ExperiancedMoney     `json:"experienceMoney"`
+	ExperienceMoney []ExperiencedMoney     `json:"experienceMoney"`
 	Orders          []OrderDetail          `json:"orders"`
 	Fills           []WsAccountOrderFill   `json:"fills"`
 	Positions       []AccountPositionInfo  `json:"positions"`
@@ -1447,7 +1447,7 @@ type AccountPositionInfo struct {
 	CustomImr   string               `json:"customImr"`
 }
 
-// AccountInfo represents an account's basic informations
+// AccountInfo represents an account's basic information
 type AccountInfo struct {
 	CreatedAt             convert.ExchangeTime `json:"createdAt"`
 	TakerFeeRate          types.Number         `json:"takerFeeRate"`

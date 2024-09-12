@@ -51,9 +51,9 @@ func TestPedersen(t *testing.T) {
 			if len(tt.want) == 65 && strings.HasPrefix(tt.want, "0x") {
 				tt.want = strings.Replace(tt.want, "0x", "0x0", 1)
 			}
-			ans := loadConfig.PedersenHash(a.String(), b.String())
-			if !strings.EqualFold(ans, tt.want) {
-				t.Errorf("TestHash got %s, want %s", ans, tt.want)
+			and := loadConfig.PedersenHash(a.String(), b.String())
+			if !strings.EqualFold(and, tt.want) {
+				t.Errorf("TestHash got %s, want %s", and, tt.want)
 			}
 		})
 	}
