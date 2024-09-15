@@ -21,15 +21,27 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey    = ""
-	apiSecret = ""
-	clientID  = ""
+	apiKey    = "1fcc2d47-6c5b-37e5-cf5d-ee07a2975c66"
+	apiSecret = "cDrY2JYzwtAGpZPENY3FnSy5W80CHJYY-dtA7TFW"
+	clientID  = "RvtoQ0zSFBTEq0Ll-tKn"
 
-	starkKey            = ""
-	starkSecret         = ""
-	starkKeyYCoordinate = ""
+	// apiKey    = "3ee9f1f5-84e7-3b45-6b8d-e0f6249792a1"
+	// apiSecret = "5EQDIF2x9p3o5Hf9xlCrmo4vrUGYoabhPI0U283X"
+	// clientID  = "WriryhFSKb8SpOtmvpWY"
 
-	ethereumAddress = ""
+	starkKey            = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
+	starkSecret         = "0x074bcbe7f64f95e8d3f1afda4c338775702b4d1db3651fc70bad95a160b7f9ae"
+	starkKeyYCoordinate = "0x0207d57867e0820e0f7588339e8b7491ce1da964260044340e3fd27c718f2a91"
+
+	// starkKey            = "0xf8c6635f9cfe85f46759dc2eebe71a45b765687e35dbe5e74e8bde347813ef"
+	// starkSecret         = "0x607ba3969039f3e19006ff8f40629d20a7b7dac31d4019e0965fbf7c5c068a"
+	// starkKeyYCoordinate = ""
+
+	// starkKey            = "0x002474dee3cd13931e85b4e7bb4a501d32097192515a492289f4804046ace567"
+	// starkSecret         = "0x064bbfda1ae95578713f23ad9dc4a19a0e8b2edc0efdc6819d389146b140f24b"
+	// starkKeyYCoordinate = "0x01c67b1317067aba57ea69fa9f3e59f4e556e520ab81dedb39b58409b79e2373"
+
+	ethereumAddress = "0x0330eBB5e894720e6746070371F9Fd797BE9D074"
 
 	canManipulateRealOrders = true
 )
@@ -537,8 +549,9 @@ func TestGetWorstPriceV1(t *testing.T) {
 
 func TestCreateOrder(t *testing.T) {
 	t.Parallel()
-	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
+	futuresTradablePair, err := currency.NewPairFromString("ETH-USDC")
 	require.NoError(t, err)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	if ap.UserAccountDetail == nil {
 		ap.UserAccountDetail, err = ap.GetUserAccountDataV2(context.Background())
@@ -550,8 +563,8 @@ func TestCreateOrder(t *testing.T) {
 		Symbol:          futuresTradablePair,
 		Side:            order.Buy.String(),
 		OrderType:       "LIMIT",
-		Size:            0.0001,
-		Price:           40000,
+		Size:            0.01,
+		Price:           2250,
 		TimeInForce:     "GOOD_TIL_CANCEL",
 		TriggerPrice:    0,
 		TrailingPercent: 0,
@@ -902,8 +915,7 @@ func TestWithdrawalToAddressV2(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
 		Amount:          1,
-		ClientID:        "12334",
-		ExpirationTime:  time.Now().Add(time.Hour * 50),
+		ClientOrderID:   "12334",
 		Asset:           currency.BTC,
 		EthereumAddress: ethereumAddress,
 	})
@@ -916,8 +928,7 @@ func TestWithdrawalToAddressV1(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.WithdrawalToAddressV1(context.Background(), &WithdrawalToAddressParams{
 		Amount:          1,
-		ClientID:        "12334",
-		ExpirationTime:  time.Now().Add(time.Hour * 50),
+		ClientOrderID:   "12334",
 		Asset:           currency.BTC,
 		EthereumAddress: ethereumAddress,
 	})
@@ -927,36 +938,36 @@ func TestWithdrawalToAddressV1(t *testing.T) {
 
 func TestOrderCreationParamsFilter(t *testing.T) {
 	t.Parallel()
-	err := ap.orderCreationParamsFilter(context.Background(), nil)
+	_, err := ap.orderCreationParamsFilter(context.Background(), nil)
 	require.ErrorIs(t, err, order.ErrOrderDetailIsNil)
-	err = ap.orderCreationParamsFilter(context.Background(), &CreateOrderParams{Side: order.Buy.String()})
+	_, err = ap.orderCreationParamsFilter(context.Background(), &CreateOrderParams{Side: order.Buy.String()})
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
 	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
 	require.NoError(t, err)
 	arg := &CreateOrderParams{Symbol: futuresTradablePair}
-	err = ap.orderCreationParamsFilter(context.Background(), arg)
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
 	require.ErrorIs(t, err, order.ErrSideIsInvalid)
 	arg.Side = order.Buy.String()
-	err = ap.orderCreationParamsFilter(context.Background(), &CreateOrderParams{Symbol: futuresTradablePair, Side: order.Buy.String()})
+	_, err = ap.orderCreationParamsFilter(context.Background(), &CreateOrderParams{Symbol: futuresTradablePair, Side: order.Buy.String()})
 	require.ErrorIs(t, err, order.ErrTypeIsInvalid)
 	arg.OrderType = order.Limit.String()
-	err = ap.orderCreationParamsFilter(context.Background(), arg)
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
 	require.ErrorIs(t, err, order.ErrAmountBelowMin)
 	arg.Size = 2
-	err = ap.orderCreationParamsFilter(context.Background(), arg)
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
 	require.ErrorIs(t, err, order.ErrPriceBelowMin)
 	arg.Price = 123
 	arg.LimitFee = -1
-	err = ap.orderCreationParamsFilter(context.Background(), arg)
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
 	require.ErrorIs(t, err, errLimitFeeRequired)
 	arg.LimitFee = 0.003
-	err = ap.orderCreationParamsFilter(context.Background(), arg)
+	_, err = ap.orderCreationParamsFilter(context.Background(), arg)
 	require.ErrorIs(t, err, errExpirationTimeRequired)
 }
 
 func TestCreateOrderV1(t *testing.T) {
 	t.Parallel()
-	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
+	futuresTradablePair, err := currency.NewPairFromString("ETH-USDC")
 	require.NoError(t, err)
 
 	if ap.UserAccountDetail == nil {
@@ -964,27 +975,20 @@ func TestCreateOrderV1(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ap.UserAccountDetail)
 	}
-	var takerFeeRate float64
-	found := false
-	for k := range ap.UserAccountDetail.Accounts {
-		if ap.UserAccountDetail.Accounts[k].Token == "USDC" {
-			takerFeeRate = ap.UserAccountDetail.Accounts[k].TakerFeeRate.Float64()
-			found = true
-		}
-	}
-	require.True(t, found)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+
+	ap.Verbose = true
 	result, err := ap.CreateOrderV1(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
-		Side:            order.Sell.String(),
+		Side:            order.Buy.String(),
 		OrderType:       "LIMIT",
-		Size:            123,
-		Price:           1,
-		LimitFee:        takerFeeRate * 123 * 1,
-		TimeInForce:     "GTC",
+		Size:            0.01,
+		Price:           2250,
+		TimeInForce:     "GOOD_TIL_CANCEL",
 		TriggerPrice:    0,
-		TrailingPercent: 1,
-		ReduceOnly:      true,
+		TrailingPercent: 0,
+		ReduceOnly:      false,
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -992,7 +996,7 @@ func TestCreateOrderV1(t *testing.T) {
 
 func TestCreateOrderV2(t *testing.T) {
 	t.Parallel()
-	futuresTradablePair, err := currency.NewPairFromString("BTC-USDC")
+	futuresTradablePair, err := currency.NewPairFromString("ETH-USDC")
 	require.NoError(t, err)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
@@ -1004,11 +1008,11 @@ func TestCreateOrderV2(t *testing.T) {
 	ap.Verbose = true
 	result, err := ap.CreateOrderV2(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
-		Side:            order.Sell.String(),
+		Side:            order.Buy.String(),
 		OrderType:       "LIMIT",
-		Size:            0.0001,
-		Price:           40000,
-		TimeInForce:     "GTC",
+		Size:            0.01,
+		Price:           2250,
+		TimeInForce:     "GOOD_TIL_CANCEL",
 		TriggerPrice:    0,
 		TrailingPercent: 0,
 		ReduceOnly:      false,
@@ -1215,3 +1219,30 @@ func TestWsConnect(t *testing.T) {
 	err := ap.WsConnect()
 	require.NoError(t, err)
 }
+
+var data = `{
+    "amount_collateral": "4000000",
+    "amount_fee": "4000",
+    "amount_synthetic": "1000000",
+    "asset_id_collateral": "0xa21edc9d9997b1b1956f542fe95922518a9e28ace11b7b2972a1974bf5971f",
+    "asset_id_synthetic": "0x0",
+    "expiration_timestamp": "1100000",
+    "is_buying_synthetic": false,
+    "nonce": "1001",
+    "order_type": "LIMIT_ORDER_WITH_FEES",
+    "position_id": "10000",
+    "public_key": "0xf8c6635f9cfe85f46759dc2eebe71a45b765687e35dbe5e74e8bde347813ef",
+    "signature": {
+        "r": "0x07a15838aad9b20368dc4ba27613fd35ceec3b34be7a2cb913bca0fb06e98107",
+        "s": "0x05007f40fddd9babae0c7362d3b4e9c152ed3fced7fe78435b302d825489298f"
+    }
+}`
+
+// func TestRegistrationAndOnboarding(t *testing.T) {
+// 	t.Parallel()
+// 	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+// 	ap.Verbose = true
+// 	result, err := ap.RegistrationAndOnboarding(context.Background(), starkKey, starkKeyYCoordinate, "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "", "")
+// 	require.NoError(t, err)
+// 	assert.NotNil(t, result)
+// }

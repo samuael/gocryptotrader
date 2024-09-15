@@ -42,7 +42,7 @@ type CreateOrderWithFeeParams struct {
 	QuantumAmountCollateral *big.Int
 	QuantumAmountFee        *big.Int
 	IsBuyingSynthetic       bool
-	PositionID              *big.Int // Users Account ID
+	PositionID              *big.Int
 	Nonce                   *big.Int
 	ExpirationEpochHours    *big.Int
 }

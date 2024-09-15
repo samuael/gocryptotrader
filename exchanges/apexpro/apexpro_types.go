@@ -1078,14 +1078,10 @@ type UserWithdrawal struct {
 // WithdrawalToAddressParams represents a withdrawal parameter to an address through the V2 API
 type WithdrawalToAddressParams struct {
 	Amount          float64       `json:"amount"`
-	ClientID        string        `json:"clientId"`
-	ExpirationTime  time.Time     `json:"expiration"`
-	ExpEpoch        int64         `json:"-"`
+	ClientOrderID   string        `json:"clientId"`
+	ExpEpoch        int64         `json:"expiration"`
 	Asset           currency.Code `json:"asset"`
 	EthereumAddress string        `json:"ethAddress"`
-
-	// Signature string `json:"signature"`
-	Signature *SignatureInfo `json:"signature"`
 }
 
 // AssetWithdrawalParams represents a user asset withdrawal parameter.
@@ -1312,8 +1308,8 @@ type CreateOrderParams struct {
 	TrailingPercent float64       `json:"trailingPercent,omitempty,string"`
 	ClientOrderID   string        `json:"clientOrderId,omitempty"`
 	ReduceOnly      bool          `json:"reduceOnly,omitempty,string"`
-	// Signature       string        `json:"signature"`
-	Signature *SignatureInfo `json:"signature,omitempty"`
+	Signature       string        `json:"signature,omitempty"`
+	// Signature *SignatureInfo `json:"signature,omitempty"`
 }
 
 // SignatureInfo holds the r and s signature string of ECDSA signature
@@ -1491,4 +1487,20 @@ type AccountNotificationInfo struct {
 	WebLink     string               `json:"webLink"`
 	Read        bool                 `json:"read"`
 	CreatedTime convert.ExchangeTime `json:"createdTime"`
+}
+
+// CreateOrderParam represents a stark order creation parameters
+type CreateOrderParam struct {
+	AmountCollateral    string        `json:"amount_collateral"`
+	AmountFee           string        `json:"amount_fee"`
+	AmountSynthetic     string        `json:"amount_synthetic"`
+	AssetIDCollateral   string        `json:"asset_id_collateral"`
+	AssetIDSynthetic    string        `json:"asset_id_synthetic"`
+	ExpirationTimestamp string        `json:"expiration_timestamp"`
+	IsBuyingSynthetic   bool          `json:"is_buying_synthetic"`
+	Nonce               string        `json:"nonce"`
+	OrderType           string        `json:"order_type"`
+	PositionID          string        `json:"position_id"`
+	PublicKey           string        `json:"public_key"`
+	Signature           SignatureInfo `json:"signature"`
 }

@@ -333,7 +333,7 @@ func (ap *Apexpro) generateNonce(ctx context.Context, l2Key, ethereumAddress, ch
 		ChainID:         chainID,
 	}
 	var resp *NonceResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, arg, &resp, false)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, arg, &resp)
 }
 
 // GetUsersDataV3 retrieves an account users information.
@@ -372,7 +372,7 @@ func (ap *Apexpro) EditUserDataV1(ctx context.Context, arg *EditUserDataParams) 
 }
 
 func (ap *Apexpro) editUserData(ctx context.Context, arg *EditUserDataParams, path string) (*UserDataResponse, error) {
-	if arg == nil || *arg == (EditUserDataParams{}) {
+	if *arg == (EditUserDataParams{}) {
 		return nil, common.ErrNilPointer
 	}
 	var resp *UserDataResponse
@@ -664,65 +664,73 @@ func (ap *Apexpro) GetWorstPriceV1(ctx context.Context, symbol, side string, amo
 	return ap.getWorstPrice(ctx, symbol, side, "v1/get-worst-price", amount, exchange.RestSpot)
 }
 
-func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrderParams) error {
-	if arg == nil || *arg == (CreateOrderParams{}) {
-		return order.ErrOrderDetailIsNil
+func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrderParams) (url.Values, error) {
+	if *arg == (CreateOrderParams{}) {
+		return nil, order.ErrOrderDetailIsNil
 	}
 	if arg.Symbol.IsEmpty() {
-		return currency.ErrSymbolStringEmpty
+		return nil, currency.ErrSymbolStringEmpty
 	}
 	if arg.Side == "" {
-		return order.ErrSideIsInvalid
+		return nil, order.ErrSideIsInvalid
 	}
 	if arg.OrderType == "" {
-		return order.ErrTypeIsInvalid
+		return nil, order.ErrTypeIsInvalid
 	}
 	if arg.Size <= 0 {
-		return order.ErrAmountBelowMin
+		return nil, order.ErrAmountBelowMin
 	}
 	if arg.Price <= 0 {
-		return order.ErrPriceBelowMin
+		return nil, order.ErrPriceBelowMin
 	}
-	r, s, err := ap.ProcessOrderSignature(ctx, arg)
+	signature, err := ap.ProcessOrderSignature(ctx, arg)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	arg.Signature = &SignatureInfo{
-		R: "0x" + r,
-		S: "0x" + s,
+	params := url.Values{}
+	params.Set("symbol", arg.Symbol.String())
+	params.Set("side", arg.Side)
+	params.Set("clientOrderId", arg.ClientOrderID)
+	params.Set("type", arg.OrderType)
+	params.Set("size", strconv.FormatFloat(arg.Size, 'f', -1, 64))
+	params.Set("price", strconv.FormatFloat(arg.Price, 'f', -1, 64))
+	params.Set("limitFee", strconv.FormatFloat(arg.LimitFee, 'f', -1, 64))
+	params.Set("expiration", strconv.FormatInt(arg.ExpirationTime, 10))
+	if arg.TimeInForce != "" {
+		params.Set("timeInForce", arg.TimeInForce)
 	}
-	return nil
+	params.Set("signature", signature)
+	return params, nil
 }
 
 // CreateOrderV3 creates a new order
 func (ap *Apexpro) CreateOrderV3(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
-	err := ap.orderCreationParamsFilter(ctx, arg)
+	params, err := ap.orderCreationParamsFilter(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
 	var resp *OrderDetail
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v3/order", request.UnAuth, nil, arg, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v3/order", request.UnAuth, params, nil, &resp)
 }
 
 // CreateOrderV2 creates a new order through the v2 API
 func (ap *Apexpro) CreateOrderV2(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
-	err := ap.orderCreationParamsFilter(ctx, arg)
+	params, err := ap.orderCreationParamsFilter(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
 	var resp *OrderDetail
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-order", request.UnAuth, nil, arg, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v2/create-order", request.UnAuth, params, nil, &resp) //, arg.ExpirationTime)
 }
 
 // CreateOrderV1 creates a new order through the v2 API
 func (ap *Apexpro) CreateOrderV1(ctx context.Context, arg *CreateOrderParams) (*OrderDetail, error) {
-	arg.ClientOrderID = randomClientID()
-	err := ap.orderCreationParamsFilter(ctx, arg)
+	params, err := ap.orderCreationParamsFilter(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
 	var resp *OrderDetail
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v1/create-order", request.UnAuth, nil, arg, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v1/create-order", request.UnAuth, params, nil, &resp)
 }
 
 // FastWithdrawalV1 withdraws an asset
@@ -736,7 +744,7 @@ func (ap *Apexpro) FastWithdrawalV2(ctx context.Context, arg *FastWithdrawalPara
 }
 
 func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) error {
-	if arg == nil || *arg == (FastWithdrawalParams{}) {
+	if *arg == (FastWithdrawalParams{}) {
 		return common.ErrNilPointer
 	}
 	if arg.Amount <= 0 {
@@ -1248,7 +1256,7 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 		return nil, errZeroKnowledgeAccountIDMissing
 	}
 	params.Set("zkAccountId", arg.ZKAccountID)
-	params.Set("signature", "0x"+r+s)
+	params.Set("signature", r+s)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/withdrawal", request.UnAuth, params, nil, &resp)
 }
@@ -1269,7 +1277,7 @@ func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientI
 	if asset.IsEmpty() {
 		return nil, currency.ErrCurrencyCodeEmpty
 	}
-	r, s, err := ap.ProcessWithdrawalSignature(ctx, &WithdrawalParams{
+	signature, err := ap.ProcessWithdrawalSignature(ctx, &WithdrawalParams{
 		Amount:         amount,
 		ClientID:       strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10),
 		ExpirationTime: expiration,
@@ -1278,15 +1286,14 @@ func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientI
 	if err != nil {
 		return nil, err
 	}
-	arg := &map[string]interface{}{
-		"amount":   strconv.FormatFloat(amount, 'f', -1, 64),
-		"clientId": clientID,
-		// "expiration", )
-		"asset":     asset.String(),
-		"signature": map[string]string{"r": "0x" + r, "s": "0x" + s},
-	}
+	params := url.Values{}
+	params.Set("signature", signature)
+	params.Set("amount", strconv.FormatFloat(amount, 'f', -1, 64))
+	params.Set("clientId", clientID)
+	params.Set("expiration", strconv.FormatInt(expiration.UnixMilli(), 10))
+	params.Set("asset", asset.String())
 	var resp *WithdrawalResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-withdrawal", request.UnAuth, nil, arg, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-withdrawal", request.UnAuth, params, nil, &resp)
 }
 
 // WithdrawalToAddressV1 withdraws as asset to an ethereum address
@@ -1300,35 +1307,37 @@ func (ap *Apexpro) WithdrawalToAddressV2(ctx context.Context, arg *WithdrawalToA
 }
 
 func (ap *Apexpro) withdrawalToAddress(ctx context.Context, arg *WithdrawalToAddressParams, path string) (*WithdrawalResponse, error) {
-	if arg == nil || *arg == (WithdrawalToAddressParams{}) {
+	if *arg == (WithdrawalToAddressParams{}) {
 		return nil, common.ErrNilPointer
 	}
 	if arg.Amount <= 0 {
 		return nil, order.ErrAmountBelowMin
 	}
-	if arg.ClientID == "" {
+	if arg.ClientOrderID == "" {
 		return nil, order.ErrClientOrderIDMustBeSet
-	}
-	if arg.ExpirationTime.IsZero() {
-		return nil, errExpirationTimeRequired
 	}
 	if arg.Asset.IsEmpty() {
 		return nil, fmt.Errorf("%w, asset is required", currency.ErrCurrencyCodeEmpty)
 	}
-	if arg.EthereumAddress == "" {
-		return nil, errEthereumAddressMissing
-	}
+	// if arg.ExpEpoch == 0 {
+	// 	return nil, errExpirationTimeRequired
+	// }
 	var err error
-	r, s, err := ap.ProcessWithdrawalToAddressSignature(ctx, arg)
+	signature, err := ap.ProcessWithdrawalToAddressSignature(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	arg.Signature = &SignatureInfo{
-		R: "0x" + r,
-		S: "0x" + s,
+	params := url.Values{}
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+	params.Set("clientId", arg.ClientOrderID)
+	params.Set("expiration", strconv.FormatInt(arg.ExpEpoch, 10))
+	params.Set("asset", arg.Asset.String())
+	params.Set("signature", signature)
+	if arg.EthereumAddress != "" {
+		params.Set("ethAddress", arg.EthereumAddress)
 	}
 	var resp *WithdrawalResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, arg, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, nil, &resp)
 }
 
 // CrossChainWithdrawals withdraws an asset through different chains
@@ -1390,7 +1399,7 @@ func paramsToMap(params url.Values) map[string]string {
 }
 
 // SendAuthenticatedHTTPRequest sends an authenticated HTTP request.
-func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, f request.EndpointLimit, params url.Values, arg, result interface{}, onboarding ...bool) error {
+func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath exchange.URL, method, path string, f request.EndpointLimit, params url.Values, arg, result interface{}, timestamps ...int64) error {
 	creds, err := ap.GetCredentials(ctx)
 	if err != nil {
 		return err
@@ -1407,16 +1416,24 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 	}
 	var body io.Reader
 	var payload []byte
+	var dataString string
 	if arg != nil {
 		payload, err = json.Marshal(arg)
 		if err != nil {
 			return err
 		}
 		body = bytes.NewBuffer(payload)
+	} else if method == http.MethodPost && params != nil {
+		body = bytes.NewBuffer([]byte(params.Encode()))
+		dataString = params.Encode()
 	}
 	err = ap.SendPayload(ctx, f, func() (*request.Item, error) {
 		timestamp := time.Now().UTC().UnixMilli()
-		message := strconv.FormatInt(timestamp, 10) + method + ("/api/" + path)
+		if len(timestamps) > 0 && timestamps[0] != 0 {
+			timestamp = timestamps[0]
+			println("Timestamp: ", timestamp)
+		}
+		message := strconv.FormatInt(timestamp, 10) + method + ("/api/" + path) + dataString
 		encodedSecret := base64.StdEncoding.EncodeToString([]byte(creds.Secret))
 		var hmacSigned []byte
 		var err error
@@ -1431,16 +1448,16 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 		headers["APEX-SIGNATURE"] = base64.StdEncoding.EncodeToString(hmacSigned)
 		headers["APEX-TIMESTAMP"] = strconv.FormatInt(timestamp, 10)
 		headers["APEX-PASSPHRASE"] = creds.ClientID
-		if len(onboarding) > 0 && onboarding[0] {
-			if creds.SubAccount == "" {
-				return nil, errEthereumAddressMissing
-			}
-			headers = make(map[string]string)
-			headers["APEX-SIGNATURE"] = base64.StdEncoding.EncodeToString(hmacSigned)
-			headers["APEX-ETHEREUM-ADDRESS"] = creds.SubAccount
-		} else if len(onboarding) > 0 {
-			headers = make(map[string]string)
-		}
+		// if len(onboarding) > 0 && onboarding[0] {
+		// 	if creds.SubAccount == "" {
+		// 		return nil, errEthereumAddressMissing
+		// 	}
+		// 	headers = make(map[string]string)
+		// 	headers["APEX-SIGNATURE"] = base64.StdEncoding.EncodeToString(hmacSigned)
+		// 	headers["APEX-ETHEREUM-ADDRESS"] = creds.SubAccount
+		// } else if len(onboarding) > 0 {
+		// 	headers = make(map[string]string)
+		// }
 		reqItem := &request.Item{
 			Method:        method,
 			Path:          endpointPath + path,
@@ -1475,3 +1492,53 @@ func nonceFromClientID(clientID string) *big.Int {
 	nonce, _ := strconv.ParseUint(hashHex[0:8], 16, 64)
 	return big.NewInt(int64(nonce))
 }
+
+// RegistrationAndOnboarding consolidate onboarding data and generate a digital signature using your wallet.
+// func (ap *Apexpro) RegistrationAndOnboarding(ctx context.Context, starkKey, starkKeyYCoordinate, ethereumAddress, referredByAffiliateLink, country string) (interface{}, error) {
+// 	if starkKey == "" {
+// 		return nil, fmt.Errorf("%w, starkKey is required", errL2KeyMissing)
+// 	}
+// 	if starkKeyYCoordinate == "" {
+// 		return nil, fmt.Errorf("%w, starkKeyYCoordinate is required", errL2KeyMissing)
+// 	}
+// 	if ethereumAddress == "" {
+// 		return nil, errEthereumAddressMissing
+// 	}
+// 	// params := url.Values{}
+// 	// params.Set("starkKey", starkKey)
+// 	// params.Set("starkKeyYCoordinate", starkKeyYCoordinate)
+// 	// params.Set("ethereumAddress", ethereumAddress)
+// 	// if referredByAffiliateLink != "" {
+// 	// 	params.Set("referredByAffiliateLink", referredByAffiliateLink)
+// 	// }
+// 	// if country != "" {
+// 	// 	params.Set("country", country)
+// 	// }
+
+// 	arg := &struct {
+// 		StarkKey                string `json:"starkKey"`
+// 		StarkKeyYCoordinate     string `json:"starkKeyYCoordinate"`
+// 		EthereumAddress         string `json:"ethereumAddress"`
+// 		ReferredByAffiliateLink string `json:"referredByAffiliateLink,omitempty"`
+// 		Country                 string `json:"country,omitempty"`
+// 		APIKeyHash              string `json:"apiKeyHash"`
+// 		SourceFlag              string `json:"sourceFlag,omitempty"`
+// 		EthMulAddress           string `json:"ethMulAddress,omitempty"`
+// 		IsLpAccount             bool   `json:"isLpAccount,omitempty"`
+// 		Category                string `json:"category,omitempty"`
+// 	}{
+// 		StarkKey:                starkKey,
+// 		StarkKeyYCoordinate:     starkKeyYCoordinate,
+// 		EthereumAddress:         ethereumAddress,
+// 		ReferredByAffiliateLink: referredByAffiliateLink,
+// 		Country:                 country,
+
+// 		// IsLpAccount: "isLpAccount",
+// 		EthMulAddress: "",
+// 		SourceFlag:    "sourceFlag",
+// 		APIKeyHash:    "apiKeyHash",
+// 		Category:      "CATEGORY_API",
+// 	}
+// 	var resp interface{}
+// 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v3/onboarding", request.UnAuth, nil, arg, &resp, true)
+// }
