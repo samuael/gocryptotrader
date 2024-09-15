@@ -21,29 +21,17 @@ import (
 
 // Please supply your own keys here to do authenticated endpoint testing
 const (
-	apiKey    = "1fcc2d47-6c5b-37e5-cf5d-ee07a2975c66"
-	apiSecret = "cDrY2JYzwtAGpZPENY3FnSy5W80CHJYY-dtA7TFW"
-	clientID  = "RvtoQ0zSFBTEq0Ll-tKn"
+	apiKey    = ""
+	apiSecret = ""
+	clientID  = ""
 
-	// apiKey    = "3ee9f1f5-84e7-3b45-6b8d-e0f6249792a1"
-	// apiSecret = "5EQDIF2x9p3o5Hf9xlCrmo4vrUGYoabhPI0U283X"
-	// clientID  = "WriryhFSKb8SpOtmvpWY"
+	starkKey            = ""
+	starkSecret         = ""
+	starkKeyYCoordinate = ""
 
-	starkKey            = "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505"
-	starkSecret         = "0x074bcbe7f64f95e8d3f1afda4c338775702b4d1db3651fc70bad95a160b7f9ae"
-	starkKeyYCoordinate = "0x0207d57867e0820e0f7588339e8b7491ce1da964260044340e3fd27c718f2a91"
+	ethereumAddress = ""
 
-	// starkKey            = "0xf8c6635f9cfe85f46759dc2eebe71a45b765687e35dbe5e74e8bde347813ef"
-	// starkSecret         = "0x607ba3969039f3e19006ff8f40629d20a7b7dac31d4019e0965fbf7c5c068a"
-	// starkKeyYCoordinate = ""
-
-	// starkKey            = "0x002474dee3cd13931e85b4e7bb4a501d32097192515a492289f4804046ace567"
-	// starkSecret         = "0x064bbfda1ae95578713f23ad9dc4a19a0e8b2edc0efdc6819d389146b140f24b"
-	// starkKeyYCoordinate = "0x01c67b1317067aba57ea69fa9f3e59f4e556e520ab81dedb39b58409b79e2373"
-
-	ethereumAddress = "0x0330eBB5e894720e6746070371F9Fd797BE9D074"
-
-	canManipulateRealOrders = true
+	canManipulateRealOrders = false
 )
 
 var ap = &Apexpro{}

@@ -17,6 +17,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
@@ -68,7 +69,7 @@ func (ap *Apexpro) WsConnect() error {
 	if err != nil {
 		return err
 	}
-	ap.Websocket.Conn.SetupPingHandler(stream.PingHandler{
+	ap.Websocket.Conn.SetupPingHandler(request.UnAuth, stream.PingHandler{
 		UseGorillaHandler: true,
 		MessageType:       websocket.PongMessage,
 		Message:           payload,
@@ -122,7 +123,7 @@ func (ap *Apexpro) WsAuth(dialer *websocket.Dialer) error {
 	}
 	ap.Websocket.Wg.Add(1)
 	go ap.wsReadData(ap.Websocket.AuthConn)
-	return ap.Websocket.AuthConn.SendJSONMessage(context.Background(), struct {
+	return ap.Websocket.AuthConn.SendJSONMessage(context.Background(), request.UnAuth, &struct {
 		Operation string        `json:"op"`
 		Arguments []interface{} `json:"args"`
 	}{
@@ -174,7 +175,7 @@ func (ap *Apexpro) Subscribe(subscriptions subscription.List) error {
 	if err != nil {
 		return err
 	}
-	err = ap.Websocket.Conn.SendJSONMessage(context.Background(), payload)
+	err = ap.Websocket.Conn.SendJSONMessage(context.Background(), request.UnAuth, payload)
 	if err != nil {
 		return err
 	}
@@ -187,7 +188,7 @@ func (ap *Apexpro) Unsubscribe(subscriptions subscription.List) error {
 	if err != nil {
 		return err
 	}
-	return ap.Websocket.Conn.SendJSONMessage(context.Background(), payload)
+	return ap.Websocket.Conn.SendJSONMessage(context.Background(), request.UnAuth, payload)
 }
 
 func (ap *Apexpro) handleSubscriptionPayload(operation string, subscriptions subscription.List) (*WsMessage, error) {
