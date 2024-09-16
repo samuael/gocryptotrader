@@ -35,15 +35,15 @@ type StarkConfig struct {
 
 var one = big.NewInt(1)
 
-const defaultPedersenConfigsPath = "internal/utils/hash/pedersen_config/"
+const defaultPedersenConfigsPath = "internal/utils/hash/elliptic_curve_config/"
 
-// NewStarkExConfig returns a stark configuration given the exchange name
-func NewStarkExConfig(exchangeName string) (*StarkConfig, error) {
+// NewStarkExConfig returns a elliptic curve configuration given the name of the elliptic curve config
+func NewStarkExConfig() (*StarkConfig, error) {
 	rootPath, err := path.RootPathFromCWD()
 	if err != nil {
 		return nil, err
 	}
-	pedersenConfig, err := hash.LoadPedersenConfig(rootPath + "/" + defaultPedersenConfigsPath + strings.ToLower(exchangeName) + ".json")
+	pedersenConfig, err := hash.LoadPedersenConfig(rootPath + "/" + defaultPedersenConfigsPath + strings.ToLower("starkEx") + ".json")
 	if err != nil {
 		return nil, err
 	}

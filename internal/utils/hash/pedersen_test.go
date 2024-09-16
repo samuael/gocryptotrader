@@ -6,9 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	path "github.com/thrasher-corp/gocryptotrader/internal/testing/utils"
-	math_utils "github.com/thrasher-corp/gocryptotrader/internal/utils/math"
 )
 
 func TestPedersen(t *testing.T) {
@@ -16,8 +14,8 @@ func TestPedersen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const defaultPedersenConfigsPath = "internal/utils/hash/pedersen_config/"
-	loadConfig, err := LoadPedersenConfig(rootPath + "/" + defaultPedersenConfigsPath + strings.ToLower("apexpro") + ".json")
+	const defaultPedersenConfigsPath = "internal/utils/hash/elliptic_curve_config/"
+	loadConfig, err := LoadPedersenConfig(rootPath + "/" + defaultPedersenConfigsPath + strings.ToLower("starkEx") + ".json")
 	if err != nil {
 		t.Fatal(t, err)
 	}
@@ -57,40 +55,4 @@ func TestPedersen(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestA(t *testing.T) {
-	t.Parallel()
-
-	rootPath, err := path.RootPathFromCWD()
-	if err != nil {
-		t.Fatal(err)
-	}
-	const defaultPedersenConfigsPath = "internal/utils/hash/pedersen_config/"
-	loadConfig, err := LoadPedersenConfig(rootPath + "/" + defaultPedersenConfigsPath + strings.ToLower("apexpro") + ".json")
-	if err != nil {
-		t.Fatal(t, err)
-	}
-	result := PedersenHash(loadConfig.FieldPrime, loadConfig.ConstantPoints, "0x03d937c035c878245caf64531a5756109c53068da139362728feb561405371cb",
-		"0x0208a0a10250e382e1e4bbe2880906c2791bf6275695e02fbbc6aeff9cd8b31a")
-	require.Equal(t, result, "1382171651951541052082654537810074813456022260470662576358627909045455537762")
-
-}
-
-func PedersenHash(P *big.Int, constants [][2]*big.Int, str ...string) string {
-	NElementBitsHash := P.BitLen()
-	point := constants[0]
-	for i, s := range str {
-		x, _ := big.NewInt(0).SetString(s, 10)
-		pointList := constants[2+i*NElementBitsHash : 2+(i+1)*NElementBitsHash]
-		n := big.NewInt(0)
-		for _, pt := range pointList {
-			n.And(x, big.NewInt(1))
-			if n.Cmp(big.NewInt(0)) > 0 {
-				point = math_utils.ECCAdd(point, pt, P)
-			}
-			x = x.Rsh(x, 1)
-		}
-	}
-	return point[0].String()
 }

@@ -15,7 +15,7 @@ const MOCK_PRIVATE_KEY = "0x58c7d5a90b1776bde86ebac077e053ed85b0f7164f53b080304a
 
 func TestNewStarkExConfig(t *testing.T) {
 	t.Parallel()
-	result, err := NewStarkExConfig("apexpro")
+	result, err := NewStarkExConfig()
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -31,7 +31,7 @@ func TestECDSASignature(t *testing.T) {
 	publicSecret, ok := big.NewInt(0).SetString(MOCK_PRIVATE_KEY, 0)
 	require.True(t, ok)
 
-	sfg, err := NewStarkExConfig("apexpro")
+	sfg, err := NewStarkExConfig()
 	require.NoError(t, err)
 	require.NotNil(t, sfg)
 
@@ -45,7 +45,7 @@ func TestECDSASignature(t *testing.T) {
 }
 
 func TestECDSAWithout(t *testing.T) {
-	sfg, err := NewStarkExConfig("apexpro")
+	sfg, err := NewStarkExConfig()
 	require.NoError(t, err)
 	require.NotNil(t, sfg)
 
@@ -83,7 +83,7 @@ func TestECDSAWithout(t *testing.T) {
 
 func TestOrderSign(t *testing.T) {
 	t.Parallel()
-	sfg, err := NewStarkExConfig("apexpro")
+	sfg, err := NewStarkExConfig()
 	require.NoError(t, err)
 	require.NotNil(t, sfg)
 
@@ -114,7 +114,7 @@ func TestOrderSign(t *testing.T) {
 
 func TestGetYCoordinate(t *testing.T) {
 	t.Parallel()
-	sfg, err := NewStarkExConfig("apexpro")
+	sfg, err := NewStarkExConfig()
 	require.NoError(t, err)
 	require.NotNil(t, sfg)
 

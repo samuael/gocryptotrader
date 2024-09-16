@@ -46,7 +46,7 @@ func (ap *Apexpro) SetDefaults() {
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
-	ap.StarkConfig, err = starkex.NewStarkExConfig(ap.Name)
+	ap.StarkConfig, err = starkex.NewStarkExConfig()
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
