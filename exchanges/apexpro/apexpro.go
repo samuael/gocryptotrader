@@ -699,6 +699,16 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	if arg.TimeInForce != "" {
 		params.Set("timeInForce", arg.TimeInForce)
 	}
+	if arg.TrailingPercent > 0 {
+		params.Set("trailingPercent", strconv.FormatFloat(arg.TrailingPercent, 'f', -1, 64))
+	}
+	if arg.TriggerPrice > 0 {
+		params.Set("triggerPrice", strconv.FormatFloat(arg.TriggerPrice, 'f', -1, 64))
+	}
+	if arg.ReduceOnly {
+		params.Set("reduceOnly", "true")
+	}
+
 	params.Set("signature", signature)
 	return params, nil
 }
@@ -750,10 +760,7 @@ func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) error {
 	if arg.Amount <= 0 {
 		return order.ErrAmountBelowMin
 	}
-	// if arg.ClientID != "" {
-	// 	return order.ErrClientOrderIDMustBeSet
-	// }
-	if arg.Expiration.IsZero() {
+	if arg.Expiration == 0 {
 		return errExpirationTimeRequired
 	}
 	if arg.Asset.IsEmpty() {
@@ -768,6 +775,12 @@ func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) error {
 	if arg.ChainID == "" {
 		return errChainIDMissing
 	}
+	params := url.Values{}
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+	params.Set("expiration", strconv.FormatInt(arg.Expiration, 10))
+	params.Set("asset", arg.Asset.String())
+	params.Set("fees", strconv.FormatFloat(arg.Fees, 'f', -1, 64))
+	params.Set("chainId", arg.ChainID)
 	return nil
 }
 
@@ -776,14 +789,12 @@ func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams
 	if err != nil {
 		return nil, err
 	}
-	r, s, err := ap.ProcessConditionalTransfer(ctx, arg)
+	signature, err := ap.ProcessConditionalTransfer(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	arg.Signature = &SignatureInfo{
-		R: "0x" + r,
-		S: "0x" + s,
-	}
+	params := url.Values{}
+	params.Set("signature", signature)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, arg, &resp)
 }
@@ -1248,7 +1259,7 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 	}
 	params.Set("isFastWithdraw", strconv.FormatBool(arg.IsFastWithdraw))
 	params.Set("nonce", arg.Nonce)
-	r, s, err := ap.ProcessWithdrawalToAddressSignatureV3(ctx, arg)
+	signature, err := ap.ProcessWithdrawalToAddressSignatureV3(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -1256,7 +1267,7 @@ func (ap *Apexpro) WithdrawAsset(ctx context.Context, arg *AssetWithdrawalParams
 		return nil, errZeroKnowledgeAccountIDMissing
 	}
 	params.Set("zkAccountId", arg.ZKAccountID)
-	params.Set("signature", r+s)
+	params.Set("signature", signature)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodGet, "v3/withdrawal", request.UnAuth, params, nil, &resp)
 }
@@ -1271,27 +1282,27 @@ func (ap *Apexpro) UserWithdrawalV2(ctx context.Context, amount float64, clientI
 	if clientID == "" {
 		return nil, errUserNonceRequired
 	}
-	if expiration.IsZero() {
-		return nil, errExpirationTimeRequired
-	}
+	// if expiration.IsZero() {
+	// 	return nil, errExpirationTimeRequired
+	// }
 	if asset.IsEmpty() {
 		return nil, currency.ErrCurrencyCodeEmpty
 	}
-	signature, err := ap.ProcessWithdrawalSignature(ctx, &WithdrawalParams{
-		Amount:         amount,
-		ClientID:       strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10),
-		ExpirationTime: expiration,
-		Asset:          asset,
-	})
-	if err != nil {
-		return nil, err
-	}
 	params := url.Values{}
-	params.Set("signature", signature)
 	params.Set("amount", strconv.FormatFloat(amount, 'f', -1, 64))
 	params.Set("clientId", clientID)
 	params.Set("expiration", strconv.FormatInt(expiration.UnixMilli(), 10))
 	params.Set("asset", asset.String())
+	signature, err := ap.ProcessWithdrawalSignature(ctx, &WithdrawalParams{
+		Amount:   amount,
+		ClientID: strconv.FormatInt(ap.Websocket.Conn.GenerateMessageID(true), 10),
+		// ExpirationTime: expiration,
+		Asset: asset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	params.Set("signature", signature)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, "v2/create-withdrawal", request.UnAuth, params, nil, &resp)
 }
@@ -1319,9 +1330,6 @@ func (ap *Apexpro) withdrawalToAddress(ctx context.Context, arg *WithdrawalToAdd
 	if arg.Asset.IsEmpty() {
 		return nil, fmt.Errorf("%w, asset is required", currency.ErrCurrencyCodeEmpty)
 	}
-	// if arg.ExpEpoch == 0 {
-	// 	return nil, errExpirationTimeRequired
-	// }
 	var err error
 	signature, err := ap.ProcessWithdrawalToAddressSignature(ctx, arg)
 	if err != nil {

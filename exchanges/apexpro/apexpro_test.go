@@ -882,7 +882,11 @@ func TestWithdrawAsset(t *testing.T) {
 func TestUserWithdrawalV2(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
-	result, err := ap.UserWithdrawalV2(context.Background(), 1000, "1231231", time.Now().Add(time.Hour*24), currency.USDC)
+	result, err := ap.UserWithdrawalV2(context.Background(),
+		1000,
+		"1231231",
+		time.Time{},
+		currency.USDC)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -890,14 +894,23 @@ func TestUserWithdrawalV2(t *testing.T) {
 func TestWithdrawalToAddressV2(t *testing.T) {
 	t.Parallel()
 	_, err := ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	require.ErrorIs(t, err, common.ErrNilPointer)
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{Asset: currency.ETH})
 	require.ErrorIs(t, err, order.ErrAmountBelowMin)
-	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
+		Amount: .1,
+	})
 	require.ErrorIs(t, err, order.ErrClientOrderIDMustBeSet)
-	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
-	require.ErrorIs(t, err, errExpirationTimeRequired)
-	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
+		Amount:        .1,
+		ClientOrderID: "1234",
+	})
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
-	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{})
+	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
+		Amount:        1,
+		ClientOrderID: "12334",
+		Asset:         currency.BTC,
+	})
 	require.ErrorIs(t, err, errEthereumAddressMissing)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
@@ -1015,7 +1028,7 @@ func TestFastWithdrawalV2(t *testing.T) {
 	result, err := ap.FastWithdrawalV2(context.Background(), &FastWithdrawalParams{
 		Amount:       1,
 		ClientID:     "123213",
-		Expiration:   time.Now().Add(time.Hour * 45),
+		Expiration:   time.Now().Add(time.Hour * 45).UnixMilli(),
 		Asset:        currency.USDC,
 		ERC20Address: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
 		ChainID:      "56",
@@ -1031,7 +1044,7 @@ func TestFastWithdrawalV1(t *testing.T) {
 	result, err := ap.FastWithdrawalV1(context.Background(), &FastWithdrawalParams{
 		Amount:       1,
 		ClientID:     "123213",
-		Expiration:   time.Now().Add(time.Hour * 45),
+		Expiration:   time.Now().Add(time.Hour * 45).UnixMilli(),
 		Asset:        currency.USDC,
 		ERC20Address: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
 		ChainID:      "56",

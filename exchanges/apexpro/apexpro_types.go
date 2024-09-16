@@ -1309,7 +1309,36 @@ type CreateOrderParams struct {
 	ClientOrderID   string        `json:"clientOrderId,omitempty"`
 	ReduceOnly      bool          `json:"reduceOnly,omitempty,string"`
 	Signature       string        `json:"signature,omitempty"`
-	// Signature *SignatureInfo `json:"signature,omitempty"`
+
+	TriggerPriceType string `json:"triggerPriceType"`
+
+	ClientID        string `json:"clientId,omitempty"`
+	IsPositionTpsl  string `json:"isPositionTpsl,omitempty"`
+	IsOpenTpslOrder string `json:"isOpenTpslOrder,omitempty"`
+
+	IsSetOpenSl string `json:"isSetOpenSl,omitempty"`
+	IsSetOpenTp string `json:"isSetOpenTp,omitempty"`
+
+	SlClientOrderID    string `json:"slClientOrderId,omitempty"`
+	SlPrice            string `json:"slPrice,omitempty"`
+	SlSide             string `json:"slSide,omitempty"`
+	SlSize             string `json:"slSize,omitempty"`
+	SlTriggerPrice     string `json:"slTriggerPrice,omitempty"`
+	SlTriggerPriceType string `json:"slTriggerPriceType,omitempty"`
+	SlExpiration       string `json:"slExpiration,omitempty"`
+	SlLimitFee         string `json:"slLimitFee,omitempty"`
+	SlSignature        string `json:"slSignature,omitempty"`
+	TpClientOrderID    string `json:"tpClientOrderId,omitempty"`
+	TpPrice            string `json:"tpPrice,omitempty"`
+	TpSide             string `json:"tpSide,omitempty"`
+	TpSize             string `json:"tpSize,omitempty"`
+	TpTriggerPrice     string `json:"tpTriggerPrice,omitempty"`
+	TpTriggerPriceType string `json:"tpTriggerPriceType,omitempty"`
+	TpExpiration       string `json:"tpExpiration,omitempty"`
+	TpLimitFee         string `json:"tpLimitFee,omitempty"`
+	TpSignature        string `json:"tpSignature,omitempty"`
+	SourceFlag         string `json:"sourceFlag,omitempty"`
+	BrokerID           string `json:"brokerId,omitempty"`
 }
 
 // SignatureInfo holds the r and s signature string of ECDSA signature
@@ -1320,10 +1349,10 @@ type SignatureInfo struct {
 
 // WithdrawalParams represents an asset withdrawal parameters
 type WithdrawalParams struct {
-	Amount         float64
-	ClientID       string
-	ExpirationTime time.Time
-	Asset          currency.Code
+	Amount   float64
+	ClientID string
+	// ExpirationTime time.Time
+	Asset currency.Code
 
 	ExpEpoch int64
 }
@@ -1332,15 +1361,12 @@ type WithdrawalParams struct {
 type FastWithdrawalParams struct {
 	Amount       float64       `json:"amount"`
 	ClientID     string        `json:"clientId"`
-	Expiration   time.Time     `json:"expiration"`
+	Expiration   int64         `json:"expiration"`
 	Asset        currency.Code `json:"asset"`
 	ERC20Address string        `json:"erc20Address"`
 	ChainID      string        `json:"fee"`
 	Fees         float64       `json:"chainId"`
 	IPAccountID  string        `json:"lpAccountId,omitempty"`
-
-	// Signature string `json:"signature"`
-	Signature *SignatureInfo `json:"signature"`
 }
 
 // WsInput represents a websocket input data
