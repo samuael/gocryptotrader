@@ -1351,10 +1351,10 @@ type SignatureInfo struct {
 type WithdrawalParams struct {
 	Amount   float64
 	ClientID string
-	// ExpirationTime time.Time
-	Asset currency.Code
+	Asset    currency.Code
 
-	ExpEpoch int64
+	EthereumAddress string
+	ExpEpoch        int64
 }
 
 // FastWithdrawalParams represents a cross-chain withdrawal parameters

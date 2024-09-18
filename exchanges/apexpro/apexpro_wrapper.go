@@ -436,7 +436,7 @@ func (ap *Apexpro) CancelOrder(_ context.Context, _ *order.Cancel) error {
 
 // CancelBatchOrders cancels orders by their corresponding ID numbers
 func (ap *Apexpro) CancelBatchOrders(_ context.Context, _ []order.Cancel) (*order.CancelBatchResponse, error) {
-	return nil, common.ErrNotYetImplemented
+	return nil, common.ErrFunctionNotSupported
 }
 
 // CancelAllOrders cancels all orders associated with a currency pair
@@ -452,7 +452,7 @@ func (ap *Apexpro) CancelAllOrders(ctx context.Context, orderCancellation *order
 	if err != nil {
 		return order.CancelAllResponse{}, err
 	}
-	return order.CancelAllResponse{}, common.ErrNotYetImplemented
+	return order.CancelAllResponse{Status: map[string]string{orderCancellation.OrderID: "success"}}, nil
 }
 
 // GetOrderInfo returns order information based on order ID

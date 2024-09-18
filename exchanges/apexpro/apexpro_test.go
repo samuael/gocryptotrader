@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/common"
-	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/margin"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
+	testexch "github.com/thrasher-corp/gocryptotrader/internal/testing/exchange"
 )
 
 // Please supply your own keys here to do authenticated endpoint testing
@@ -37,32 +37,17 @@ const (
 var ap = &Apexpro{}
 
 func TestMain(m *testing.M) {
-	ap.SetDefaults()
-	cfg := config.GetConfig()
-	err := cfg.LoadConfig("../../testdata/configtest.json", true)
-	if err != nil {
+	ap = new(Apexpro)
+	if err := testexch.Setup(ap); err != nil {
 		log.Fatal(err)
 	}
 
-	exchCfg, err := cfg.GetExchangeConfig("Apexpro")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	exchCfg.API.AuthenticatedSupport = true
-	exchCfg.API.AuthenticatedWebsocketSupport = true
-	exchCfg.API.Credentials.Key = apiKey
-	exchCfg.API.Credentials.Secret = apiSecret
-	exchCfg.API.Credentials.ClientID = clientID
-
-	exchCfg.API.Credentials.L2Key = starkKey
-	exchCfg.API.Credentials.L2Secret = starkSecret
-	exchCfg.API.Credentials.L2KeyYCoordinate = starkKeyYCoordinate
-	exchCfg.API.Credentials.Subaccount = ethereumAddress
-
-	err = ap.Setup(exchCfg)
-	if err != nil {
-		log.Fatal(err)
+	if apiKey != "" && apiSecret != "" && clientID != "" {
+		ap.API.AuthenticatedSupport = true
+		ap.API.AuthenticatedWebsocketSupport = true
+		ap.API.CredentialsValidator.RequiresBase64DecodeSecret = false
+		ap.SetCredentials(apiKey, apiSecret, clientID, ethereumAddress, "", "", starkKey, starkSecret, starkKeyYCoordinate)
+		ap.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	}
 	if err := ap.UpdateTradablePairs(context.Background(), true); err != nil {
 		log.Fatal(err)
@@ -150,6 +135,7 @@ func TestGetCandlestickChartDataV3(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetCandlestickChartDataV3(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+
 	result, err := ap.GetCandlestickChartDataV3(context.Background(), "BTC-USDC", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -169,6 +155,7 @@ func TestGetCandlestickChartDataV1(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetCandlestickChartDataV1(context.Background(), "", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+
 	result, err := ap.GetCandlestickChartDataV1(context.Background(), "BTC-USDC", kline.FiveMin, time.Time{}, time.Time{}, 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -198,6 +185,7 @@ func TestGetFundingHistoryRate(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetFundingHistoryRateV3(context.Background(), "", time.Time{}, time.Time{}, 10, 0)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+
 	result, err := ap.GetFundingHistoryRateV3(context.Background(), "BTC-USDC", time.Time{}, time.Time{}, 0, 0)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -207,6 +195,7 @@ func TestGetFundingHistoryRateV2(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetFundingHistoryRateV2(context.Background(), "", time.Time{}, time.Time{}, 10, 0)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+
 	result, err := ap.GetFundingHistoryRateV2(context.Background(), "BTC-USDC", time.Time{}, time.Time{}, 0, 0)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -216,6 +205,7 @@ func TestGetFundingHistoryRateV1(t *testing.T) {
 	t.Parallel()
 	_, err := ap.GetFundingHistoryRateV1(context.Background(), "", time.Time{}, time.Time{}, 10, 0)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+
 	result, err := ap.GetFundingHistoryRateV1(context.Background(), "BTC-USDC", time.Time{}, time.Time{}, 0, 0)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -231,6 +221,9 @@ func TestGetAllConfigDataV2(t *testing.T) {
 func TestGetCheckIfUserExistsV2(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	_, err := ap.GetCheckIfUserExistsV2(context.Background(), "")
+	require.ErrorIs(t, err, errEthereumAddressMissing)
+
 	result, err := ap.GetCheckIfUserExistsV2(context.Background(), "0x0330eBB5e894720e6746070371F9Fd797BE9D074")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -238,6 +231,9 @@ func TestGetCheckIfUserExistsV2(t *testing.T) {
 
 func TestGetCheckIfUserExistsV1(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetCheckIfUserExistsV1(context.Background(), "")
+	require.ErrorIs(t, err, errEthereumAddressMissing)
+
 	result, err := ap.GetCheckIfUserExistsV1(context.Background(), "0x0330eBB5e894720e6746070371F9Fd797BE9D074")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -245,6 +241,13 @@ func TestGetCheckIfUserExistsV1(t *testing.T) {
 
 func TestGenerateNonce(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GenerateNonceV3(context.Background(), "", "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "9")
+	require.ErrorIs(t, err, errL2KeyMissing)
+	_, err = ap.GenerateNonceV3(context.Background(), "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505", "", "9")
+	require.ErrorIs(t, err, errEthereumAddressMissing)
+	_, err = ap.GenerateNonceV3(context.Background(), "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505", "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "")
+	require.ErrorIs(t, err, errChainIDMissing)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GenerateNonceV3(context.Background(), starkKey, ethereumAddress, "9")
 	require.NoError(t, err)
@@ -253,6 +256,13 @@ func TestGenerateNonce(t *testing.T) {
 
 func TestGenerateNonceV2(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GenerateNonceV2(context.Background(), "", "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "9")
+	require.ErrorIs(t, err, errL2KeyMissing)
+	_, err = ap.GenerateNonceV2(context.Background(), "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505", "", "9")
+	require.ErrorIs(t, err, errEthereumAddressMissing)
+	_, err = ap.GenerateNonceV2(context.Background(), "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505", "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "")
+	require.ErrorIs(t, err, errChainIDMissing)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GenerateNonceV2(context.Background(), starkKey, ethereumAddress, "9")
 	require.NoError(t, err)
@@ -261,6 +271,13 @@ func TestGenerateNonceV2(t *testing.T) {
 
 func TestGenerateNonceV1(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GenerateNonceV1(context.Background(), "", "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "9")
+	require.ErrorIs(t, err, errL2KeyMissing)
+	_, err = ap.GenerateNonceV1(context.Background(), "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505", "", "9")
+	require.ErrorIs(t, err, errEthereumAddressMissing)
+	_, err = ap.GenerateNonceV1(context.Background(), "0x06c98993ca62f5e71dbe721f743045eff7475711b359681cd64364a60e677505", "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "")
+	require.ErrorIs(t, err, errChainIDMissing)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GenerateNonceV1(context.Background(), starkKey, ethereumAddress, "9")
 	require.NoError(t, err)
@@ -455,6 +472,11 @@ func TestGetAssetWithdrawalAndTransferLimitV1(t *testing.T) {
 
 func TestGetUserDepositWithdrawData(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetUserTransferData(context.Background(), 0, 10, "", "DEPOSIT", "", "", time.Time{}, time.Now(), []string{"1"})
+	require.ErrorIs(t, err, errInvalidTimestamp)
+	_, err = ap.GetUserTransferData(context.Background(), 0, 10, "", "DEPOSIT", "", "", time.Now().Add(time.Hour*30), time.Time{}, []string{"1"})
+	require.ErrorIs(t, err, errInvalidTimestamp)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetUserTransferData(context.Background(), 0, 10, "", "DEPOSIT", "", "", time.Now().Add(time.Hour*30), time.Now(), []string{"1"})
 	require.NoError(t, err)
@@ -471,6 +493,9 @@ func TestGetWithdrawalFees(t *testing.T) {
 
 func TestGetContractAccountTransferLimits(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetContractAccountTransferLimits(context.Background(), currency.EMPTYCODE)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetContractAccountTransferLimits(context.Background(), currency.USDT)
 	require.NoError(t, err)
@@ -487,8 +512,11 @@ func TestGetTradeHistory(t *testing.T) {
 
 func TestGetTradeHistoryV2(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetTradeHistoryV2(context.Background(), "BTC-USD", order.Sell.String(), "LIMIT", currency.EMPTYCODE, time.Time{}, time.Time{}, 0, 10)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	result, err := ap.GetTradeHistoryV2(context.Background(), "BTC-USD", order.Sell.String(), "LIMIT", currency.USDT, time.Time{}, time.Time{}, 0, 10)
+	result, err := ap.GetTradeHistoryV2(context.Background(), "BTC-USD", order.Sell.String(), "LIMIT", currency.USDC, time.Time{}, time.Time{}, 0, 10)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -513,6 +541,13 @@ func TestGetWorstPrice(t *testing.T) {
 
 func TestGetWorstPriceV3(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetWorstPriceV3(context.Background(), "", "SELL", 1)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	_, err = ap.GetWorstPriceV3(context.Background(), "BTC-USDC", "", 1)
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	_, err = ap.GetWorstPriceV3(context.Background(), "BTC-USDC", "SELL", 0)
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetWorstPriceV3(context.Background(), "BTC-USDC", "SELL", 1)
 	require.NoError(t, err)
@@ -521,6 +556,13 @@ func TestGetWorstPriceV3(t *testing.T) {
 
 func TestGetWorstPriceV2(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetWorstPriceV2(context.Background(), "", "SELL", 1)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	_, err = ap.GetWorstPriceV2(context.Background(), "BTC-USDC", "", 1)
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	_, err = ap.GetWorstPriceV2(context.Background(), "BTC-USDC", "SELL", 0)
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetWorstPriceV2(context.Background(), "BTC-USDC", "SELL", 1)
 	require.NoError(t, err)
@@ -529,6 +571,13 @@ func TestGetWorstPriceV2(t *testing.T) {
 
 func TestGetWorstPriceV1(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetWorstPriceV2(context.Background(), "", "SELL", 1)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	_, err = ap.GetWorstPriceV2(context.Background(), "BTC-USDC", "", 1)
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	_, err = ap.GetWorstPriceV2(context.Background(), "BTC-USDC", "SELL", 0)
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetWorstPriceV1(context.Background(), "BTC-USDC", "SELL", 1)
 	require.NoError(t, err)
@@ -564,6 +613,9 @@ func TestCreateOrder(t *testing.T) {
 
 func TestCancelPerpOrder(t *testing.T) {
 	t.Parallel()
+	_, err := ap.CancelPerpOrder(context.Background(), 0)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.CancelPerpOrder(context.Background(), 123231)
 	require.NoError(t, err)
@@ -572,6 +624,9 @@ func TestCancelPerpOrder(t *testing.T) {
 
 func TestCancelPerpOrderByClientOrderID(t *testing.T) {
 	t.Parallel()
+	_, err := ap.CancelPerpOrderByClientOrderID(context.Background(), 0)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.CancelPerpOrderByClientOrderID(context.Background(), 2312312)
 	require.NoError(t, err)
@@ -587,6 +642,9 @@ func TestCancelAllOpenOrdersV3(t *testing.T) {
 
 func TestCancelPerpOrderV2(t *testing.T) {
 	t.Parallel()
+	_, err := ap.CancelPerpOrderV2(context.Background(), "", currency.USDT)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.CancelPerpOrderV2(context.Background(), "123231", currency.USDT)
 	require.NoError(t, err)
@@ -663,6 +721,11 @@ func TestGetSingleOrderV2(t *testing.T) {
 
 func TestGetSingleOrderByOrderIDV2(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetSingleOrderByOrderIDV2(context.Background(), "", currency.USDT)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+	_, err = ap.GetSingleOrderByOrderIDV2(context.Background(), "231232341", currency.EMPTYCODE)
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetSingleOrderByOrderIDV2(context.Background(), "231232341", currency.USDT)
 	require.NoError(t, err)
@@ -684,6 +747,9 @@ func TestGetSingleOrderByClientOrderIDV2(t *testing.T) {
 
 func TestGetSingleOrderByOrderIDV1(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetSingleOrderByOrderIDV1(context.Background(), "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetSingleOrderByOrderIDV1(context.Background(), "231232341")
 	require.NoError(t, err)
@@ -842,27 +908,75 @@ func TestGetHistoricalAssetValueV2(t *testing.T) {
 
 func TestSetInitialMarginRateInfo(t *testing.T) {
 	t.Parallel()
+	err := ap.SetInitialMarginRateInfo(context.Background(), "", 200)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	err = ap.SetInitialMarginRateInfo(context.Background(), "BTC-USDC", 0)
+	require.ErrorIs(t, err, errInitialMarginRateRequired)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	err := ap.SetInitialMarginRateInfo(context.Background(), "BTC-USDC", 200)
+	err = ap.SetInitialMarginRateInfo(context.Background(), "BTC-USDC", 200)
 	assert.NoError(t, err)
 }
 
 func TestSetInitialMarginRateInfoV1(t *testing.T) {
 	t.Parallel()
+	err := ap.SetInitialMarginRateInfoV1(context.Background(), "", 200)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	err = ap.SetInitialMarginRateInfoV1(context.Background(), "BTC-USDC", 0)
+	require.ErrorIs(t, err, errInitialMarginRateRequired)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	err := ap.SetInitialMarginRateInfoV1(context.Background(), "BTC-USDC", 200)
+	err = ap.SetInitialMarginRateInfoV1(context.Background(), "BTC-USDC", 200)
 	assert.NoError(t, err)
 }
 
 func TestSetInitialMarginRateInfoV2(t *testing.T) {
 	t.Parallel()
+	err := ap.SetInitialMarginRateInfoV2(context.Background(), "", 200)
+	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
+	err = ap.SetInitialMarginRateInfoV2(context.Background(), "BTC-USDC", 0)
+	require.ErrorIs(t, err, errInitialMarginRateRequired)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-	err := ap.SetInitialMarginRateInfoV2(context.Background(), "BTC-USDC", 200)
+	err = ap.SetInitialMarginRateInfoV2(context.Background(), "BTC-USDC", 200)
 	assert.NoError(t, err)
 }
 
 func TestWithdrawAsset(t *testing.T) {
 	t.Parallel()
+	_, err := ap.WithdrawAsset(context.Background(), &AssetWithdrawalParams{
+		ClientWithdrawID: "123123",
+		Timestamp:        time.Now(),
+		EthereumAddress:  ethereumAddress,
+		L2Key:            starkKey,
+		ToChainID:        "3",
+		L2SourceTokenID:  currency.USDC,
+		L1TargetTokenID:  currency.USDC,
+		IsFastWithdraw:   false})
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+
+	_, err = ap.WithdrawAsset(context.Background(), &AssetWithdrawalParams{
+		Amount:          1,
+		Timestamp:       time.Now(),
+		EthereumAddress: ethereumAddress,
+		L2Key:           starkKey,
+		ToChainID:       "3",
+		L2SourceTokenID: currency.USDC,
+		L1TargetTokenID: currency.USDC,
+		IsFastWithdraw:  false})
+	require.ErrorIs(t, err, order.ErrClientOrderIDMustBeSet)
+
+	_, err = ap.WithdrawAsset(context.Background(), &AssetWithdrawalParams{
+		Amount:           1,
+		ClientWithdrawID: "123123",
+		EthereumAddress:  ethereumAddress,
+		L2Key:            starkKey,
+		ToChainID:        "3",
+		L2SourceTokenID:  currency.USDC,
+		L1TargetTokenID:  currency.USDC,
+		IsFastWithdraw:   false})
+	require.ErrorIs(t, err, errInvalidTimestamp)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.WithdrawAsset(context.Background(), &AssetWithdrawalParams{
 		Amount:           1,
@@ -883,10 +997,11 @@ func TestUserWithdrawalV2(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.UserWithdrawalV2(context.Background(),
-		1000,
-		"1231231",
-		time.Time{},
-		currency.USDC)
+		&WithdrawalParams{
+			Amount:          1,
+			Asset:           currency.USDC,
+			EthereumAddress: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
+		})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -900,11 +1015,6 @@ func TestWithdrawalToAddressV2(t *testing.T) {
 	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
 		Amount: .1,
 	})
-	require.ErrorIs(t, err, order.ErrClientOrderIDMustBeSet)
-	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
-		Amount:        .1,
-		ClientOrderID: "1234",
-	})
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 	_, err = ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
 		Amount:        1,
@@ -916,9 +1026,8 @@ func TestWithdrawalToAddressV2(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.WithdrawalToAddressV2(context.Background(), &WithdrawalToAddressParams{
 		Amount:          1,
-		ClientOrderID:   "12334",
-		Asset:           currency.BTC,
-		EthereumAddress: ethereumAddress,
+		Asset:           currency.USDC,
+		EthereumAddress: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -929,9 +1038,8 @@ func TestWithdrawalToAddressV1(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.WithdrawalToAddressV1(context.Background(), &WithdrawalToAddressParams{
 		Amount:          1,
-		ClientOrderID:   "12334",
-		Asset:           currency.BTC,
-		EthereumAddress: ethereumAddress,
+		Asset:           currency.USDC,
+		EthereumAddress: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -1196,6 +1304,9 @@ func TestCancelAllOrders(t *testing.T) {
 
 func TestGetOrderInfo(t *testing.T) {
 	t.Parallel()
+	_, err := ap.GetOrderInfo(context.Background(), "", currency.EMPTYPAIR, asset.Futures)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	result, err := ap.GetOrderInfo(context.Background(), "614463889001677573", currency.EMPTYPAIR, asset.Futures)
 	require.NoError(t, err)
@@ -1220,30 +1331,3 @@ func TestWsConnect(t *testing.T) {
 	err := ap.WsConnect()
 	require.NoError(t, err)
 }
-
-var data = `{
-    "amount_collateral": "4000000",
-    "amount_fee": "4000",
-    "amount_synthetic": "1000000",
-    "asset_id_collateral": "0xa21edc9d9997b1b1956f542fe95922518a9e28ace11b7b2972a1974bf5971f",
-    "asset_id_synthetic": "0x0",
-    "expiration_timestamp": "1100000",
-    "is_buying_synthetic": false,
-    "nonce": "1001",
-    "order_type": "LIMIT_ORDER_WITH_FEES",
-    "position_id": "10000",
-    "public_key": "0xf8c6635f9cfe85f46759dc2eebe71a45b765687e35dbe5e74e8bde347813ef",
-    "signature": {
-        "r": "0x07a15838aad9b20368dc4ba27613fd35ceec3b34be7a2cb913bca0fb06e98107",
-        "s": "0x05007f40fddd9babae0c7362d3b4e9c152ed3fced7fe78435b302d825489298f"
-    }
-}`
-
-// func TestRegistrationAndOnboarding(t *testing.T) {
-// 	t.Parallel()
-// 	// sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
-// 	ap.Verbose = true
-// 	result, err := ap.RegistrationAndOnboarding(context.Background(), starkKey, starkKeyYCoordinate, "0x0330eBB5e894720e6746070371F9Fd797BE9D074", "", "")
-// 	require.NoError(t, err)
-// 	assert.NotNil(t, result)
-// }

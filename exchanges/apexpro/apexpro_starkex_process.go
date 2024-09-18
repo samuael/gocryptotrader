@@ -344,13 +344,14 @@ func (ap *Apexpro) ProcessWithdrawalSignature(ctx context.Context, arg *Withdraw
 		expEpoch = int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000)))
 		arg.ExpEpoch = expEpoch * 3600 * 1000
 	}
-	r, s, err := ap.StarkConfig.Sign(&starkex.WithdrawalParams{
+	newArg := &starkex.WithdrawalParams{
 		AssetIDCollateral:    collateralAssetID,
 		PositionID:           positionID,
 		Amount:               amount.Mul(collateralResolution).BigInt(),
 		Nonce:                nonceFromClientID(arg.ClientID),
 		ExpirationEpochHours: big.NewInt(expEpoch),
-	}, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
+	}
+	r, s, err := ap.StarkConfig.Sign(newArg, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
 	if err != nil {
 		return "", err
 	}
@@ -441,7 +442,7 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		if err != nil {
 			return "", err
 		}
-	}
+	} 
 	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 0)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
