@@ -533,57 +533,69 @@ type V1CurrencyConfig struct {
 // AllSymbolsV1Config represents a configuration information
 type AllSymbolsV1Config struct {
 	Data struct {
-		Currency []V1CurrencyConfig `json:"currency"`
-		Global   struct {
-			FeeAccountID                    string       `json:"feeAccountId"`
-			FeeAccountL2Key                 string       `json:"feeAccountL2Key"`
-			StarkExCollateralCurrencyID     string       `json:"starkExCollateralCurrencyId"`
-			StarkExFundingValidityPeriod    int64        `json:"starkExFundingValidityPeriod"`
-			StarkExMaxFundingRate           types.Number `json:"starkExMaxFundingRate"`
-			StarkExOrdersTreeHeight         int64        `json:"starkExOrdersTreeHeight"`
-			StarkExPositionsTreeHeight      int64        `json:"starkExPositionsTreeHeight"`
-			StarkExPriceValidityPeriod      int64        `json:"starkExPriceValidityPeriod"`
-			StarkExContractAddress          string       `json:"starkExContractAddress"`
-			RegisterEnvID                   int64        `json:"registerEnvId"`
-			CrossChainAccountID             string       `json:"crossChainAccountId"`
-			CrossChainL2Key                 string       `json:"crossChainL2Key"`
-			FastWithdrawAccountID           string       `json:"fastWithdrawAccountId"`
-			FastWithdrawFactRegisterAddress string       `json:"fastWithdrawFactRegisterAddress"`
-			FastWithdrawL2Key               string       `json:"fastWithdrawL2Key"`
-			FastWithdrawMaxAmount           string       `json:"fastWithdrawMaxAmount"`
-		} `json:"global"`
+		Currency          []V1CurrencyConfig        `json:"currency"`
+		Global            GlobalConfig              `json:"global"`
 		PerpetualContract []PerpetualContractDetail `json:"perpetualContract"`
-		MultiChain        struct {
-			Chains []struct {
-				Chain             string       `json:"chain"`
-				ChainID           int64        `json:"chainId"`
-				ChainIconURL      string       `json:"chainIconUrl"`
-				ContractAddress   string       `json:"contractAddress"`
-				DepositGasFeeLess bool         `json:"depositGasFeeLess"`
-				FeeLess           bool         `json:"feeLess"`
-				FeeRate           types.Number `json:"feeRate"`
-				GasLess           bool         `json:"gasLess"`
-				GasToken          string       `json:"gasToken"`
-				MinFee            string       `json:"minFee"`
-				RPCURL            string       `json:"rpcUrl"`
-				WebTxURL          string       `json:"webTxUrl"`
-				TxConfirm         int64        `json:"txConfirm"`
-				Tokens            []struct {
-					Decimals     int64  `json:"decimals"`
-					IconURL      string `json:"iconUrl"`
-					Token        string `json:"token"`
-					TokenAddress string `json:"tokenAddress"`
-					PullOff      bool   `json:"pullOff"`
-				} `json:"tokens"`
-				WithdrawGasFeeLess bool `json:"withdrawGasFeeLess"`
-			} `json:"chains"`
-			Currency    string       `json:"currency"`
-			MaxWithdraw types.Number `json:"maxWithdraw"`
-			MinDeposit  types.Number `json:"minDeposit"`
-			MinWithdraw types.Number `json:"minWithdraw"`
-		} `json:"multiChain"`
+		MultiChain        MultiChainDetails         `json:"multiChain"`
 	} `json:"data"`
 	TimeCost int64 `json:"timeCost"`
+}
+
+// MultiChainDetails holds details about chains and summary information
+type MultiChainDetails struct {
+	Chains      []ChainInfo  `json:"chains"`
+	Currency    string       `json:"currency"`
+	MaxWithdraw types.Number `json:"maxWithdraw"`
+	MinDeposit  types.Number `json:"minDeposit"`
+	MinWithdraw types.Number `json:"minWithdraw"`
+}
+
+// GlobalConfig represents a global configuration details.
+type GlobalConfig struct {
+	FeeAccountID                    string       `json:"feeAccountId"`
+	FeeAccountL2Key                 string       `json:"feeAccountL2Key"`
+	StarkExCollateralCurrencyID     string       `json:"starkExCollateralCurrencyId"`
+	StarkExFundingValidityPeriod    int64        `json:"starkExFundingValidityPeriod"`
+	StarkExMaxFundingRate           types.Number `json:"starkExMaxFundingRate"`
+	StarkExOrdersTreeHeight         int64        `json:"starkExOrdersTreeHeight"`
+	StarkExPositionsTreeHeight      int64        `json:"starkExPositionsTreeHeight"`
+	StarkExPriceValidityPeriod      int64        `json:"starkExPriceValidityPeriod"`
+	StarkExContractAddress          string       `json:"starkExContractAddress"`
+	RegisterEnvID                   int64        `json:"registerEnvId"`
+	CrossChainAccountID             string       `json:"crossChainAccountId"`
+	CrossChainL2Key                 string       `json:"crossChainL2Key"`
+	FastWithdrawAccountID           string       `json:"fastWithdrawAccountId"`
+	FastWithdrawFactRegisterAddress string       `json:"fastWithdrawFactRegisterAddress"`
+	FastWithdrawL2Key               string       `json:"fastWithdrawL2Key"`
+	FastWithdrawMaxAmount           string       `json:"fastWithdrawMaxAmount"`
+}
+
+// ChainInfo represents a chain information
+type ChainInfo struct {
+	Chain              string       `json:"chain"`
+	ChainID            int64        `json:"chainId"`
+	ChainIconURL       string       `json:"chainIconUrl"`
+	ContractAddress    string       `json:"contractAddress"`
+	DepositGasFeeLess  bool         `json:"depositGasFeeLess"`
+	FeeLess            bool         `json:"feeLess"`
+	FeeRate            types.Number `json:"feeRate"`
+	GasLess            bool         `json:"gasLess"`
+	GasToken           string       `json:"gasToken"`
+	MinFee             types.Number `json:"minFee"`
+	RPCURL             string       `json:"rpcUrl"`
+	WebTxURL           string       `json:"webTxUrl"`
+	TransactionConfirm int64        `json:"txConfirm"`
+	Tokens             []TokenInfo  `json:"tokens"`
+	WithdrawGasFeeLess bool         `json:"withdrawGasFeeLess"`
+}
+
+// TokenInfo represents a token info detail
+type TokenInfo struct {
+	Decimals     int64  `json:"decimals"`
+	IconURL      string `json:"iconUrl"`
+	Token        string `json:"token"`
+	TokenAddress string `json:"tokenAddress"`
+	PullOff      bool   `json:"pullOff"`
 }
 
 // PerpetualContractDetail represents a perpetual contract detail.
@@ -875,10 +887,10 @@ type UserDataResponse struct {
 
 // UserAccountV2 represents a V2 user account detail.
 type UserAccountV2 struct {
+	ID              string `json:"id"`
 	StarkKey        string `json:"starkKey"`
 	PositionID      string `json:"positionId"`
 	EthereumAddress string `json:"ethereumAddress"`
-	ID              string `json:"id"`
 	ExperienceMoney []struct {
 		AvailableAmount types.Number `json:"availableAmount"`
 		TotalNumber     types.Number `json:"totalNumber"`
@@ -1367,6 +1379,7 @@ type FastWithdrawalParams struct {
 	ChainID      string        `json:"fee"`
 	Fees         float64       `json:"chainId"`
 	IPAccountID  string        `json:"lpAccountId,omitempty"`
+	Signature    string        `json:"signature"`
 }
 
 // WsInput represents a websocket input data

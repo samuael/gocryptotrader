@@ -31,7 +31,7 @@ const (
 
 	ethereumAddress = ""
 
-	canManipulateRealOrders = false
+	canManipulateRealOrders = true
 )
 
 var ap = &Apexpro{}
@@ -1150,13 +1150,10 @@ func TestFastWithdrawalV1(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.FastWithdrawalV1(context.Background(), &FastWithdrawalParams{
-		Amount:       1,
-		ClientID:     "123213",
-		Expiration:   time.Now().Add(time.Hour * 45).UnixMilli(),
-		Asset:        currency.USDC,
-		ERC20Address: "0x0330eBB5e894720e6746070371F9Fd797BE9D074",
-		ChainID:      "56",
-		Fees:         0,
+		Amount:  1,
+		Asset:   currency.USDC,
+		ChainID: "1",
+		Fees:    0,
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, result)

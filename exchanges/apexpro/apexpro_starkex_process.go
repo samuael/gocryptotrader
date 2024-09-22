@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/internal/utils/hash/solsha3"
 	"github.com/thrasher-corp/gocryptotrader/internal/utils/starkex"
 )
 
@@ -21,6 +24,7 @@ var (
 	errSettlementCurrencyInfoNotFound = errors.New("settlement currency information not found")
 	errInvalidAssetID                 = errors.New("invalid asset ID provided")
 	errInvalidPositionIDMissing       = errors.New("invalid position or account ID")
+	errTokenDetailIsMissing           = errors.New("token detail is missing")
 )
 
 const ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS = 24 * 7 // Seven days.
@@ -136,7 +140,7 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 		QuantumAmountFee:        limitFeeRounded.Mul(quantumsAmountCollateral).RoundUp(0).BigInt(),
 		IsBuyingSynthetic:       isBuy,
 		PositionID:              positionID,
-		Nonce:                   nonceFromClientID(arg.ClientOrderID), //nonceVal,
+		Nonce:                   nonceFromClientID(arg.ClientOrderID),
 		ExpirationEpochHours:    big.NewInt(expEpoch),
 	}
 	r, s, err := ap.StarkConfig.Sign(newArg, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
@@ -212,11 +216,6 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 	}
 	amount := decimal.NewFromFloat(arg.Amount)
 
-	// expEpoch := int64(float64(arg.ExpirationTime) / float64(3600*1000))
-	// if arg. == 0 {
-	// 	expEpoch = int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000)))
-	// 	arg.ExpirationTime = expEpoch * 3600 * 1000
-	// }
 	r, s, err := ap.StarkConfig.Sign(&starkex.WithdrawalToAddressParams{
 		AssetIDCollateral:    collateralAssetID,
 		EthAddress:           ethereumAddress,
@@ -427,6 +426,13 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 	if err != nil {
 		return "", err
 	}
+	// check if the all symbols config is loaded, if not load
+	if ap.SymbolsConfig == nil {
+		ap.SymbolsConfig, err = ap.GetAllSymbolsConfigDataV1(ctx)
+		if err != nil {
+			return "", err
+		}
+	}
 	var currencyInfo *V1CurrencyConfig
 	for c := range ap.SymbolsConfig.Data.Currency {
 		if ap.SymbolsConfig.Data.Currency[c].ID == arg.Asset.String() {
@@ -442,12 +448,12 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		if err != nil {
 			return "", err
 		}
-	} 
-	collateralAssetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 0)
+	}
+	assetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 0)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
 	}
-	positionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
+	senderPositionID, ok := big.NewInt(0).SetString(ap.UserAccountDetail.PositionID, 0)
 	if !ok {
 		return "", errInvalidPositionIDMissing
 	}
@@ -462,16 +468,103 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		return "", err
 	}
 	amount := decimal.NewFromFloat(arg.Amount)
-	arg.ClientID = randomClientID()
-	r, s, err := ap.StarkConfig.Sign(&starkex.ConditionalTransferParams{
-		AssetID:          collateralAssetID,
-		AssetIDFee:       big.NewInt(0),
-		SenderPositionID: positionID,
-		QuantumsAmount:   amount.Mul(resolution).BigInt(),
-		Nonce:            nonceFromClientID(arg.ClientID),
-	}, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
+	if arg.ClientID == "" {
+		arg.ClientID = randomClientID()
+	}
+	receiverPositionID, ok := big.NewInt(0).SetString(ap.SymbolsConfig.Data.Global.FastWithdrawAccountID, 0)
+	if !ok {
+		return "", fmt.Errorf("%w, invalid fast withdrawal position ID", errInvalidPositionIDMissing)
+	}
+	receiverPublicKey, ok := big.NewInt(0).SetString(ap.SymbolsConfig.Data.Global.FeeAccountL2Key, 0)
+	if !ok {
+		return "", fmt.Errorf("%w, invalid fast withdrawal L2 key", errL2KeyMissing)
+	}
+	fastWithdrawFactRegisterAddress, ok := big.NewInt(0).SetString(ap.SymbolsConfig.Data.Global.FastWithdrawFactRegisterAddress, 0)
+	if !ok {
+		return "", fmt.Errorf("%w, invalid fast withdraw fact register address", errL2KeyMissing)
+	}
+	var token *TokenInfo
+	for k := range ap.SymbolsConfig.Data.MultiChain.Chains {
+		if ap.SymbolsConfig.Data.MultiChain.Chains[k].ChainID == int64(ap.NetworkID) {
+			for t := range ap.SymbolsConfig.Data.MultiChain.Chains[k].Tokens {
+				if ap.SymbolsConfig.Data.MultiChain.Chains[k].Tokens[t].Token == arg.Asset.Upper().String() {
+					token = &ap.SymbolsConfig.Data.MultiChain.Chains[k].Tokens[t]
+				}
+			}
+		}
+	}
+	if token == nil {
+		return "", errTokenDetailIsMissing
+	}
+	fact, err := GetTransferErc20Fact(arg.ERC20Address, int(token.Decimals), strconv.FormatFloat(arg.Amount, 'f', -1, 64),
+		token.TokenAddress, nonceFromClientID(arg.ClientID).String())
+	if err != nil {
+		return "", err
+	}
+	expEpoch := int64(float64(arg.Expiration) / float64(3600*1000))
+	if arg.Expiration == 0 {
+		expEpoch = int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000)))
+		arg.Expiration = expEpoch * 3600 * 1000
+	}
+
+	senderPublicKey, ok := big.NewInt(0).SetString(creds.L2Key, 0)
+	if !ok {
+		return "", errL2KeyMissing
+	}
+
+	newArg := &starkex.ConditionalTransferParams{
+		AssetID:            assetID,
+		AssetIDFee:         big.NewInt(0),
+		MaxAmountFee:       big.NewInt(0),
+		SenderPositionID:   senderPositionID,
+		SenderPublicKey:    senderPublicKey,
+		ReceiverPositionID: receiverPositionID,
+		ReceiverPublicKey:  receiverPublicKey,
+		Condition:          FactToCondition(fastWithdrawFactRegisterAddress.Text(16), fact),
+		QuantumsAmount:     amount.Mul(resolution).BigInt(),
+		Nonce:              nonceFromClientID(arg.ClientID),
+		ExpTimestampHrs:    big.NewInt(expEpoch),
+	}
+
+	r, s, err := ap.StarkConfig.Sign(newArg, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
 	if err != nil {
 		return "", err
 	}
 	return appendSignatures(r, s), nil
+}
+
+// FactToCondition Generate the condition, signed as part of a conditional transfer.
+func FactToCondition(factRegistryAddress string, fact string) *big.Int {
+	data := strings.TrimPrefix(factRegistryAddress, "0x") + fact
+	hexBytes, _ := hex.DecodeString(data)
+	hash := crypto.Keccak256Hash(hexBytes)
+	fst := hash.Big()
+	fst.And(fst, BIT_MASK_250)
+	return fst
+}
+
+// GetTransferErc20Fact get erc20 fact
+// tokenDecimals is COLLATERAL_TOKEN_DECIMALS
+func GetTransferErc20Fact(recipient string, tokenDecimals int, humanAmount, tokenAddress, salt string) (string, error) {
+	fmt.Println("GetTransferErc20Fact", recipient, tokenDecimals, humanAmount, tokenAddress, salt)
+	// token_amount = float(human_amount) * (10 ** token_decimals)
+	amount, err := decimal.NewFromString(humanAmount)
+	if err != nil {
+		return "", err
+	}
+	saltInt, ok := big.NewInt(0).SetString(salt, 0) // with prefix: 0x
+	if !ok {
+		return "", fmt.Errorf("invalid salt: %v,can not parse to big.Int", salt)
+	}
+	tokenAmount := amount.Mul(decimal.New(10, int32(tokenDecimals-1)))
+	fact, err := solsha3.SoliditySHA3(
+		// types
+		[]string{"address", "uint256", "address", "uint256"},
+		// values
+		[]interface{}{recipient, tokenAmount.String(), tokenAddress, saltInt.String()},
+	)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(fact), nil
 }

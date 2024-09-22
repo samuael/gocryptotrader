@@ -39,6 +39,7 @@ type Apexpro struct {
 
 	StarkConfig       *starkex.StarkConfig
 	UserAccountDetail *UserAccountV2
+	NetworkID         int
 }
 
 const (
@@ -688,7 +689,9 @@ func (ap *Apexpro) orderCreationParamsFilter(ctx context.Context, arg *CreateOrd
 	params.Set("type", arg.OrderType)
 	params.Set("size", strconv.FormatFloat(arg.Size, 'f', -1, 64))
 	params.Set("price", strconv.FormatFloat(arg.Price, 'f', -1, 64))
-	params.Set("limitFee", strconv.FormatFloat(arg.LimitFee, 'f', -1, 64))
+	if arg.LimitFee != 0 {
+		params.Set("limitFee", strconv.FormatFloat(arg.LimitFee, 'f', -1, 64))
+	}
 	params.Set("expiration", strconv.FormatInt(arg.ExpirationTime, 10))
 	if arg.TimeInForce != "" {
 		params.Set("timeInForce", arg.TimeInForce)
@@ -746,39 +749,33 @@ func (ap *Apexpro) FastWithdrawalV2(ctx context.Context, arg *FastWithdrawalPara
 	return ap.fastWithdrawal(ctx, arg, "v2/fast-withdraw")
 }
 
-func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) (url.Values, error) {
+func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) error {
 	if *arg == (FastWithdrawalParams{}) {
-		return nil, common.ErrNilPointer
+		return common.ErrNilPointer
 	}
 	if arg.Amount <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return order.ErrAmountBelowMin
 	}
-	if arg.Expiration == 0 {
-		return nil, errExpirationTimeRequired
-	}
+	// if arg.Expiration == 0 {
+	// 	return errExpirationTimeRequired
+	// }
 	if arg.Asset.IsEmpty() {
-		return nil, currency.ErrCurrencyCodeEmpty
+		return currency.ErrCurrencyCodeEmpty
 	}
-	if arg.ERC20Address == "" {
-		return nil, errEthereumAddressMissing
-	}
-	if arg.Fees <= 0 {
-		return nil, errLimitFeeRequired
-	}
+	// if arg.ERC20Address == "" {
+	// 	return nil, errEthereumAddressMissing
+	// }
+	// if arg.Fees <= 0 {
+	// 	return nil, errLimitFeeRequired
+	// }
 	if arg.ChainID == "" {
-		return nil, errChainIDMissing
+		return errChainIDMissing
 	}
-	params := url.Values{}
-	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
-	params.Set("expiration", strconv.FormatInt(arg.Expiration, 10))
-	params.Set("asset", arg.Asset.String())
-	params.Set("fees", strconv.FormatFloat(arg.Fees, 'f', -1, 64))
-	params.Set("chainId", arg.ChainID)
-	return params, nil
+	return nil
 }
 
 func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams, path string) (*WithdrawalResponse, error) {
-	params, err := ap.fillWithdrawalParams(arg)
+	err := ap.fillWithdrawalParams(arg)
 	if err != nil {
 		return nil, err
 	}
@@ -786,9 +783,19 @@ func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams
 	if err != nil {
 		return nil, err
 	}
+	// arg.Signature = signature
+	params := url.Values{}
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+	params.Set("expiration", strconv.FormatInt(arg.Expiration, 10))
+	params.Set("asset", arg.Asset.String())
+	// if arg.Fees != 0 {
+	params.Set("fees", strconv.FormatFloat(arg.Fees, 'f', -1, 64))
+	// }
+	params.Set("chainId", arg.ChainID)
+	params.Set("clientId", arg.ClientID)
 	params.Set("signature", signature)
 	var resp *WithdrawalResponse
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, nil, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, path, request.UnAuth, params, nil, &resp)
 }
 
 func (ap *Apexpro) getWorstPrice(ctx context.Context, symbol, side, path string, amount float64, ePath exchange.URL) (*SymbolWorstPrice, error) {
@@ -1325,11 +1332,11 @@ func (ap *Apexpro) withdrawalToAddress(ctx context.Context, arg *WithdrawalToAdd
 	}
 	params := url.Values{}
 	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
-	params.Set("clientId", arg.ClientOrderID)
-	params.Set("expiration", strconv.FormatInt(arg.ExpEpoch, 10))
 	params.Set("asset", arg.Asset.String())
-	params.Set("signature", signature)
+	params.Set("expiration", strconv.FormatInt(arg.ExpEpoch, 10))
+	params.Set("clientId", arg.ClientOrderID)
 	params.Set("ethAddress", arg.EthereumAddress)
+	params.Set("signature", signature)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, nil, &resp)
 }
@@ -1345,7 +1352,7 @@ func (ap *Apexpro) CrossChainWithdrawalsV2(ctx context.Context, arg *FastWithdra
 }
 
 func (ap *Apexpro) crossChainWithdrawals(ctx context.Context, arg *FastWithdrawalParams, path string) (*WithdrawalResponse, error) {
-	params, err := ap.fillWithdrawalParams(arg)
+	err := ap.fillWithdrawalParams(arg)
 	if err != nil {
 		return nil, err
 	}
@@ -1354,6 +1361,12 @@ func (ap *Apexpro) crossChainWithdrawals(ctx context.Context, arg *FastWithdrawa
 	if err != nil {
 		return nil, err
 	}
+	params := url.Values{}
+	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
+	params.Set("expiration", strconv.FormatInt(arg.Expiration, 10))
+	params.Set("asset", arg.Asset.String())
+	params.Set("fees", strconv.FormatFloat(arg.Fees, 'f', -1, 64))
+	params.Set("chainId", arg.ChainID)
 	params.Set("signature", signature)
 	var resp *WithdrawalResponse
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, nil, &resp)

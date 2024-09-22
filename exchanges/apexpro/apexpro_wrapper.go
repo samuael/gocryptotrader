@@ -69,6 +69,7 @@ func (ap *Apexpro) SetDefaults() {
 			AutoPairUpdates: true,
 		},
 	}
+
 	ap.Requester, err = request.New(ap.Name,
 		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
 	if err != nil {
@@ -87,6 +88,7 @@ func (ap *Apexpro) SetDefaults() {
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
+	ap.NetworkID = 1 // 1 for Main Net
 	ap.Websocket = stream.NewWebsocket()
 	ap.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
 	ap.WebsocketResponseCheckTimeout = exchange.DefaultWebsocketResponseCheckTimeout
@@ -154,6 +156,11 @@ func (ap *Apexpro) FetchTradablePairs(ctx context.Context, a asset.Item) (curren
 	}
 	// Storing the configuration values for later use.
 	ap.SymbolsConfig = configs
+
+	for a := range ap.SymbolsConfig.Data.MultiChain.Chains {
+		println("\nap.SymbolsConfig.Data.MultiChain.Chains[0].ChainID: ", ap.SymbolsConfig.Data.MultiChain.Chains[a].ChainID)
+		println("\nap.SymbolsConfig.Data.MultiChain.Chains[0].Chain: ", ap.SymbolsConfig.Data.MultiChain.Chains[a].Chain)
+	}
 
 	tradablePairs := make(currency.Pairs, 0, len((configs.Data.PerpetualContract)))
 	for a := range configs.Data.PerpetualContract {
