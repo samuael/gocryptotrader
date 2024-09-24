@@ -157,11 +157,6 @@ func (ap *Apexpro) FetchTradablePairs(ctx context.Context, a asset.Item) (curren
 	// Storing the configuration values for later use.
 	ap.SymbolsConfig = configs
 
-	for a := range ap.SymbolsConfig.Data.MultiChain.Chains {
-		println("\nap.SymbolsConfig.Data.MultiChain.Chains[0].ChainID: ", ap.SymbolsConfig.Data.MultiChain.Chains[a].ChainID)
-		println("\nap.SymbolsConfig.Data.MultiChain.Chains[0].Chain: ", ap.SymbolsConfig.Data.MultiChain.Chains[a].Chain)
-	}
-
 	tradablePairs := make(currency.Pairs, 0, len((configs.Data.PerpetualContract)))
 	for a := range configs.Data.PerpetualContract {
 		if !configs.Data.PerpetualContract[a].EnableTrade {
@@ -216,7 +211,7 @@ func (ap *Apexpro) UpdateTicker(ctx context.Context, p currency.Pair, assetType 
 }
 
 // UpdateTickers updates all currency pairs of a given asset type
-func (ap *Apexpro) UpdateTickers(ctx context.Context, assetType asset.Item) error {
+func (ap *Apexpro) UpdateTickers(_ context.Context, _ asset.Item) error {
 	return common.ErrFunctionNotSupported
 }
 
@@ -336,22 +331,22 @@ func (ap *Apexpro) GetAccountFundingHistory(ctx context.Context) ([]exchange.Fun
 }
 
 // GetWithdrawalsHistory returns previous withdrawals data
-func (ap *Apexpro) GetWithdrawalsHistory(ctx context.Context, c currency.Code, a asset.Item) ([]exchange.WithdrawalHistory, error) {
+func (ap *Apexpro) GetWithdrawalsHistory(ctx context.Context, _ currency.Code, _ asset.Item) ([]exchange.WithdrawalHistory, error) {
 	withdrawals, err := ap.GetUserTransferDataV2(ctx, currency.EMPTYCODE, time.Time{}, time.Time{}, "WITHDRAW", []string{}, 0, 0)
 	if err != nil {
 		return nil, err
 	}
 	resp := make([]exchange.WithdrawalHistory, len(withdrawals.Transfers))
 	for x := range withdrawals.Transfers {
-		resp = append(resp, exchange.WithdrawalHistory{
-			Status:       resp[x].Status,
+		resp[x] = exchange.WithdrawalHistory{
+			Status:       withdrawals.Transfers[x].Status,
 			Timestamp:    withdrawals.Transfers[x].UpdatedTime.Time(),
 			Currency:     withdrawals.Transfers[x].CurrencyID,
 			Amount:       withdrawals.Transfers[x].Amount.Float64(),
 			TransferType: withdrawals.Transfers[x].Type,
 			CryptoTxID:   withdrawals.Transfers[x].ID,
 			Fee:          withdrawals.Transfers[x].Fee.Float64(),
-		})
+		}
 	}
 	return resp, nil
 }
@@ -376,7 +371,7 @@ func (ap *Apexpro) GetRecentTrades(ctx context.Context, p currency.Pair, assetTy
 		if err != nil {
 			return nil, err
 		}
-		resp = append(resp, trade.Data{
+		resp[i] = trade.Data{
 			Exchange:     ap.Name,
 			CurrencyPair: p.Format(pairFormat),
 			AssetType:    asset.Futures,
@@ -384,14 +379,14 @@ func (ap *Apexpro) GetRecentTrades(ctx context.Context, p currency.Pair, assetTy
 			Amount:       tradeData[i].Volume.Float64(),
 			Timestamp:    tradeData[i].TradeTime.Time(),
 			Side:         side,
-		})
+		}
 	}
 	return resp, nil
 }
 
 // GetHistoricTrades returns historic trade data within the timeframe provided
-func (ap *Apexpro) GetHistoricTrades(ctx context.Context, p currency.Pair, assetType asset.Item, timestampStart, timestampEnd time.Time) ([]trade.Data, error) {
-	return nil, common.ErrNotYetImplemented
+func (ap *Apexpro) GetHistoricTrades(_ context.Context, _ currency.Pair, _ asset.Item, _, _ time.Time) ([]trade.Data, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetServerTime returns the current exchange server time.
@@ -418,26 +413,15 @@ func (ap *Apexpro) SubmitOrder(_ context.Context, s *order.Submit) (*order.Submi
 
 // ModifyOrder will allow of changing orderbook placement and limit to
 // market conversion
-func (ap *Apexpro) ModifyOrder(_ context.Context, action *order.Modify) (*order.ModifyResponse, error) {
-	if err := action.Validate(); err != nil {
-		return nil, err
-	}
-	// When an order has been modified you can use this helpful constructor to
-	// return. Please add any additional order details to the
-	// order.ModifyResponse if you think they are applicable.
-	// resp, err := action.DeriveModifyResponse()
-	// if err != nil {
-	// 	return nil, nil
-	// }
-	// resp.OrderID = maybeANewOrderID // e.g. If this is supplied by the exchanges API.
-	return nil, common.ErrNotYetImplemented
+func (ap *Apexpro) ModifyOrder(_ context.Context, _ *order.Modify) (*order.ModifyResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // CancelOrder cancels an order by its corresponding ID number
-func (ap *Apexpro) CancelOrder(_ context.Context, _ *order.Cancel) error {
-	// if err := ord.Validate(ord.StandardCancel()); err != nil {
-	//	 return err
-	// }
+func (ap *Apexpro) CancelOrder(_ context.Context, ord *order.Cancel) error {
+	if err := ord.Validate(ord.StandardCancel()); err != nil {
+		return err
+	}
 	return common.ErrNotYetImplemented
 }
 
@@ -513,7 +497,7 @@ func (ap *Apexpro) GetOrderInfo(ctx context.Context, orderID string, _ currency.
 }
 
 // GetDepositAddress returns a deposit address for a specified currency
-func (ap *Apexpro) GetDepositAddress(ctx context.Context, c currency.Code, accountID, chain string) (*deposit.Address, error) {
+func (ap *Apexpro) GetDepositAddress(_ context.Context, _ currency.Code, _, _ string) (*deposit.Address, error) {
 	return nil, common.ErrFunctionNotSupported
 }
 
@@ -523,12 +507,19 @@ func (ap *Apexpro) WithdrawCryptocurrencyFunds(ctx context.Context, withdrawRequ
 	if err := withdrawRequest.Validate(); err != nil {
 		return nil, err
 	}
-	ap.WithdrawAsset(ctx, &AssetWithdrawalParams{
+	withdrawalResponse, err := ap.WithdrawAsset(ctx, &AssetWithdrawalParams{
 		Amount:           withdrawRequest.Amount,
 		ClientWithdrawID: withdrawRequest.ClientOrderID,
 		EthereumAddress:  withdrawRequest.Crypto.Address,
 	})
-	return nil, common.ErrNotYetImplemented
+	if err != nil {
+		return nil, err
+	}
+	return &withdraw.ExchangeResponse{
+		Name:   ap.Name,
+		ID:     withdrawalResponse.ID,
+		Status: "success",
+	}, nil
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a withdrawal is
@@ -877,7 +868,6 @@ func (ap *Apexpro) UpdateOrderExecutionLimits(ctx context.Context, _ asset.Item)
 	if err != nil {
 		return err
 	}
-	// return fmt.Errorf("%s %w", aa, asset.ErrNotSupported)
 	limits := make([]order.MinMaxLevel, 0, len(instrumentsInfo.ContractConfig.PerpetualContract))
 	for x := range instrumentsInfo.ContractConfig.PerpetualContract {
 		var pair currency.Pair

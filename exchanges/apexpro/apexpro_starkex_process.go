@@ -27,8 +27,7 @@ var (
 	errTokenDetailIsMissing           = errors.New("token detail is missing")
 )
 
-const ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS = 24 * 7 // Seven days.
-const NONCE_UPPER_BOUND_EXCLUSIVE = 1 << 32            // 1 << ORDER_FIELD_BIT_LENGTHS['nonce']
+const orderSignatureExpirationBuffersHours = 24 * 7
 
 // ProcessOrderSignature processes order request parameter and generates a starkEx signature
 func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderParams) (string, error) {
@@ -79,7 +78,7 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 			break
 		}
 	}
-	takerFeeRate = 0.003
+	// takerFeeRate = 0.003
 	if takerFeeRate == -1. {
 		return "", fmt.Errorf("%w, account with a settlement "+contractDetail.SettleCurrencyID+" is missing", errLimitFeeRequired)
 	}
@@ -160,8 +159,7 @@ func appendSignatures(r, s *big.Int) string {
 	for i := len(sBytes); i < 32; i++ {
 		sBytes = append([]byte{byte(0)}, sBytes...)
 	}
-	bytes := append(rBytes, sBytes...)
-	return hex.EncodeToString(bytes)
+	return hex.EncodeToString(append(rBytes, sBytes...))
 }
 
 // ProcessWithdrawalToAddressSignatureV3 processes withdrawal to specified ethereum address request parameter and generates a starkEx signature
@@ -222,7 +220,7 @@ func (ap *Apexpro) ProcessWithdrawalToAddressSignatureV3(ctx context.Context, ar
 		PositionID:           positionID,
 		Amount:               amount.Mul(resolution).BigInt(),
 		Nonce:                nonceFromClientID(arg.Nonce),
-		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Timestamp.Unix())/float64(3600))) + ORDER_SIGNATURE_EXPIRATION_BUFFER_HOURS),
+		ExpirationEpochHours: big.NewInt(int64(math.Ceil(float64(arg.Timestamp.Unix())/float64(3600))) + orderSignatureExpirationBuffersHours),
 	}, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
 	if err != nil {
 		return "", err
@@ -496,8 +494,9 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 	if token == nil {
 		return "", errTokenDetailIsMissing
 	}
-	fact, err := GetTransferErc20Fact(arg.ERC20Address, int(token.Decimals), strconv.FormatFloat(arg.Amount, 'f', -1, 64),
-		token.TokenAddress, nonceFromClientID(arg.ClientID).String())
+	fact, err := GetTransferErc20Fact(arg.ERC20Address, int(token.Decimals),
+		strconv.FormatFloat(arg.Amount, 'f', -1, 64), token.TokenAddress,
+		nonceFromClientID(arg.ClientID).String())
 	if err != nil {
 		return "", err
 	}
@@ -506,13 +505,12 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		expEpoch = int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000)))
 		arg.Expiration = expEpoch * 3600 * 1000
 	}
-
 	senderPublicKey, ok := big.NewInt(0).SetString(creds.L2Key, 0)
 	if !ok {
 		return "", errL2KeyMissing
 	}
 
-	newArg := &starkex.ConditionalTransferParams{
+	r, s, err := ap.StarkConfig.Sign(&starkex.ConditionalTransferParams{
 		AssetID:            assetID,
 		AssetIDFee:         big.NewInt(0),
 		MaxAmountFee:       big.NewInt(0),
@@ -524,9 +522,7 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		QuantumsAmount:     amount.Mul(resolution).BigInt(),
 		Nonce:              nonceFromClientID(arg.ClientID),
 		ExpTimestampHrs:    big.NewInt(expEpoch),
-	}
-
-	r, s, err := ap.StarkConfig.Sign(newArg, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
+	}, creds.L2Secret, creds.L2Key, creds.L2KeyYCoordinate)
 	if err != nil {
 		return "", err
 	}
@@ -534,12 +530,12 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 }
 
 // FactToCondition Generate the condition, signed as part of a conditional transfer.
-func FactToCondition(factRegistryAddress string, fact string) *big.Int {
+func FactToCondition(factRegistryAddress, fact string) *big.Int {
 	data := strings.TrimPrefix(factRegistryAddress, "0x") + fact
 	hexBytes, _ := hex.DecodeString(data)
 	hash := crypto.Keccak256Hash(hexBytes)
 	fst := hash.Big()
-	fst.And(fst, BIT_MASK_250)
+	fst.And(fst, BitMask250)
 	return fst
 }
 
@@ -547,7 +543,6 @@ func FactToCondition(factRegistryAddress string, fact string) *big.Int {
 // tokenDecimals is COLLATERAL_TOKEN_DECIMALS
 func GetTransferErc20Fact(recipient string, tokenDecimals int, humanAmount, tokenAddress, salt string) (string, error) {
 	fmt.Println("GetTransferErc20Fact", recipient, tokenDecimals, humanAmount, tokenAddress, salt)
-	// token_amount = float(human_amount) * (10 ** token_decimals)
 	amount, err := decimal.NewFromString(humanAmount)
 	if err != nil {
 		return "", err

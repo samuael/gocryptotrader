@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"math/big"
 
-	math_utils "github.com/thrasher-corp/gocryptotrader/internal/utils/math"
+	math_utils "github.com/thrasher-corp/gocryptotrader/internal/utils/mathutils"
 )
 
 // LoadPedersenConfig loads a pedersen configuration from a json file.
@@ -17,7 +17,7 @@ func LoadPedersenConfig(path string) (*PedersenCfg, error) {
 		return nil, err
 	}
 	var resp *PedersenCfg
-	return resp, json.Unmarshal([]byte(file), &resp)
+	return resp, json.Unmarshal(file, &resp)
 }
 
 // PedersenHash hashed the

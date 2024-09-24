@@ -9,7 +9,7 @@ import (
 
 	path "github.com/thrasher-corp/gocryptotrader/internal/testing/utils"
 	"github.com/thrasher-corp/gocryptotrader/internal/utils/hash"
-	math_utils "github.com/thrasher-corp/gocryptotrader/internal/utils/math"
+	math_utils "github.com/thrasher-corp/gocryptotrader/internal/utils/mathutils"
 )
 
 // Error declarations.
@@ -69,8 +69,8 @@ func NewStarkExConfig() (*StarkConfig, error) {
 }
 
 // Sign generates a signature out using the users private key and signable order params.
-func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKey, starkPublicKeyYCoordinate string) (*big.Int, *big.Int, error) {
-	pHash, err := sgn.GetPedersenHash(sfg.PedersenHash)
+func (sc *StarkConfig) Sign(sgn Signable, starkPrivateKey, starkPublicKey, starkPublicKeyYCoordinate string) (r, s *big.Int, err error) {
+	pHash, err := sgn.GetPedersenHash(sc.PedersenHash)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -82,7 +82,7 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKe
 	if !okay {
 		return nil, nil, ErrInvalidHashPayload
 	}
-	r, s, err := sfg.SignECDSA(msgHash, priKey)
+	r, s, err = sc.SignECDSA(msgHash, priKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -92,12 +92,12 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKe
 	}
 	publicKeyYCoordinate, ok := big.NewInt(0).SetString(starkPublicKeyYCoordinate, 0)
 	if !ok {
-		publicKeyYCoordinate = sfg.GetYCoordinate(publicKey)
+		publicKeyYCoordinate = sc.GetYCoordinate(publicKey)
 		if publicKeyYCoordinate.Cmp(big.NewInt(0)) == 0 {
 			return nil, nil, fmt.Errorf("%w, invalid stark public key x coordinat", ErrInvalidPublicKey)
 		}
 	}
-	ok = sfg.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
+	ok = sc.Verify(msgHash, r, s, [2]*big.Int{publicKey, publicKeyYCoordinate})
 	if !ok {
 		return nil, nil, ErrFailedToGenerateSignature
 	}
@@ -105,7 +105,7 @@ func (sfg *StarkConfig) Sign(sgn Signable, starkPrivateKey string, starkPublicKe
 }
 
 // GetYCoordinate generates the y-coordinate of starkEx Public key from the x coordinate
-func (sc StarkConfig) GetYCoordinate(starkKeyXCoordinate *big.Int) *big.Int {
+func (sc *StarkConfig) GetYCoordinate(starkKeyXCoordinate *big.Int) *big.Int {
 	x := starkKeyXCoordinate
 	xpow3 := new(big.Int).Exp(x, big.NewInt(3), nil)
 	alphaXPlusB := new(big.Int).Add(new(big.Int).Mul(sc.Alpha, x), sc.B)
@@ -114,26 +114,26 @@ func (sc StarkConfig) GetYCoordinate(starkKeyXCoordinate *big.Int) *big.Int {
 }
 
 // InvModCurveSize calculates the inverse modulus of a given big integer 'x' with respect to the StarkCurve 'sc'.
-func (sc StarkConfig) InvModCurveSize(x *big.Int) *big.Int {
+func (sc *StarkConfig) InvModCurveSize(x *big.Int) *big.Int {
 	return math_utils.DivMod(one, x, sc.N)
 }
 
-// Sign calculates the signature of a message using the StarkCurve algorithm.
-func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (*big.Int, *big.Int, error) {
+// SignECDSA calculates the signature of a message using the StarkCurve algorithm.
+func (sc *StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (r, s *big.Int, err error) {
 	if msgHash == nil {
-		return nil, nil, fmt.Errorf("nil msgHash")
+		return nil, nil, ErrInvalidHashPayload
 	}
 	if privKey == nil {
-		return nil, nil, fmt.Errorf("nil privKey")
+		return nil, nil, ErrInvalidPrivateKey
 	}
 	if msgHash.Cmp(big.NewInt(0)) != 1 || msgHash.Cmp(sc.Max) != -1 {
-		return nil, nil, fmt.Errorf("invalid bit length")
+		return nil, nil, errors.New("invalid bit length")
 	}
 	inSeed := big.NewInt(0)
 	if len(seed) == 1 {
 		inSeed = seed[0]
 	}
-	nBit := big.NewInt(0).Exp(big.NewInt(2), N_ELEMENT_BITS_ECDSA, nil)
+	nBit := big.NewInt(0).Exp(big.NewInt(2), NElementBitsECDSA, nil)
 	for {
 		k := math_utils.GenerateKRfc6979(msgHash, privKey, sc.N, int(inSeed.Int64()))
 		// In case r is rejected k shall be generated with new seed
@@ -167,11 +167,11 @@ func (sc StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (*b
 	}
 }
 
-// Computes m * point + shift_point using the same steps like the AIR and throws an exception if
+// MimicEcMultAir computes m * point + shift_point using the same steps like the AIR and throws an exception if
 // and only if the AIR errors.
 //
 // (ref: https://github.com/starkware-libs/cairo-lang/blob/master/src/starkware/crypto/starkware/crypto/signature/signature.py)
-func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int, y *big.Int, err error) {
+func (sc *StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x, y *big.Int, err error) {
 	m := new(big.Int).Set(mout)
 	if m.Cmp(big.NewInt(0)) != 1 || m.Cmp(sc.Max) != -1 {
 		return x, y, fmt.Errorf("too many bits %v", m.BitLen())
@@ -179,9 +179,9 @@ func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int,
 
 	psx := x2
 	psy := y2
-	for i := 0; i < 251; i++ {
+	for range 251 {
 		if psx == x1 {
-			return x, y, fmt.Errorf("xs are the same")
+			return x, y, errors.New("xs are the same")
 		}
 		if m.Bit(0) == 1 {
 			point1 := math_utils.ECCAdd([2]*big.Int{psx, psy}, [2]*big.Int{x1, y1}, sc.P)
@@ -192,13 +192,13 @@ func (sc StarkConfig) MimicEcMultAir(mout, x1, y1, x2, y2 *big.Int) (x *big.Int,
 		m = m.Rsh(m, 1)
 	}
 	if m.Cmp(big.NewInt(0)) != 0 {
-		return psx, psy, fmt.Errorf("m doesn't equal zero")
+		return psx, psy, fmt.Errorf("unexpected value, expected 0 got %v", m)
 	}
 	return psx, psy, nil
 }
 
-// Verifies an ECDSA signature
-func (sc *StarkConfig) Verify(msgHash *big.Int, r *big.Int, s *big.Int, publicKey [2]*big.Int) bool {
+// Verify an ECDSA signature given the r and s signature values
+func (sc *StarkConfig) Verify(msgHash, r, s *big.Int, publicKey [2]*big.Int) bool {
 	calc := func(pubX, pubY *big.Int) *big.Int {
 		publicKeyPow2 := new(big.Int).Exp(pubY, big.NewInt(2), nil)
 		publicKeyPow3 := new(big.Int).Exp(pubX, big.NewInt(3), nil)

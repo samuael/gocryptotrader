@@ -1,9 +1,8 @@
 package apexpro
 
 import (
-	"time"
-
 	"encoding/json"
+	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
 	"github.com/thrasher-corp/gocryptotrader/currency"

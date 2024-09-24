@@ -80,7 +80,7 @@ func (ap *Apexpro) WsConnect() error {
 		err := ap.WsAuth(&dialer)
 		ap.Websocket.SetCanUseAuthenticatedEndpoints(err == nil)
 		if err != nil {
-			log.Debugf(log.ExchangeSys, err.Error())
+			log.Warnf(log.ExchangeSys, "%v", err.Error())
 		}
 	}
 	return nil
@@ -247,7 +247,6 @@ func (ap *Apexpro) wsReadData(conn stream.Connection) {
 }
 
 func (ap *Apexpro) wsHandleData(respRaw []byte) error {
-	println(string(respRaw))
 	var response WsMessage
 	err := json.Unmarshal(respRaw, &response)
 	if err != nil {
@@ -278,14 +277,13 @@ func (ap *Apexpro) wsHandleData(respRaw []byte) error {
 			if err != nil {
 				return err
 			}
-			// TODO: handle each account information detail
-			err := ap.processAccountOrders(resp.Orders)
+			err = ap.processAccountOrders(resp.Orders)
 			if err != nil {
-				log.Warnf(log.ExchangeSys, err.Error())
+				log.Warnf(log.ExchangeSys, "%v", err.Error())
 			}
 			err = ap.processAccountFills(resp.Fills)
 			if err != nil {
-				log.Warnf(log.ExchangeSys, err.Error())
+				log.Warnf(log.ExchangeSys, "%v", err.Error())
 			}
 		case chNotify:
 			var resp *WsAccountNotificationsResponse

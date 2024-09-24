@@ -156,9 +156,10 @@ func (ap *Apexpro) getNewestTradingData(ctx context.Context, symbol, path string
 	return resp, ap.SendHTTPRequest(ctx, exchange.RestSpot, common.EncodeURLValues(path, params), request.UnAuth, &resp)
 }
 
+var intervalToStringMap = map[kline.Interval]string{
+	kline.OneMin: "1", kline.FiveMin: "5", kline.FifteenMin: "15", kline.ThirtyMin: "30", kline.OneHour: "60", kline.TwoHour: "120", kline.FourHour: "240", kline.SixHour: "360", kline.SevenHour: "720", kline.OneDay: "D", kline.OneMonth: "M", kline.OneWeek: "W"}
+
 func intervalToString(interval kline.Interval) (string, error) {
-	intervalToStringMap := map[kline.Interval]string{
-		kline.OneMin: "1", kline.FiveMin: "5", kline.FifteenMin: "15", kline.ThirtyMin: "30", kline.OneHour: "60", kline.TwoHour: "120", kline.FourHour: "240", kline.SixHour: "360", kline.SevenHour: "720", kline.OneDay: "D", kline.OneMonth: "M", kline.OneWeek: "W"}
 	intervalString, okay := intervalToStringMap[interval]
 	if !okay {
 		return "", kline.ErrUnsupportedInterval
@@ -726,7 +727,7 @@ func (ap *Apexpro) CreateOrderV2(ctx context.Context, arg *CreateOrderParams) (*
 		return nil, err
 	}
 	var resp *OrderDetail
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v2/create-order", request.UnAuth, params, nil, &resp) //, arg.ExpirationTime)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v2/create-order", request.UnAuth, params, nil, &resp)
 }
 
 // CreateOrderV1 creates a new order through the v2 API
@@ -756,18 +757,9 @@ func (ap *Apexpro) fillWithdrawalParams(arg *FastWithdrawalParams) error {
 	if arg.Amount <= 0 {
 		return order.ErrAmountBelowMin
 	}
-	// if arg.Expiration == 0 {
-	// 	return errExpirationTimeRequired
-	// }
 	if arg.Asset.IsEmpty() {
 		return currency.ErrCurrencyCodeEmpty
 	}
-	// if arg.ERC20Address == "" {
-	// 	return nil, errEthereumAddressMissing
-	// }
-	// if arg.Fees <= 0 {
-	// 	return nil, errLimitFeeRequired
-	// }
 	if arg.ChainID == "" {
 		return errChainIDMissing
 	}
@@ -783,14 +775,11 @@ func (ap *Apexpro) fastWithdrawal(ctx context.Context, arg *FastWithdrawalParams
 	if err != nil {
 		return nil, err
 	}
-	// arg.Signature = signature
 	params := url.Values{}
 	params.Set("amount", strconv.FormatFloat(arg.Amount, 'f', -1, 64))
 	params.Set("expiration", strconv.FormatInt(arg.Expiration, 10))
 	params.Set("asset", arg.Asset.String())
-	// if arg.Fees != 0 {
 	params.Set("fees", strconv.FormatFloat(arg.Fees, 'f', -1, 64))
-	// }
 	params.Set("chainId", arg.ChainID)
 	params.Set("clientId", arg.ClientID)
 	params.Set("signature", signature)
@@ -1341,7 +1330,7 @@ func (ap *Apexpro) withdrawalToAddress(ctx context.Context, arg *WithdrawalToAdd
 	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, params, nil, &resp)
 }
 
-// CrossChainWithdrawals withdraws an asset through different chains
+// CrossChainWithdrawalsV1 withdraws an asset through different chains
 func (ap *Apexpro) CrossChainWithdrawalsV1(ctx context.Context, arg *FastWithdrawalParams) (*WithdrawalResponse, error) {
 	return ap.crossChainWithdrawals(ctx, arg, "v1/cross-chain-withdraw")
 }
@@ -1433,12 +1422,10 @@ func (ap *Apexpro) SendAuthenticatedHTTPRequest(ctx context.Context, ePath excha
 		timestamp := time.Now().UTC().UnixMilli()
 		if len(timestamps) > 0 && timestamps[0] != 0 {
 			timestamp = timestamps[0]
-			println("Timestamp: ", timestamp)
 		}
 		message := strconv.FormatInt(timestamp, 10) + method + ("/api/" + path) + dataString
 		encodedSecret := base64.StdEncoding.EncodeToString([]byte(creds.Secret))
 		var hmacSigned []byte
-		var err error
 		hmacSigned, err = crypto.GetHMAC(crypto.HashSHA256,
 			[]byte(message),
 			[]byte(encodedSecret))

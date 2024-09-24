@@ -1,4 +1,4 @@
-package math_utils
+package mathutils
 
 import (
 	"bytes"
@@ -74,7 +74,7 @@ func Bits2Octets(in []byte, q *big.Int, qlen, rolen int) []byte {
 }
 
 // https://tools.ietf.org/html/rfc6979#section-3.2
-func GenerateSecret(q, x *big.Int, alg func() hash.Hash, hash []byte, extraEntropy []byte) *big.Int {
+func GenerateSecret(q, x *big.Int, alg func() hash.Hash, hash, extraEntropy []byte) *big.Int {
 	qlen := q.BitLen()
 	holen := alg().Size()
 	rolen := (qlen + 7) >> 3
@@ -123,11 +123,10 @@ func GenerateSecret(q, x *big.Int, alg func() hash.Hash, hash []byte, extraEntro
 	}
 }
 
-
 // GenerateK implements the RFC 6979 generate_k method with specified parameters.
-func GenerateK(EC_Order *big.Int, PrivateKey *big.Int, hashFunc hash.Hash, message []byte, extra []byte) *big.Int {
+func GenerateK(ecOrder *big.Int, privateKey *big.Int, hashFunc hash.Hash, message, extra []byte) *big.Int {
 	// Convert PrivateKey and message hash to byte slices
-	x := PrivateKey.Bytes()
+	x := privateKey.Bytes()
 	h1 := message
 
 	// Initialize v and k
@@ -135,10 +134,10 @@ func GenerateK(EC_Order *big.Int, PrivateKey *big.Int, hashFunc hash.Hash, messa
 	k := make([]byte, hashFunc.Size())
 
 	// Step B: Set v to 0x01 and k to 0x00
-	for i := 0; i < len(v); i++ {
+	for i := range len(v) {
 		v[i] = 0x01
 	}
-	for i := 0; i < len(k); i++ {
+	for i := range len(k) {
 		k[i] = 0x00
 	}
 
@@ -157,7 +156,7 @@ func GenerateK(EC_Order *big.Int, PrivateKey *big.Int, hashFunc hash.Hash, messa
 	for {
 		// Step H: Generate t and convert it to an integer
 		t := make([]byte, 0)
-		for len(t) < len(EC_Order.Bytes()) {
+		for len(t) < len(ecOrder.Bytes()) {
 			v = hmacFunc(hashFunc, k, v)
 			t = append(t, v...)
 		}
@@ -166,7 +165,7 @@ func GenerateK(EC_Order *big.Int, PrivateKey *big.Int, hashFunc hash.Hash, messa
 		kCandidate := new(big.Int).SetBytes(t)
 
 		// Check if kCandidate is in the range [1, EC_Order-1]
-		if kCandidate.Cmp(big.NewInt(0)) > 0 && kCandidate.Cmp(EC_Order) < 0 {
+		if kCandidate.Cmp(big.NewInt(0)) > 0 && kCandidate.Cmp(ecOrder) < 0 {
 			return kCandidate
 		}
 

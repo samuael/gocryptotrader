@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrInvalidInput = errors.New("invalid input")
+	errInvalidInput = errors.New("invalid input")
 )
 
 func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
@@ -35,15 +35,12 @@ func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 		return Bool(value), nil
 	}
 
-	regexNumber := regexp.MustCompile(`^(u?int)([0-9]*)$`)
+	regexNumber := regexp.MustCompile(`^(u?int)(\d*)$`)
 	matches := regexNumber.FindAllStringSubmatch(typ, -1)
 	if len(matches) > 0 {
 		match := matches[0]
 		var err error
 		size := 256
-		if len(match) > 1 {
-			//signed = match[1] == "int"
-		}
 		if len(match) > 2 {
 			size, err = strconv.Atoi(match[2])
 			if err != nil {
@@ -69,7 +66,7 @@ func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 		return common.LeftPadBytes(v, size/8), nil
 	}
 
-	regexBytes := regexp.MustCompile(`^bytes([0-9]+)$`)
+	regexBytes := regexp.MustCompile(`^bytes(\d+)$`)
 	matches = regexBytes.FindAllStringSubmatch(typ, -1)
 	if len(matches) > 0 {
 		match := matches[0]
@@ -88,8 +85,8 @@ func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 			s := reflect.ValueOf(value)
 			v := s.Index(0).Bytes()
 			z := make([]byte, 64)
-			copy(z[:], v[:])
-			return z[:], nil
+			copy(z, v)
+			return z, nil
 		}
 
 		str, isString := value.(string)
@@ -103,19 +100,19 @@ func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 				panic(err)
 			}
 			z := make([]byte, byteLen)
-			copy(z[:], hexb)
+			copy(z, hexb)
 			return z, nil
 		} else if isString {
 			s := reflect.ValueOf(value)
 			z := make([]byte, byteLen)
-			copy(z[:], s.Bytes())
+			copy(z, s.Bytes())
 			return z, nil
 		}
 
 		s := reflect.ValueOf(value)
 		z := make([]byte, byteLen)
 		b := make([]byte, s.Len())
-		for i := 0; i < s.Len(); i++ {
+		for i := range s.Len() {
 			ifc := s.Index(i).Interface()
 			v, ok := ifc.(byte)
 			if ok {
@@ -134,13 +131,11 @@ func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 					b[i] = decoded[0]
 				}
 			}
-
 		}
-		copy(z[:], b[:])
+		copy(z, b)
 		return z, nil
 	}
-
-	regexArray := regexp.MustCompile(`^(.*)\[([0-9]*)\]$`)
+	regexArray := regexp.MustCompile(`^(.*)\[(\d*)\]$`)
 	matches = regexArray.FindAllStringSubmatch(typ, -1)
 	if len(matches) > 0 {
 		match := matches[0]
@@ -162,7 +157,7 @@ func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 			}
 
 			var result [][]byte
-			for i := 0; i < k.Len(); i++ {
+			for i := range k.Len() {
 				val := k.Index(i).Interface()
 				data, err := pack(baseType, val, true)
 				if err != nil {
@@ -177,14 +172,14 @@ func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 			return array, nil
 		}
 	}
-	return nil, ErrInvalidInput
+	return nil, errInvalidInput
 }
 
 // Address address
 func Address(input interface{}) []byte {
 	switch v := input.(type) {
 	case common.Address:
-		return v.Bytes()[:]
+		return v.Bytes()
 	case string:
 		v = strings.TrimPrefix(v, "0x")
 		if v == "" || v == "0" {
@@ -212,14 +207,14 @@ func Address(input interface{}) []byte {
 		return AddressArray(input)
 	}
 
-	return common.HexToAddress("").Bytes()[:]
+	return common.HexToAddress("").Bytes()
 }
 
 // AddressArray address
 func AddressArray(input interface{}) []byte {
 	var values []byte
 	s := reflect.ValueOf(input)
-	for i := 0; i < s.Len(); i++ {
+	for i := range s.Len() {
 		val := s.Index(i).Interface()
 		result := common.LeftPadBytes(Address(val), 32)
 		values = append(values, result...)
@@ -248,7 +243,7 @@ func String(input interface{}) []byte {
 func StringArray(input interface{}) []byte {
 	var values []byte
 	s := reflect.ValueOf(input)
-	for i := 0; i < s.Len(); i++ {
+	for i := range s.Len() {
 		val := s.Index(i).Interface()
 		result := String(val)
 		values = append(values, result...)
@@ -279,7 +274,7 @@ func Uint256(input interface{}) []byte {
 func Uint256Array(input interface{}) []byte {
 	var values []byte
 	s := reflect.ValueOf(input)
-	for i := 0; i < s.Len(); i++ {
+	for i := range s.Len() {
 		val := s.Index(i).Interface()
 		result := common.LeftPadBytes(Uint256(val), 32)
 		values = append(values, result...)
@@ -289,8 +284,7 @@ func Uint256Array(input interface{}) []byte {
 
 // Bool bool
 func Bool(input interface{}) []byte {
-	switch v := input.(type) {
-	case bool:
+	if v, ok := input.(bool); ok {
 		if v {
 			return []byte{0x1}
 		}
@@ -309,7 +303,7 @@ func Bool(input interface{}) []byte {
 func BoolArray(input interface{}) []byte {
 	var values []byte
 	s := reflect.ValueOf(input)
-	for i := 0; i < s.Len(); i++ {
+	for i := range s.Len() {
 		val := s.Index(i).Interface()
 		result := common.LeftPadBytes(Bool(val), 32)
 		values = append(values, result...)

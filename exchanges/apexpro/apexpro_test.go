@@ -31,7 +31,7 @@ const (
 
 	ethereumAddress = ""
 
-	canManipulateRealOrders = true
+	canManipulateRealOrders = false
 )
 
 var ap = &Apexpro{}
@@ -1132,6 +1132,7 @@ func TestCreateOrderV2(t *testing.T) {
 
 func TestFastWithdrawalV2(t *testing.T) {
 	t.Parallel()
+	ap.Verbose = true
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
 	result, err := ap.FastWithdrawalV2(context.Background(), &FastWithdrawalParams{
 		Amount:       1,
@@ -1326,5 +1327,5 @@ func TestWsConnect(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	err := ap.WsConnect()
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }

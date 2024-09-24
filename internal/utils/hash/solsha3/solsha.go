@@ -8,7 +8,7 @@ import (
 
 // solsha3 solidity sha3
 func solsha3(types []string, values ...interface{}) []byte {
-	var b [][]byte
+	b := [][]byte{}
 	for i, typ := range types {
 		data, err := pack(typ, values[i], false)
 		if err != nil {

@@ -9,12 +9,11 @@ import (
 )
 
 // FactToCondition Generate the condition, signed as part of a conditional transfer.
-func FactToCondition(factRegistryAddress string, fact string) *big.Int {
+func FactToCondition(factRegistryAddress, fact string) *big.Int {
 	data := strings.TrimPrefix(factRegistryAddress, "0x") + fact
 	hexBytes, _ := hex.DecodeString(data)
-	// int(Web3.keccak(data).hex(), 16) & BIT_MASK_250
 	hash := crypto.Keccak256Hash(hexBytes)
 	fst := hash.Big()
-	fst.And(fst, BIT_MASK_250)
+	fst.And(fst, BitMask250)
 	return fst
 }

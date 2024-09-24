@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const MOCK_PUBLIC_KEY = "0x3b865a18323b8d147a12c556bfb1d502516c325b1477a23ba6c77af31f020fd"
-const MOCK_PRIVATE_KEY = "0x58c7d5a90b1776bde86ebac077e053ed85b0f7164f53b080304a531947f46e3"
+const MockPublicKey = "0x3b865a18323b8d147a12c556bfb1d502516c325b1477a23ba6c77af31f020fd"
+const MockPrivateKey = "0x58c7d5a90b1776bde86ebac077e053ed85b0f7164f53b080304a531947f46e3"
 
 func TestNewStarkExConfig(t *testing.T) {
 	t.Parallel()
@@ -25,10 +25,10 @@ func TestECDSASignature(t *testing.T) {
 	magHash, ok := big.NewInt(0).SetString("0x011049f4032190ec4b5a9420cc77006d13a260df46bfcacf60a53f447a5a925d", 0)
 	require.True(t, ok)
 
-	publicX, ok := big.NewInt(0).SetString(MOCK_PUBLIC_KEY, 0)
+	publicX, ok := big.NewInt(0).SetString(MockPublicKey, 0)
 	require.True(t, ok)
 
-	publicSecret, ok := big.NewInt(0).SetString(MOCK_PRIVATE_KEY, 0)
+	publicSecret, ok := big.NewInt(0).SetString(MockPrivateKey, 0)
 	require.True(t, ok)
 
 	sfg, err := NewStarkExConfig()
@@ -76,8 +76,8 @@ func TestECDSAWithout(t *testing.T) {
 
 		r, s, err := sfg.SignECDSA(hashMessage, privateKey)
 		require.NoError(t, err)
-		require.True(t, r.Cmp(resp.Messages[a].R) == 0)
-		require.True(t, s.Cmp(resp.Messages[a].S) == 0)
+		require.Equal(t, 0, r.Cmp(resp.Messages[a].R))
+		require.Equal(t, 0, s.Cmp(resp.Messages[a].S))
 	}
 }
 
@@ -106,7 +106,7 @@ func TestOrderSign(t *testing.T) {
 		Nonce:                   big.NewInt(3762202436),
 		ExpirationEpochHours:    big.NewInt(479941),
 	}
-	r, s, err := sfg.Sign(arg, MOCK_PRIVATE_KEY, MOCK_PUBLIC_KEY, "")
+	r, s, err := sfg.Sign(arg, MockPrivateKey, MockPublicKey, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, r)
 	assert.NotEmpty(t, s)
@@ -118,7 +118,7 @@ func TestGetYCoordinate(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sfg)
 
-	publicX, ok := big.NewInt(0).SetString(MOCK_PUBLIC_KEY, 0)
+	publicX, ok := big.NewInt(0).SetString(MockPublicKey, 0)
 	assert.True(t, ok)
 
 	result := sfg.GetYCoordinate(publicX)
