@@ -493,12 +493,13 @@ func (ap *Apexpro) processCandlestickData(respRaw []byte) error {
 	if err != nil {
 		return err
 	}
+	klineData := make([]stream.KlineData, len(resp.Data))
 	for a := range resp.Data {
 		pair, err := currency.NewPairFromString(resp.Data[a].Symbol)
 		if err != nil {
 			return err
 		}
-		ap.Websocket.DataHandler <- stream.KlineData{
+		klineData[a] = stream.KlineData{
 			Timestamp:  resp.Timestamp.Time(),
 			Pair:       pair,
 			AssetType:  asset.Futures,
@@ -512,6 +513,7 @@ func (ap *Apexpro) processCandlestickData(respRaw []byte) error {
 			Volume:     resp.Data[a].Volume.Float64(),
 		}
 	}
+	ap.Websocket.DataHandler <- klineData
 	return nil
 }
 

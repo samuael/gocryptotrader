@@ -31,7 +31,7 @@ const (
 
 	ethereumAddress = ""
 
-	canManipulateRealOrders = false
+	canManipulateRealOrders = true
 )
 
 var ap = &Apexpro{}
@@ -595,7 +595,6 @@ func TestCreateOrder(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, ap.UserAccountDetail)
 	}
-	ap.Verbose = true
 	result, err := ap.CreateOrderV3(context.Background(), &CreateOrderParams{
 		Symbol:          futuresTradablePair,
 		Side:            order.Buy.String(),
@@ -613,22 +612,22 @@ func TestCreateOrder(t *testing.T) {
 
 func TestCancelPerpOrder(t *testing.T) {
 	t.Parallel()
-	_, err := ap.CancelPerpOrder(context.Background(), 0)
+	_, err := ap.CancelPerpOrder(context.Background(), "")
 	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
-	result, err := ap.CancelPerpOrder(context.Background(), 123231)
+	result, err := ap.CancelPerpOrder(context.Background(), "123231")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
 
 func TestCancelPerpOrderByClientOrderID(t *testing.T) {
 	t.Parallel()
-	_, err := ap.CancelPerpOrderByClientOrderID(context.Background(), 0)
+	_, err := ap.CancelPerpOrderByClientOrderID(context.Background(), "")
 	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
-	result, err := ap.CancelPerpOrderByClientOrderID(context.Background(), 2312312)
+	result, err := ap.CancelPerpOrderByClientOrderID(context.Background(), "2312312")
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
@@ -1328,4 +1327,13 @@ func TestWsConnect(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
 	err := ap.WsConnect()
 	assert.NoError(t, err)
+}
+
+func TestGetTransferErc20Fact(t *testing.T) {
+	fact, err := GetTransferErc20Fact(
+		3, "0x1234567890123456789012345678901234567890",
+		"123.456", "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa",
+		"0x1234567890abcdef")
+	assert.NoError(t, err)
+	assert.Equal(t, "34052387b5efb6132a42b244cff52a85a507ab319c414564d7a89207d4473672", fact)
 }

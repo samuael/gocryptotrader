@@ -395,20 +395,27 @@ func (ap *Apexpro) GetServerTime(ctx context.Context, _ asset.Item) (time.Time, 
 }
 
 // SubmitOrder submits a new order
-func (ap *Apexpro) SubmitOrder(_ context.Context, s *order.Submit) (*order.SubmitResponse, error) {
+func (ap *Apexpro) SubmitOrder(ctx context.Context, s *order.Submit) (*order.SubmitResponse, error) {
 	if err := s.Validate(ap.GetTradingRequirements()); err != nil {
 		return nil, err
 	}
-	// When an order has been submitted you can use this helpful constructor to
-	// return. Please add any additional order details to the
-	// order.SubmitResponse if you think they are applicable.
-	// resp, err := s.DeriveSubmitResponse( /*newOrderID*/)
-	// if err != nil {
-	// 	return nil, nil
-	// }
-	// resp.Date = exampleTime // e.g. If this is supplied by the exchanges API.
-	// return resp, nil
-	return nil, common.ErrNotYetImplemented
+	orderResp, err := ap.CreateOrderV2(ctx, &CreateOrderParams{
+		Symbol:           s.Pair,
+		Side:             s.Side.String(),
+		OrderType:        s.Type.Lower(),
+		Size:             s.Amount,
+		Price:            s.Price,
+		TriggerPrice:     s.TriggerPrice,
+		ClientOrderID:    s.ClientOrderID,
+		ReduceOnly:       s.ReduceOnly,
+		TriggerPriceType: s.TriggerPriceType.String(),
+		ClientID:         s.ClientID,
+		TrailingPercent:  s.TrailingPercent,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.DeriveSubmitResponse(orderResp.ID)
 }
 
 // ModifyOrder will allow of changing orderbook placement and limit to
@@ -418,11 +425,19 @@ func (ap *Apexpro) ModifyOrder(_ context.Context, _ *order.Modify) (*order.Modif
 }
 
 // CancelOrder cancels an order by its corresponding ID number
-func (ap *Apexpro) CancelOrder(_ context.Context, ord *order.Cancel) error {
+func (ap *Apexpro) CancelOrder(ctx context.Context, ord *order.Cancel) error {
 	if err := ord.Validate(ord.StandardCancel()); err != nil {
 		return err
 	}
-	return common.ErrNotYetImplemented
+	if ord.OrderID == "" && ord.ClientOrderID == "" {
+		return order.ErrOrderIDNotSet
+	}
+	if ord.OrderID != "" {
+		_, err := ap.CancelPerpOrder(ctx, ord.OrderID)
+		return err
+	}
+	_, err := ap.CancelPerpOrderByClientOrderID(ctx, ord.ClientOrderID)
+	return err
 }
 
 // CancelBatchOrders cancels orders by their corresponding ID numbers
@@ -525,13 +540,13 @@ func (ap *Apexpro) WithdrawCryptocurrencyFunds(ctx context.Context, withdrawRequ
 // WithdrawFiatFunds returns a withdrawal ID when a withdrawal is
 // submitted
 func (ap *Apexpro) WithdrawFiatFunds(_ context.Context, _ *withdraw.Request) (*withdraw.ExchangeResponse, error) {
-	return nil, common.ErrNotYetImplemented
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a withdrawal is
 // submitted
 func (ap *Apexpro) WithdrawFiatFundsToInternationalBank(_ context.Context, _ *withdraw.Request) (*withdraw.ExchangeResponse, error) {
-	return nil, common.ErrNotYetImplemented
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetActiveOrders retrieves any orders that are active/open

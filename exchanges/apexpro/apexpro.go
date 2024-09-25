@@ -806,21 +806,21 @@ func (ap *Apexpro) getWorstPrice(ctx context.Context, symbol, side, path string,
 }
 
 // CancelPerpOrder cancels a perpetual contract order cancellation.
-func (ap *Apexpro) CancelPerpOrder(ctx context.Context, orderID int64) (types.Number, error) {
+func (ap *Apexpro) CancelPerpOrder(ctx context.Context, orderID string) (types.Number, error) {
 	return ap.cancelOrderByID(ctx, orderID, "v3/delete-order")
 }
 
 // CancelPerpOrderByClientOrderID cancels a perpetual contract order by client order ID.
-func (ap *Apexpro) CancelPerpOrderByClientOrderID(ctx context.Context, clientOrderID int64) (types.Number, error) {
+func (ap *Apexpro) CancelPerpOrderByClientOrderID(ctx context.Context, clientOrderID string) (types.Number, error) {
 	return ap.cancelOrderByID(ctx, clientOrderID, "v3/delete-client-order-id")
 }
 
-func (ap *Apexpro) cancelOrderByID(ctx context.Context, id int64, path string) (types.Number, error) {
-	if id == 0 {
+func (ap *Apexpro) cancelOrderByID(ctx context.Context, id, path string) (types.Number, error) {
+	if id == "" {
 		return 0, order.ErrOrderIDNotSet
 	}
 	var resp types.Number
-	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, map[string]interface{}{"id": strconv.FormatInt(id, 10)}, &resp)
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestFutures, http.MethodPost, path, request.UnAuth, nil, map[string]interface{}{"id": id}, &resp)
 }
 
 // CancelAllOpenOrdersV3 cancels all open orders

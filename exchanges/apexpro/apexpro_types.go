@@ -2,12 +2,18 @@ package apexpro
 
 import (
 	"encoding/json"
+	"math/big"
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/types"
 )
+
+var one = big.NewInt(1)
+
+// BitMask250 (2 ** 250) - 1
+var BitMask250 = big.NewInt(0).Sub(big.NewInt(0).Exp(big.NewInt(2), big.NewInt(250), nil), one)
 
 // AllSymbolsConfigs represents all symbols configurations.
 type AllSymbolsConfigs struct {
@@ -590,11 +596,11 @@ type ChainInfo struct {
 
 // TokenInfo represents a token info detail
 type TokenInfo struct {
-	Decimals     int64  `json:"decimals"`
-	IconURL      string `json:"iconUrl"`
-	Token        string `json:"token"`
-	TokenAddress string `json:"tokenAddress"`
-	PullOff      bool   `json:"pullOff"`
+	Decimals     float64 `json:"decimals"`
+	IconURL      string  `json:"iconUrl"`
+	Token        string  `json:"token"`
+	TokenAddress string  `json:"tokenAddress"`
+	PullOff      bool    `json:"pullOff"`
 }
 
 // PerpetualContractDetail represents a perpetual contract detail.
@@ -1324,11 +1330,11 @@ type CreateOrderParams struct {
 	TriggerPriceType string `json:"triggerPriceType"`
 
 	ClientID        string `json:"clientId,omitempty"`
-	IsPositionTpsl  string `json:"isPositionTpsl,omitempty"`
-	IsOpenTpslOrder string `json:"isOpenTpslOrder,omitempty"`
+	IsPositionTPSL  string `json:"isPositionTpsl,omitempty"`
+	IsOpenTPSLOrder string `json:"isOpenTpslOrder,omitempty"`
 
-	IsSetOpenSl string `json:"isSetOpenSl,omitempty"`
-	IsSetOpenTp string `json:"isSetOpenTp,omitempty"`
+	IsSetOpenSL string `json:"isSetOpenSl,omitempty"`
+	IsSetOpenTP string `json:"isSetOpenTp,omitempty"`
 
 	SlClientOrderID    string `json:"slClientOrderId,omitempty"`
 	SlPrice            string `json:"slPrice,omitempty"`

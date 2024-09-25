@@ -92,6 +92,9 @@ type Submit struct {
 
 	// Iceberg specifies whether or not only visible portions of orders are shown in iceberg orders
 	Iceberg bool
+
+	// Specifies  used with trailing stop order types.
+	TrailingPercent float64
 }
 
 // SubmitResponse is what is returned after submitting an order to an exchange

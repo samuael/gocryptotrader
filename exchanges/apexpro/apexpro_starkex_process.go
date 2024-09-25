@@ -24,6 +24,7 @@ var (
 	errSettlementCurrencyInfoNotFound = errors.New("settlement currency information not found")
 	errInvalidAssetID                 = errors.New("invalid asset ID provided")
 	errInvalidPositionIDMissing       = errors.New("invalid position or account ID")
+	errL2CredentialsMismatch          = errors.New("l2 credentials mismatch")
 	errTokenDetailIsMissing           = errors.New("token detail is missing")
 )
 
@@ -447,6 +448,7 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 			return "", err
 		}
 	}
+
 	assetID, ok := big.NewInt(0).SetString(currencyInfo.StarkExAssetID, 0)
 	if !ok {
 		return "", fmt.Errorf("%w, assetId: %s", errInvalidAssetID, currencyInfo.StarkExAssetID)
@@ -460,6 +462,9 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		if err != nil {
 			return "", err
 		}
+	}
+	if ap.UserAccountDetail.StarkKey != creds.L2Key {
+		return "", errL2CredentialsMismatch
 	}
 	resolution, err := decimal.NewFromString(currencyInfo.StarkExResolution)
 	if err != nil {
@@ -494,9 +499,18 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 	if token == nil {
 		return "", errTokenDetailIsMissing
 	}
-	fact, err := GetTransferErc20Fact(arg.ERC20Address, int(token.Decimals),
+	println(
+		"\n\n",
+		int(token.Decimals),
+		arg.ERC20Address,
 		strconv.FormatFloat(arg.Amount, 'f', -1, 64), token.TokenAddress,
-		nonceFromClientID(arg.ClientID).String())
+		"0x"+nonceFromClientID(arg.ClientID).Text(16),
+		"\n\n",
+	)
+	fact, err := GetTransferErc20Fact(int(token.Decimals),
+		arg.ERC20Address,
+		strconv.FormatFloat(arg.Amount, 'f', -1, 64), token.TokenAddress,
+		"0x"+nonceFromClientID(arg.ClientID).Text(16))
 	if err != nil {
 		return "", err
 	}
@@ -505,11 +519,10 @@ func (ap *Apexpro) ProcessConditionalTransfer(ctx context.Context, arg *FastWith
 		expEpoch = int64(math.Ceil(float64(time.Now().Add(time.Hour*24*28).UnixMilli()) / float64(3600*1000)))
 		arg.Expiration = expEpoch * 3600 * 1000
 	}
-	senderPublicKey, ok := big.NewInt(0).SetString(creds.L2Key, 0)
+	senderPublicKey, ok := big.NewInt(0).SetString(ap.UserAccountDetail.StarkKey, 0)
 	if !ok {
 		return "", errL2KeyMissing
 	}
-
 	r, s, err := ap.StarkConfig.Sign(&starkex.ConditionalTransferParams{
 		AssetID:            assetID,
 		AssetIDFee:         big.NewInt(0),
@@ -541,8 +554,7 @@ func FactToCondition(factRegistryAddress, fact string) *big.Int {
 
 // GetTransferErc20Fact get erc20 fact
 // tokenDecimals is COLLATERAL_TOKEN_DECIMALS
-func GetTransferErc20Fact(recipient string, tokenDecimals int, humanAmount, tokenAddress, salt string) (string, error) {
-	fmt.Println("GetTransferErc20Fact", recipient, tokenDecimals, humanAmount, tokenAddress, salt)
+func GetTransferErc20Fact(tokenDecimals int, recipient, humanAmount, tokenAddress, salt string) (string, error) {
 	amount, err := decimal.NewFromString(humanAmount)
 	if err != nil {
 		return "", err
