@@ -1337,3 +1337,18 @@ func TestGetTransferErc20Fact(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "34052387b5efb6132a42b244cff52a85a507ab319c414564d7a89207d4473672", fact)
 }
+
+func TestOrderTypeStrings(t *testing.T) {
+	t.Parallel()
+	orderMap := map[order.Type]string{
+		order.Limit:            "LIMIT",
+		order.Market:           "MARKET",
+		order.StopLimit:        "STOP_LIMIT",
+		order.StopMarket:       "STOP_MARKET",
+		order.TakeProfit:       "TAKE_PROFIT_LIMIT",
+		order.TakeProfitMarket: "TAKE_PROFIT_MARKET",
+	}
+	for k := range orderMap {
+		assert.Equal(t, orderTypeString(k), orderMap[k])
+	}
+}

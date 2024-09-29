@@ -402,7 +402,7 @@ func (ap *Apexpro) SubmitOrder(ctx context.Context, s *order.Submit) (*order.Sub
 	orderResp, err := ap.CreateOrderV2(ctx, &CreateOrderParams{
 		Symbol:           s.Pair,
 		Side:             s.Side.String(),
-		OrderType:        s.Type.Lower(),
+		OrderType:        orderTypeString(s.Type),
 		Size:             s.Amount,
 		Price:            s.Price,
 		TriggerPrice:     s.TriggerPrice,
@@ -617,7 +617,7 @@ func (ap *Apexpro) GetOrderHistory(ctx context.Context, getOrdersRequest *order.
 	if len(getOrdersRequest.Pairs) == 0 {
 		symbol = getOrdersRequest.Pairs[0].String()
 	}
-	orderHistoryResponse, err := ap.GetAllOrderHistory(ctx, symbol, getOrdersRequest.Side.String(), getOrdersRequest.Type.String(), "", "", getOrdersRequest.StartTime, getOrdersRequest.EndTime, 0, 0)
+	orderHistoryResponse, err := ap.GetAllOrderHistory(ctx, symbol, getOrdersRequest.Side.String(), orderTypeString(getOrdersRequest.Type), "", "", getOrdersRequest.StartTime, getOrdersRequest.EndTime, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -905,4 +905,19 @@ func (ap *Apexpro) UpdateOrderExecutionLimits(ctx context.Context, _ asset.Item)
 		})
 	}
 	return ap.LoadLimits(limits)
+}
+
+func orderTypeString(oType order.Type) string {
+	switch oType {
+	case order.StopLimit:
+		return "STOP_LIMIT"
+	case order.StopMarket:
+		return "STOP_MARKET"
+	case order.TakeProfit:
+		return "TAKE_PROFIT_LIMIT"
+	case order.TakeProfitMarket:
+		return "TAKE_PROFIT_MARKET"
+	default:
+		return oType.String()
+	}
 }
