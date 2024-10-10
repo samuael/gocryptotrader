@@ -20,3 +20,8 @@ func (sg *ZkLinkSigner) SignMusig(msg *big.Int) (*ZkLinkSignature, error) {
 }
 
 // func (sg *ZkLinkSigner) SignMusig(msg []uint8) (*ZkLinkSignature, error) {
+
+// Verify verifies the ZkLink signature processing
+func (sg *ZkLinkSigner) Verify(r, s *big.Int) bool {
+	return false
+}

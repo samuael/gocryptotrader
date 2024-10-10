@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/big"
-
-	"github.com/huandu/xstrings"
 )
 
-var zero = big.NewInt(0)
-var one = big.NewInt(1)
-var two = big.NewInt(2)
+var (
+	zero = big.NewInt(0)
+	one  = big.NewInt(1)
+	two  = big.NewInt(2)
+)
 
 // ECMult Multiplies by m a point on the elliptic curve with equation y^2 = x^3 + alpha*x + beta mod p.
 // Assumes the point is given in affine form (x, y) and that 0 < m < order(point).
@@ -71,7 +72,7 @@ func ECCAdd(point1, point2 [2]*big.Int, p *big.Int) [2]*big.Int {
 	return [2]*big.Int{x, y}
 }
 
-// DivMod Finds a nonnegative integer 0 <= x < p such that (m * x) % p == n
+// DivMod finds a nonnegative integer 0 <= x < p such that (m * x) % p == n
 func DivMod(n, m, p *big.Int) *big.Int {
 	a, _, c := IGCdex(m, p)
 	// (n * a) % p
@@ -84,7 +85,7 @@ func DivMod(n, m, p *big.Int) *big.Int {
 
 /*
 IGCdex
-Returns x, y, g such that g = x*a + y*b = gcd(a, b).
+returns x, y, g such that g = x*a + y*b = gcd(a, b).
 
 	>>> from sympy.core.numbers import IGCdex
 	>>> IGCdex(2, 3)
@@ -182,8 +183,21 @@ func GenerateKRfc6979(msgHash, priKey, ecOrder *big.Int, seed int) *big.Int {
 	return GenerateSecret(ecOrder, priKey, sha256.New, msgHash.Bytes(), extra)
 }
 
-// IntToHex32 Normalize to a 32-byte hex string without 0x prefix.
-func IntToHex32(x *big.Int) string {
-	str := x.Text(16)
-	return xstrings.RightJustify(str, 64, "0")
+const PAD_MSG_BEFORE_HASH_BITS_LEN = 736
+
+func RescueHashTransactionMsg(message *big.Int) (interface{}, error) {
+	// msgBits := BytesIntoBits(message)
+	if len(message.Bits()) <= PAD_MSG_BEFORE_HASH_BITS_LEN {
+		return nil, errors.New("invalid message")
+	}
+	return nil, nil
+}
+
+func BytesIntoBits(message []byte) *big.Int {
+	msg := new(big.Int)
+	for _, b := range message {
+		msg.Add(msg, big.NewInt(int64(b)))
+		msg.Lsh(msg, 8)
+	}
+	return msg
 }

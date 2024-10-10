@@ -2,7 +2,7 @@ package hash
 
 import "math/big"
 
-// PedersenCfg represents a pedersen configuration options.
+// PedersenCfg represents a pedersen hash configuration options
 type PedersenCfg struct {
 	Comment        string        `json:"_comment"`
 	FieldPrime     *big.Int      `json:"FIELD_PRIME"`

@@ -44,7 +44,7 @@ func TestECDSASignature(t *testing.T) {
 		ErrFailedToGenerateSignature)
 }
 
-func TestECDSAWithout(t *testing.T) {
+func TestECDSASignatureFromFile(t *testing.T) {
 	sfg, err := NewStarkExConfig()
 	require.NoError(t, err)
 	require.NotNil(t, sfg)

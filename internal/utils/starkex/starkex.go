@@ -74,13 +74,13 @@ func (sc *StarkConfig) Sign(sgn Signable, starkPrivateKey, starkPublicKey, stark
 	if err != nil {
 		return nil, nil, err
 	}
-	priKey, okay := big.NewInt(0).SetString(starkPrivateKey, 0)
-	if !okay {
-		return nil, nil, fmt.Errorf("%w, %v", ErrInvalidPrivateKey, starkPrivateKey)
-	}
 	msgHash, okay := new(big.Int).SetString(pHash, 0)
 	if !okay {
 		return nil, nil, ErrInvalidHashPayload
+	}
+	priKey, okay := big.NewInt(0).SetString(starkPrivateKey, 0)
+	if !okay {
+		return nil, nil, fmt.Errorf("%w, %v", ErrInvalidPrivateKey, starkPrivateKey)
 	}
 	r, s, err = sc.SignECDSA(msgHash, priKey)
 	if err != nil {
@@ -157,7 +157,6 @@ func (sc *StarkConfig) SignECDSA(msgHash, privKey *big.Int, seed ...*big.Int) (r
 		}
 
 		w := math_utils.DivMod(k, agg, sc.N)
-		// if w.Cmp(big.NewInt(0)) != 1 || w.Cmp(sc.Max) != -1 {
 		if !(w.Cmp(one) > 0 && w.Cmp(nBit) < 0) {
 			continue
 		}

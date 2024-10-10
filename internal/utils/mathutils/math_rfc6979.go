@@ -74,6 +74,7 @@ func Bits2Octets(in []byte, q *big.Int, qlen, rolen int) []byte {
 }
 
 // https://tools.ietf.org/html/rfc6979#section-3.2
+
 func GenerateSecret(q, x *big.Int, alg func() hash.Hash, hash, extraEntropy []byte) *big.Int {
 	qlen := q.BitLen()
 	holen := alg().Size()

@@ -3,6 +3,7 @@ package solsha3
 import (
 	"errors"
 
+	"github.com/thrasher-corp/gocryptotrader/backtester/common"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -27,7 +28,7 @@ func solsha3(types []string, values ...interface{}) []byte {
 	return hash.Sum(nil)
 }
 
-// SoliditySHA3 solidity sha3
+// SoliditySHA3 computes the KECCAK-256 hash of the given input.
 func SoliditySHA3(data ...interface{}) ([]byte, error) {
 	types, ok := data[0].([]string)
 	if !ok {
@@ -41,5 +42,5 @@ func SoliditySHA3(data ...interface{}) ([]byte, error) {
 	if ok {
 		return solsha3(types, iface...), nil
 	}
-	return nil, errors.New("invalid input")
+	return nil, common.ErrInvalidDataType
 }
