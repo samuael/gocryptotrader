@@ -179,7 +179,7 @@ func (ap *Apexpro) Subscribe(subscriptions subscription.List) error {
 	if err != nil {
 		return err
 	}
-	return ap.Websocket.AddSuccessfulSubscriptions(subscriptions...)
+	return ap.Websocket.AddSuccessfulSubscriptions(ap.Websocket.Conn, subscriptions...)
 }
 
 // Unsubscribe sends a websocket channel unsubscriptions.

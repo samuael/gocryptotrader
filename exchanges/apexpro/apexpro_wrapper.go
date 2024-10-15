@@ -128,7 +128,7 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 	if err != nil {
 		return err
 	}
-	err = ap.Websocket.SetupNewConnection(stream.ConnectionSetup{
+	err = ap.Websocket.SetupNewConnection(&stream.ConnectionSetup{
 		URL:                  apexProWebsocket,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
@@ -137,7 +137,7 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 		return err
 	}
 
-	return ap.Websocket.SetupNewConnection(stream.ConnectionSetup{
+	return ap.Websocket.SetupNewConnection(&stream.ConnectionSetup{
 		URL:                  apexProPrivateWebsocket,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,

@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common"
-	"github.com/thrasher-corp/gocryptotrader/common/convert"
 	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
@@ -82,7 +81,7 @@ func (ap *Apexpro) GetSystemTimeV1(ctx context.Context) (time.Time, error) {
 
 func (ap *Apexpro) getSystemTime(ctx context.Context, path string) (time.Time, error) {
 	resp := &struct {
-		Time convert.ExchangeTime `json:"time"`
+		Time types.Time `json:"time"`
 	}{}
 	return resp.Time.Time(), ap.SendHTTPRequest(ctx, exchange.RestSpot, path, request.UnAuth, &resp)
 }
