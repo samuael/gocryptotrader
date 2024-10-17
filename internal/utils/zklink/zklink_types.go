@@ -83,13 +83,3 @@ type TransferBuilder struct {
 	Nonce            *big.Int
 	Timestamp        *big.Int
 }
-
-// Bn256RescueParams
-type Bn256RescueParams struct {
-	C             uint64
-	R             uint64
-	Rounds        uint64
-	SecurityLevel uint64
-
-	CustomGatesAllowed bool
-}

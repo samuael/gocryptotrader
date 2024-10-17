@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math/big"
 )
@@ -181,23 +180,4 @@ func GenerateKRfc6979(msgHash, priKey, ecOrder *big.Int, seed int) *big.Int {
 		extra = buf.Bytes()
 	}
 	return GenerateSecret(ecOrder, priKey, sha256.New, msgHash.Bytes(), extra)
-}
-
-const PAD_MSG_BEFORE_HASH_BITS_LEN = 736
-
-func RescueHashTransactionMsg(message *big.Int) (interface{}, error) {
-	// msgBits := BytesIntoBits(message)
-	if len(message.Bits()) <= PAD_MSG_BEFORE_HASH_BITS_LEN {
-		return nil, errors.New("invalid message")
-	}
-	return nil, nil
-}
-
-func BytesIntoBits(message []byte) *big.Int {
-	msg := new(big.Int)
-	for _, b := range message {
-		msg.Add(msg, big.NewInt(int64(b)))
-		msg.Lsh(msg, 8)
-	}
-	return msg
 }
