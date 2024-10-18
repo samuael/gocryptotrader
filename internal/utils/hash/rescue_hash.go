@@ -1,15 +1,14 @@
 package hash
 
 import (
-	"crypto/cipher"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 
 	"golang.org/x/crypto/blake2s"
-	"golang.org/x/crypto/chacha20poly1305"
+	"golang.org/x/crypto/chacha20"
 )
 
 const PAD_MSG_BEFORE_HASH_BITS_LEN = 736
@@ -140,7 +139,7 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 		// that produces MDS matrix without eigenvalues for rate = 2,
 		// capacity = 1 variant over Bn254 curve
 		tag := []byte("ResM0003")
-		rng, err := func() (cipher.AEAD, error) {
+		rng, err := func() (*chacha20.Cipher, error) {
 			hasher, err := blake2s.New256(nil)
 			if err != nil {
 				return nil, err
@@ -170,11 +169,22 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 			}
 
 			// Create a ChaCha20-Poly1305 cipher
-			aead, err := chacha20poly1305.NewX(byteSeed)
-			if err != nil {
-				log.Fatal("failed to create cipher:", err)
+			// aead, err := chacha20poly1305.NewX(byteSeed)
+			// if err != nil {
+			// 	log.Fatal("failed to create cipher:", err)
+			// }
+			// return aead, nil
+			key := make([]byte, 32) // 256 bits for ChaCha20 key
+			if _, err := rand.Read(key); err != nil {
+				return nil, err
 			}
-			return aead, nil
+
+			// Return a new ChaCha20 instance
+			rng, err := chacha20.NewUnauthenticatedCipher(key, byteSeed)
+			if err != nil {
+				return nil, err
+			}
+			return rng, nil
 		}()
 		if err != nil {
 			return nil, err
@@ -195,6 +205,115 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 		MDSMatrix:          mdsMatrix,
 		CustomGatesAllowed: false,
 	}, nil
+}
+
+// generateMDSMatrix ...
+func generateMDSMatrix(t uint32, rng *chacha20.Cipher) ([]*big.Int, error) {
+	for {
+		var x, y []*big.Int
+		for range t {
+			x = append(x, genFr(rng))
+			y = append(y, genFr(rng))
+		}
+		var invalid bool
+		// quick and dirty check for uniqueness of x
+		for i := range t {
+			if invalid {
+				continue
+			}
+			el := x[i]
+			for _, other := range x[i+1:] {
+				if el == other {
+					invalid = true
+					break
+				}
+			}
+		}
+		if invalid {
+			continue
+		}
+		// quick and dirty check for uniqueness of y
+		for i := range t {
+			if invalid {
+				continue
+			}
+			el := y[i]
+			for _, other := range y[i+1:] {
+				if el == other {
+					invalid = true
+					break
+				}
+			}
+		}
+		if invalid {
+			continue
+		}
+		// quick and dirty check for uniqueness of x vs y
+		for i := range t {
+			if invalid {
+				continue
+			}
+			el := x[i]
+			for _, other := range y {
+				if el == other {
+					invalid = true
+					break
+				}
+			}
+		}
+
+		if invalid {
+			continue
+		}
+
+		// by previous checks we can be sure in uniqueness and perform subtractions easily
+		mdsMatrix := make([]*big.Int, t*t)
+		for i, xi := range x {
+			for j, yi := range y {
+				placeInto := uint32(i)*t + uint32(j)
+				element := new(big.Int).Set(xi)
+				element = element.Sub(element, yi)
+				mdsMatrix[placeInto] = element
+			}
+		}
+
+		// now we need to do the inverse
+		// batch_inversion::<E>(&mut mds_matrix[..]);
+
+		// return mds_matrix;
+		return mdsMatrix, nil
+
+	}
+
+}
+
+func batchInversion(v []*big.Int) []*big.Int {
+	// Montgomery’s Trick and Fast Implementation of Masked AES
+	// Genelle, Prouff and Quisquater
+	// Section 3.2
+	prod := make([]big.Int, len(v))
+	temp := big.NewInt(1)
+
+	for _, g := range v {
+		if g.Cmp(big.NewInt(0)) == 0 {
+			continue
+		}
+		temp.Mul(temp, g)
+		prod = append(prod, *temp)
+	}
+	println(len(prod))
+
+	// Invert `tmp`
+	// TODO:
+	return nil
+}
+
+// genFr simulates generating a random number value using the provided ChaCha20 RNG.
+func genFr(rng *chacha20.Cipher) *big.Int {
+	buf := make([]byte, 8)     // Assuming we need 64 bits for our random values
+	rng.XORKeyStream(buf, buf) // Fill buf with random data
+	value := binary.BigEndian.Uint64(buf)
+	return big.NewInt(0).SetUint64(value)
 }
 
 type PowerSBox struct {
