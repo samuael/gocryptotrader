@@ -83,3 +83,17 @@ type TransferBuilder struct {
 	Nonce            *big.Int
 	Timestamp        *big.Int
 }
+
+// Bn256RescueParams represents capacity, rate of hash, and other details of the rescue hash algorithm
+type Bn256RescueParams struct {
+	C              uint32
+	R              uint32
+	Rounds         uint32
+	SecurityLevel  uint32
+	RoundConstants []*big.Int
+	MDSMatrix      []*big.Int
+	SBox0          *PowerSBox
+	SBox1          *QuinticSBox
+
+	CustomGatesAllowed bool
+}

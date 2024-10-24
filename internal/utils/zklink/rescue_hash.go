@@ -1,4 +1,4 @@
-package hash
+package zklink
 
 import (
 	"crypto/rand"
@@ -19,6 +19,7 @@ func RescueHashTransactionMsg(message *big.Int) (interface{}, error) {
 		return nil, errors.New("invalid message")
 	}
 	// bits := BytesIntoBits(message.Bytes())
+	// bn256.Order
 	return nil, nil
 }
 
@@ -189,12 +190,13 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 		if err != nil {
 			return nil, err
 		}
-		// return rng, nil
-		//
-		// TODO: ...
-		// generatemdsMatrix()
-		println(rng)
-		return nil, nil
+		var mdsMatrix []*big.Int
+		mdsMatrix, err = generateMDSMatrix(stateWidth, rng)
+		if err != nil {
+			return nil, err
+		}
+		// println(rng)
+		return mdsMatrix, nil
 	}()
 	return &Bn256RescueParams{
 		C:                  c,
@@ -279,6 +281,7 @@ func generateMDSMatrix(t uint32, rng *chacha20.Cipher) ([]*big.Int, error) {
 
 		// now we need to do the inverse
 		// batch_inversion::<E>(&mut mds_matrix[..]);
+		// BatchInversion(mdsMatrix, bn256.Order)
 
 		// return mds_matrix;
 		return mdsMatrix, nil
@@ -287,25 +290,73 @@ func generateMDSMatrix(t uint32, rng *chacha20.Cipher) ([]*big.Int, error) {
 
 }
 
-func batchInversion(v []*big.Int) []*big.Int {
-	// Montgomery’s Trick and Fast Implementation of Masked AES
-	// Genelle, Prouff and Quisquater
-	// Section 3.2
-	prod := make([]big.Int, len(v))
-	temp := big.NewInt(1)
+// BatchInvert returns a new slice with every element inverted.
+// Uses Montgomery batch inversion trick
+// func BatchInvert(a []Element) []Element {
+// 	res := make([]Element, len(a))
+// 	if len(a) == 0 {
+// 		return res
+// 	}
+
+// 	zeroes := bitset.New(uint(len(a)))
+// 	accumulator := One()
+
+// 	for i := 0; i < len(a); i++ {
+// 		if a[i].IsZero() {
+// 			zeroes.Set(uint(i))
+// 			continue
+// 		}
+// 		res[i] = accumulator
+// 		accumulator.Mul(&accumulator, &a[i])
+// 	}
+
+// 	accumulator.Inverse(&accumulator)
+
+// 	for i := len(a) - 1; i >= 0; i-- {
+// 		if zeroes.Test(uint(i)) {
+// 			continue
+// 		}
+// 		res[i].Mul(&res[i], &accumulator)
+// 		accumulator.Mul(&accumulator, &a[i])
+// 	}
+
+// 	return res
+// }
+
+// BatchInversion computes the inverses of elements in the slice using Montgomery's trick
+func BatchInversion(v []*big.Int, modulus *big.Int) {
+	if len(v) == 0 {
+		return
+	}
+	// First pass: compute [a, ab, abc, ...]
+	prod := make([]*big.Int, len(v))
+	tmp := big.NewInt(1) // Assuming the one method initializes to multiplicative identity
+	var zero = big.NewInt(0)
+	j := 0
 
 	for _, g := range v {
-		if g.Cmp(big.NewInt(0)) == 0 {
-			continue
+		if g.Cmp(zero) != 0 {
+			tmp = new(big.Int).Mul(tmp, g)
+			tmp = tmp.Mod(tmp, modulus)
+			prod[j] = new(big.Int).Set(tmp)
+			j++
 		}
-		temp.Mul(temp, g)
-		prod = append(prod, *temp)
 	}
-	println(len(prod))
 
 	// Invert `tmp`
-	// TODO:
-	return nil
+	tmp = tmp.ModInverse(tmp, modulus)
+
+	// Second pass: iterate backwards to compute inverses
+	for i := j - 1; i >= 0; i-- {
+		g := v[i]
+		if g.Cmp(zero) != 0 {
+			newtmp := new(big.Int).Mul(tmp, g)
+			newtmp = newtmp.Mod(newtmp, modulus)
+			g.Mul(tmp, prod[i])
+			g.Mod(g, modulus)
+			tmp.Set(newtmp)
+		}
+	}
 }
 
 // genFr simulates generating a random number value using the provided ChaCha20 RNG.
