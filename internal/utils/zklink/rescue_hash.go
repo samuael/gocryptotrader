@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/bits-and-blooms/bitset"
+	"github.com/thrasher-corp/gocryptotrader/internal/utils/zklink/bn256/fr"
+	"github.com/thrasher-corp/gocryptotrader/internal/utils/zklink/helper"
 	"golang.org/x/crypto/blake2s"
 	"golang.org/x/crypto/chacha20"
 )
@@ -96,9 +99,9 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 	stateWidth := c + r
 	numRoundConstants := int((1 + rounds*2) * stateWidth)
 
-	roundConstants, err := func() ([]*big.Int, error) {
+	roundConstants, err := func() ([]*fr.Element, error) {
 		tag := []byte("Rescue_f")
-		roundConstants := make([]*big.Int, numRoundConstants)
+		roundConstants := make([]*fr.Element, numRoundConstants)
 		nonce := uint32(0)
 		var nonceBytes []byte
 
@@ -118,9 +121,9 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 				return nil, fmt.Errorf("expecting a hash length of 32 bytes, got a hash with length %d", len(hashData))
 			}
 
-			constantRepr := big.NewInt(0).SetBytes(hashData)
+			constantRepr := helper.NewElement().SetBytes(hashData)
 			constant := constantRepr
-			if constant.Cmp(big.NewInt(0)) != 0 {
+			if constant.Cmp(helper.NewElement().SetZero()) != 0 {
 				roundConstants = append(roundConstants, constant)
 			}
 
@@ -135,7 +138,7 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 		return nil, err
 	}
 
-	mdsMatrix, err := func() ([]*big.Int, error) {
+	mdsMatrix, err := func() ([]*fr.Element, error) {
 		// This tag is a first one in a sequence of b"ResMxxxx"
 		// that produces MDS matrix without eigenvalues for rate = 2,
 		// capacity = 1 variant over Bn254 curve
@@ -190,14 +193,13 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 		if err != nil {
 			return nil, err
 		}
-		var mdsMatrix []*big.Int
-		mdsMatrix, err = generateMDSMatrix(stateWidth, rng)
-		if err != nil {
-			return nil, err
-		}
-		// println(rng)
-		return mdsMatrix, nil
+		// var mdsMatrix helper.Matrix
+		return generateMDSMatrix(stateWidth, rng)
+		// return helper.GenMDS(int(stateWidth)), nil
 	}()
+	if err != nil {
+		return nil, err
+	}
 	return &Bn256RescueParams{
 		C:                  c,
 		R:                  r,
@@ -210,9 +212,9 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 }
 
 // generateMDSMatrix ...
-func generateMDSMatrix(t uint32, rng *chacha20.Cipher) ([]*big.Int, error) {
+func generateMDSMatrix(t uint32, rng *chacha20.Cipher) ([]*fr.Element, error) {
 	for {
-		var x, y []*big.Int
+		var x, y []*fr.Element
 		for range t {
 			x = append(x, genFr(rng))
 			y = append(y, genFr(rng))
@@ -269,11 +271,11 @@ func generateMDSMatrix(t uint32, rng *chacha20.Cipher) ([]*big.Int, error) {
 		}
 
 		// by previous checks we can be sure in uniqueness and perform subtractions easily
-		mdsMatrix := make([]*big.Int, t*t)
+		mdsMatrix := make([]*fr.Element, t*t)
 		for i, xi := range x {
 			for j, yi := range y {
 				placeInto := uint32(i)*t + uint32(j)
-				element := new(big.Int).Set(xi)
+				element := new(fr.Element).Set(xi)
 				element = element.Sub(element, yi)
 				mdsMatrix[placeInto] = element
 			}
@@ -281,47 +283,42 @@ func generateMDSMatrix(t uint32, rng *chacha20.Cipher) ([]*big.Int, error) {
 
 		// now we need to do the inverse
 		// batch_inversion::<E>(&mut mds_matrix[..]);
-		// BatchInversion(mdsMatrix, bn256.Order)
-
-		// return mds_matrix;
-		return mdsMatrix, nil
-
+		return BatchInvert(mdsMatrix), nil
+		// return helper.GenMDS(int(t)), nil
 	}
-
 }
 
 // BatchInvert returns a new slice with every element inverted.
 // Uses Montgomery batch inversion trick
-// func BatchInvert(a []Element) []Element {
-// 	res := make([]Element, len(a))
-// 	if len(a) == 0 {
-// 		return res
-// 	}
+func BatchInvert(a []*fr.Element) []*fr.Element {
+	res := make([]*fr.Element, len(a))
+	if len(a) == 0 {
+		return res
+	}
 
-// 	zeroes := bitset.New(uint(len(a)))
-// 	accumulator := One()
+	zeroes := bitset.New(uint(len(a)))
+	accumulator := new(fr.Element).SetUint64(1)
 
-// 	for i := 0; i < len(a); i++ {
-// 		if a[i].IsZero() {
-// 			zeroes.Set(uint(i))
-// 			continue
-// 		}
-// 		res[i] = accumulator
-// 		accumulator.Mul(&accumulator, &a[i])
-// 	}
+	for i := 0; i < len(a); i++ {
+		if a[i].IsZero() {
+			zeroes.Set(uint(i))
+			continue
+		}
+		res[i] = accumulator
+		accumulator.Mul(accumulator, a[i])
+	}
 
-// 	accumulator.Inverse(&accumulator)
+	accumulator.Inverse(accumulator)
 
-// 	for i := len(a) - 1; i >= 0; i-- {
-// 		if zeroes.Test(uint(i)) {
-// 			continue
-// 		}
-// 		res[i].Mul(&res[i], &accumulator)
-// 		accumulator.Mul(&accumulator, &a[i])
-// 	}
-
-// 	return res
-// }
+	for i := len(a) - 1; i >= 0; i-- {
+		if zeroes.Test(uint(i)) {
+			continue
+		}
+		res[i].Mul(res[i], accumulator)
+		accumulator.Mul(accumulator, a[i])
+	}
+	return res
+}
 
 // BatchInversion computes the inverses of elements in the slice using Montgomery's trick
 func BatchInversion(v []*big.Int, modulus *big.Int) {
@@ -360,18 +357,20 @@ func BatchInversion(v []*big.Int, modulus *big.Int) {
 }
 
 // genFr simulates generating a random number value using the provided ChaCha20 RNG.
-func genFr(rng *chacha20.Cipher) *big.Int {
+func genFr(rng *chacha20.Cipher) *fr.Element {
 	buf := make([]byte, 8)     // Assuming we need 64 bits for our random values
 	rng.XORKeyStream(buf, buf) // Fill buf with random data
 	value := binary.BigEndian.Uint64(buf)
-	return big.NewInt(0).SetUint64(value)
+	return helper.NewElement().SetBigInt(big.NewInt(0).SetUint64(value))
 }
 
+// PowerSBox ...
 type PowerSBox struct {
 	Power *big.Int
 	Inv   uint64
 }
 
+// QuinticSBox ...
 type QuinticSBox struct {
 	Marker *big.Int
 }

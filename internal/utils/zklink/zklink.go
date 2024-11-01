@@ -1,6 +1,8 @@
 package zklink
 
-import "math/big"
+import (
+	"math/big"
+)
 
 // NewZkLinkSigner creates a new zklink signer instance.
 func NewZkLinkSigner() *ZkLinkSigner {
@@ -16,6 +18,11 @@ func (sr *ZkLinkSigner) Sign(arg Signable) (*ZkLinkSignature, error) {
 // It is impossible to restore signer for signature, that is why we provide public key of the signer
 // along with signature.
 func (sg *ZkLinkSigner) SignMusig(msg *big.Int) (*ZkLinkSignature, error) {
+	pGen := 5
+	// var publicKey
+	// newElem := helper.NewElement()
+	// newElem.Mul()
+	println(pGen)
 	return nil, nil
 }
 

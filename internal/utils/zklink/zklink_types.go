@@ -3,6 +3,8 @@ package zklink
 import (
 	"errors"
 	"math/big"
+
+	"github.com/thrasher-corp/gocryptotrader/internal/utils/zklink/bn256/fr"
 )
 
 var (
@@ -11,7 +13,6 @@ var (
 	errInvalidSeed          = errors.New("invalid seed")
 	errInvalidPublicKey     = errors.New("invalid public key")
 	errInvalidPublicKeyHash = errors.New("invalid public key hash")
-
 	errInvalidEthSigner     = errors.New("invalid eth signer")
 	errMissingEthPrivateKey = errors.New("Ethereum private key required to perform an operation")
 	errMissingEthSigner     = errors.New("EthereumSigner required to perform an operation")
@@ -23,7 +24,7 @@ var (
 	errDefineAddress        = errors.New("address determination error")
 	errRecoverAddress       = errors.New("recover address from signature failed: {0}")
 	errLengthMismatched     = errors.New("signature length mismatch")
-	errCryptoError          = errors.New("Crypto Error")
+	errCryptoError          = errors.New("crypto Error")
 	errInvalidETHSignature  = errors.New("invalid eth signature string")
 )
 
@@ -90,8 +91,8 @@ type Bn256RescueParams struct {
 	R              uint32
 	Rounds         uint32
 	SecurityLevel  uint32
-	RoundConstants []*big.Int
-	MDSMatrix      []*big.Int
+	RoundConstants []*fr.Element
+	MDSMatrix      []*fr.Element
 	SBox0          *PowerSBox
 	SBox1          *QuinticSBox
 
