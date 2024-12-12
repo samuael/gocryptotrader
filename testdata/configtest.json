@@ -1092,7 +1092,7 @@
     },
     "enabled": {
      "autoPairUpdates": true,
-     "websocketAPI": false
+     "websocketAPI": true
     }
    },
    "bankAccounts": [
