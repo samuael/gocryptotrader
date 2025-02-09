@@ -2,6 +2,7 @@ package apexpro
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"testing"
@@ -1351,4 +1352,63 @@ func TestOrderTypeStrings(t *testing.T) {
 	for k := range orderMap {
 		assert.Equal(t, orderTypeString(k), orderMap[k])
 	}
+}
+
+func TestGetRepaymentPrice(t *testing.T) {
+	t.Parallel()
+	_, err := ap.GetRepaymentPrice(context.Background(), []RepaymentTokenAndAmount{}, "client-id-here")
+	require.ErrorIs(t, err, common.ErrEmptyParams)
+	_, err = ap.GetRepaymentPrice(context.Background(), []RepaymentTokenAndAmount{{}}, "")
+	require.ErrorIs(t, err, errClientIDMissing)
+	_, err = ap.GetRepaymentPrice(context.Background(), []RepaymentTokenAndAmount{{}}, "client-id-here")
+	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
+	_, err = ap.GetRepaymentPrice(context.Background(), []RepaymentTokenAndAmount{{
+		Token: currency.ETH,
+	}}, "client-id-here")
+	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap)
+	result, err := ap.GetRepaymentPrice(context.Background(), []RepaymentTokenAndAmount{
+		{
+			Token:  currency.BTC,
+			Amount: 123.4,
+		},
+	}, "client-id-here")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestMarshalJSON(t *testing.T) {
+	t.Parallel()
+	data := LoanRepaymentTokenAndAmountList{{Token: currency.BTC, Amount: 123.4}}
+	marshalData, err := json.Marshal(data)
+	require.NoError(t, err)
+	assert.NotNil(t, marshalData)
+}
+
+func TestUserManualRepayment(t *testing.T) {
+	t.Parallel()
+	_, err := ap.UserManualRepayment(context.Background(), nil)
+	require.ErrorIs(t, err, common.ErrNilPointer)
+	_, err = ap.UserManualRepayment(context.Background(), &UserManualRepaymentParams{ExpiryTime: time.Now().Add(-time.Hour * 48)})
+	require.ErrorIs(t, err, errClientIDMissing)
+	_, err = ap.UserManualRepayment(context.Background(), &UserManualRepaymentParams{ClientID: "1234567"})
+	require.ErrorIs(t, err, common.ErrEmptyParams)
+	_, err = ap.UserManualRepayment(context.Background(), &UserManualRepaymentParams{ClientID: "1234567",
+		LoanRepaymentTokenAndAmount: LoanRepaymentTokenAndAmountList{{Token: currency.BTC, Amount: 123.4}}})
+	require.ErrorIs(t, err, common.ErrEmptyParams)
+	_, err = ap.UserManualRepayment(context.Background(), &UserManualRepaymentParams{ClientID: "1234567",
+		LoanRepaymentTokenAndAmount: LoanRepaymentTokenAndAmountList{{Token: currency.BTC, Amount: 123.4}},
+		PoolRepaymentTokensDetail:   LoanRepaymentTokenAndAmountList{{Token: currency.BTC, Amount: 123.4}}})
+	require.ErrorIs(t, err, errExpirationTimeRequired)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, ap, canManipulateRealOrders)
+	result, err := ap.UserManualRepayment(context.Background(), &UserManualRepaymentParams{
+		ClientID:                    "1234567",
+		ExpiryTime:                  time.Now().Add(-time.Hour * 48),
+		PoolRepaymentTokensDetail:   LoanRepaymentTokenAndAmountList{{Token: currency.BTC, Amount: 123.4}},
+		LoanRepaymentTokenAndAmount: LoanRepaymentTokenAndAmountList{{Token: currency.BTC, Amount: 123.4}},
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
 }

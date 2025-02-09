@@ -60,6 +60,7 @@ var (
 	errUserIDRequired                = errors.New("user ID is required")
 	errDeviceTypeIsRequired          = errors.New("device type is required")
 	errLimitFeeRequired              = errors.New("limit fee is required")
+	errClientIDMissing               = errors.New("client ID is required")
 )
 
 // Start implementing public and private exchange API funcs below
@@ -1168,6 +1169,67 @@ func (ap *Apexpro) getHistoricalAssetValue(ctx context.Context, token, path stri
 // SetInitialMarginRateInfo sets an initial margin rate
 func (ap *Apexpro) SetInitialMarginRateInfo(ctx context.Context, symbol string, initialMarginRate float64) error {
 	return ap.setInitialMarginRateInfo(ctx, symbol, "v3/set-initial-margin-rate", initialMarginRate, exchange.RestFutures)
+}
+
+// GetRepaymentPrice retrieves repayment prices for tokens
+func (ap *Apexpro) GetRepaymentPrice(ctx context.Context, repaymentPriceTokens []RepaymentTokenAndAmount, clientID string) (*LoanRepaymentRates, error) {
+	if len(repaymentPriceTokens) == 0 {
+		return nil, common.ErrEmptyParams
+	}
+	if clientID == "" {
+		return nil, errClientIDMissing
+	}
+	params := url.Values{}
+	var paramString string
+	for a := range repaymentPriceTokens {
+		if repaymentPriceTokens[a].Token.IsEmpty() {
+			return nil, currency.ErrCurrencyCodeEmpty
+		}
+		if repaymentPriceTokens[a].Amount <= 0 {
+			return nil, order.ErrAmountBelowMin
+		}
+		paramString += repaymentPriceTokens[a].Token.String() + "|" + strconv.FormatFloat(repaymentPriceTokens[a].Amount, 'f', -1, 64) + ","
+	}
+	paramString = strings.Trim(paramString, ",")
+	params.Set("repaymentPriceTokens", paramString)
+	params.Set("clientId", clientID)
+	var resp *LoanRepaymentRates
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "v3/repayment-price", request.Auth, params, nil, &resp)
+}
+
+// UserManualRepayment sends a user manual repayment request
+func (ap *Apexpro) UserManualRepayment(ctx context.Context, arg *UserManualRepaymentParams) (*IDResponse, error) {
+	if arg == nil {
+		return nil, common.ErrNilPointer
+	}
+	if arg.ClientID == "" {
+		return nil, errClientIDMissing
+	}
+	if len(arg.LoanRepaymentTokenAndAmount) == 0 {
+		return nil, fmt.Errorf("%w: LoanRepaymentTokenAndAmount detail is required", common.ErrEmptyParams)
+	}
+	if len(arg.PoolRepaymentTokensDetail) == 0 {
+		return nil, fmt.Errorf("%w: PoolRepaymentTokensDetail detail is required", common.ErrEmptyParams)
+	}
+	if arg.ExpiryTime.IsZero() {
+		return nil, errExpirationTimeRequired
+	}
+	loanRepaymentTokensByteData, err := json.Marshal(arg.LoanRepaymentTokenAndAmount)
+	if err != nil {
+		return nil, err
+	}
+	poolTokensByteData, err := json.Marshal(arg.PoolRepaymentTokensDetail)
+	if err != nil {
+		return nil, err
+	}
+	argParam := &map[string]string{
+		"repaymentTokens":     string(loanRepaymentTokensByteData),
+		"poolRepaymentTokens": string(poolTokensByteData),
+		"clientId":            arg.ClientID,
+		"expireTime":          strconv.FormatInt(arg.ExpiryTime.UnixMilli(), 10),
+	}
+	var resp *IDResponse
+	return resp, ap.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "v3/manual-create-repayment", request.Auth, nil, argParam, &resp)
 }
 
 // SetInitialMarginRateInfoV1 sets an initial margin rate

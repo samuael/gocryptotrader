@@ -3,6 +3,7 @@ package apexpro
 import (
 	"encoding/json"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/currency"
@@ -708,17 +709,16 @@ type WsTicker struct {
 
 // UserData represents an account user information.
 type UserData struct {
-	EthereumAddress string `json:"ethereumAddress"`
-	IsRegistered    bool   `json:"isRegistered"`
-	Email           string `json:"email"`
-	Username        string `json:"username"`
-	UserData        struct {
-	} `json:"userData"`
-	IsEmailVerified          bool `json:"isEmailVerified"`
-	EmailNotifyGeneralEnable bool `json:"emailNotifyGeneralEnable"`
-	EmailNotifyTradingEnable bool `json:"emailNotifyTradingEnable"`
-	EmailNotifyAccountEnable bool `json:"emailNotifyAccountEnable"`
-	PopupNotifyTradingEnable bool `json:"popupNotifyTradingEnable"`
+	EthereumAddress          string `json:"ethereumAddress"`
+	IsRegistered             bool   `json:"isRegistered"`
+	Email                    string `json:"email"`
+	Username                 string `json:"username"`
+	UserData                 any    `json:"userData"`
+	IsEmailVerified          bool   `json:"isEmailVerified"`
+	EmailNotifyGeneralEnable bool   `json:"emailNotifyGeneralEnable"`
+	EmailNotifyTradingEnable bool   `json:"emailNotifyTradingEnable"`
+	EmailNotifyAccountEnable bool   `json:"emailNotifyAccountEnable"`
+	PopupNotifyTradingEnable bool   `json:"popupNotifyTradingEnable"`
 }
 
 // UserResponse represents a user account detail response.
@@ -1546,4 +1546,52 @@ type CreateOrderParam struct {
 	PositionID          string        `json:"position_id"`
 	PublicKey           string        `json:"public_key"`
 	Signature           SignatureInfo `json:"signature"`
+}
+
+// LoanRepaymentRates represents a loan repayment rates
+type LoanRepaymentRates struct {
+	RepaymentTokens []struct {
+		Token string       `json:"token"`
+		Price types.Number `json:"price"`
+		Size  types.Number `json:"size"`
+	} `json:"repaymentTokens"`
+}
+
+// RepaymentTokenAndAmount holds loan repayment tokens and amount
+type RepaymentTokenAndAmount struct {
+	Token  currency.Code
+	Amount float64
+}
+
+// UserLoanRepaymentParams holds user manual loans repayment parameter
+type UserLoanRepaymentParams struct {
+	RepaymentTokens     []RepaymentTokenAndAmount `json:"repaymentTokens"`
+	ClientID            string                    `json:"clientId"`
+	PoolRepaymentTokens []RepaymentTokenAndAmount `json:"poolRepaymentTokens"`
+}
+
+// LoanRepaymentTokenAndAmountList holds list of tokens and amount details
+type LoanRepaymentTokenAndAmountList []RepaymentTokenAndAmount
+
+// MarshalJSON serializes the LoanRepaymentTokenAndAmount into byte data
+func (l LoanRepaymentTokenAndAmountList) MarshalJSON() ([]byte, error) {
+	var marshaledString string
+	for a := range l {
+		marshaledString += l[a].Token.String() + "|" + strconv.FormatFloat(l[a].Amount, 'f', -1, 64)
+	}
+	byteData := append([]byte{'"'}, append([]byte(marshaledString), []byte{'"'}...)...)
+	return byteData, nil
+}
+
+// UserManualRepaymentParams holds request parameters for user manual repayments
+type UserManualRepaymentParams struct {
+	LoanRepaymentTokenAndAmount LoanRepaymentTokenAndAmountList
+	ClientID                    string
+	ExpiryTime                  time.Time
+	PoolRepaymentTokensDetail   LoanRepaymentTokenAndAmountList
+}
+
+// IDResponse holds id data as a response
+type IDResponse struct {
+	ID string `json:"id"`
 }
