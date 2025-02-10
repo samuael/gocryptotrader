@@ -72,7 +72,7 @@ func TestMain(m *testing.M) {
 		exchCfg.API.AuthenticatedSupport = true
 		exchCfg.API.AuthenticatedWebsocketSupport = true
 		ok.API.CredentialsValidator.RequiresBase64DecodeSecret = false
-		ok.SetCredentials(apiKey, apiSecret, passphrase, "", "", "")
+		ok.SetCredentials(apiKey, apiSecret, passphrase, "", "", "", "", "", "")
 		ok.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	}
 	if !useTestNet {
