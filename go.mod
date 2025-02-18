@@ -29,7 +29,7 @@ require (
 	github.com/volatiletech/null v8.0.0+incompatible
 	golang.org/x/crypto v0.33.0
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
-	golang.org/x/net v0.34.0
+	golang.org/x/net v0.35.0
 	golang.org/x/sys v0.30.0
 	golang.org/x/term v0.29.0
 	golang.org/x/text v0.22.0
