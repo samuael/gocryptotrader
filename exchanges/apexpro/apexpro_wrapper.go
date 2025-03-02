@@ -192,7 +192,7 @@ func (ap *Apexpro) UpdateTicker(ctx context.Context, p currency.Pair, assetType 
 		return nil, err
 	}
 	if len(tick) == 0 {
-		return nil, ticker.ErrNoTickerFound
+		return nil, ticker.ErrTickerNotFound
 	}
 	tickerPrice := &ticker.Price{
 		Last:         tick[0].LastPrice.Float64(),
