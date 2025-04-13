@@ -1,10 +1,8 @@
 package helper
 
 import (
-	// "math/big"
 	"reflect"
 
-	// "github.com/consensys/gnark-crypto/field/pool"
 	"github.com/thrasher-corp/gocryptotrader/internal/utils/zklink/bn256/fr"
 )
 
@@ -12,11 +10,6 @@ func NewElement() *fr.Element {
 	typ := reflect.TypeOf((*fr.Element)(nil)).Elem()
 	val := reflect.New(typ.Elem())
 	return val.Interface().(*fr.Element)
-}
-
-func isNil(t fr.Element) bool {
-	v := reflect.ValueOf(t)
-	return v.IsNil()
 }
 
 func zero() *fr.Element {

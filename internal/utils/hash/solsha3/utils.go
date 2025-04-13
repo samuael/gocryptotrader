@@ -13,9 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
-var (
-	errInvalidInput = errors.New("invalid input")
-)
+var errInvalidInput = errors.New("invalid input")
 
 func pack(typ string, value interface{}, _isArray bool) ([]byte, error) {
 	switch typ {

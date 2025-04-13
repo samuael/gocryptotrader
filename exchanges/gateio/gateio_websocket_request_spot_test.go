@@ -204,7 +204,7 @@ func newExchangeWithWebsocket(t *testing.T, a asset.Item) *Gateio {
 	testexch.UpdatePairsOnce(t, g)
 	g.API.AuthenticatedSupport = true
 	g.API.AuthenticatedWebsocketSupport = true
-	g.SetCredentials(apiKey, apiSecret, "", "", "", "")
+	g.SetCredentials(apiKey, apiSecret, "", "", "", "", "", "", "")
 	g.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	switch a {
 	case asset.Spot:

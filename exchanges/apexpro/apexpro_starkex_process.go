@@ -79,7 +79,6 @@ func (ap *Apexpro) ProcessOrderSignature(ctx context.Context, arg *CreateOrderPa
 			break
 		}
 	}
-	// takerFeeRate = 0.003
 	if takerFeeRate == -1. {
 		return "", fmt.Errorf("%w, account with a settlement "+contractDetail.SettleCurrencyID+" is missing", errLimitFeeRequired)
 	}

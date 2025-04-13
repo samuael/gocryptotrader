@@ -68,12 +68,11 @@ func (w *WithdrawBuilder) GetBytes() *big.Int {
 	payload.Lsh(payload, WithdrawFieldBitLengths["nonce"])
 	payload.Add(payload, w.Nonce)
 	payload.Lsh(payload, WithdrawFieldBitLengths["withdrawToL1"])
-	// payload.Add(part1, w.With)
+
 	payload.Lsh(payload, WithdrawFieldBitLengths["withdrawFeeRatio"])
 	payload.Add(payload, w.WithdrawFeeRatio)
 
 	payload.Lsh(payload, WithdrawFieldBitLengths["callData"])
-	// part1.Add(part1, w.)
 
 	payload.Lsh(payload, WithdrawFieldBitLengths["ts"])
 	return payload.Add(payload, w.Timestamp)

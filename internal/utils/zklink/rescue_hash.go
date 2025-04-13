@@ -111,7 +111,6 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 			if err != nil {
 				return nil, err
 			}
-			// nonceBytes = []byte()
 			hasher.Write(tag)
 			hasher.Write(GH_FIRST_BLOCK)
 			hasher.Write(nonceBytes)
@@ -193,9 +192,7 @@ func (b *Bn256RescueParams) NewForParams(c, r, rounds, securityLevel uint32) (*B
 		if err != nil {
 			return nil, err
 		}
-		// var mdsMatrix helper.Matrix
 		return generateMDSMatrix(stateWidth, rng)
-		// return helper.GenMDS(int(stateWidth)), nil
 	}()
 	if err != nil {
 		return nil, err

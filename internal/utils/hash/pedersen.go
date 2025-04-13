@@ -3,10 +3,10 @@ package hash
 // Note: currently some methods implementations here are directly copied from the github.com/yaune/starkex repository, and will be removed/update and tested
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"math/big"
 
+	"github.com/thrasher-corp/gocryptotrader/encoding/json"
 	math_utils "github.com/thrasher-corp/gocryptotrader/internal/utils/mathutils"
 )
 

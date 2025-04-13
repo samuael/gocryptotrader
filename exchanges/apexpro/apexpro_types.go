@@ -1,12 +1,12 @@
 package apexpro
 
 import (
-	"encoding/json"
 	"math/big"
 	"strconv"
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/encoding/json"
 	"github.com/thrasher-corp/gocryptotrader/types"
 )
 
@@ -876,17 +876,16 @@ type EditUserDataParams struct {
 
 // UserDataResponse represents a user data response.
 type UserDataResponse struct {
-	EthereumAddress string `json:"ethereumAddress"`
-	IsRegistered    bool   `json:"isRegistered"`
-	Email           string `json:"email"`
-	Username        string `json:"username"`
-	UserData        struct {
-	} `json:"userData"`
-	IsEmailVerified          bool `json:"isEmailVerified"`
-	EmailNotifyGeneralEnable bool `json:"emailNotifyGeneralEnable"`
-	EmailNotifyTradingEnable bool `json:"emailNotifyTradingEnable"`
-	EmailNotifyAccountEnable bool `json:"emailNotifyAccountEnable"`
-	PopupNotifyTradingEnable bool `json:"popupNotifyTradingEnable"`
+	EthereumAddress          string   `json:"ethereumAddress"`
+	IsRegistered             bool     `json:"isRegistered"`
+	Email                    string   `json:"email"`
+	Username                 string   `json:"username"`
+	UserData                 struct{} `json:"userData"`
+	IsEmailVerified          bool     `json:"isEmailVerified"`
+	EmailNotifyGeneralEnable bool     `json:"emailNotifyGeneralEnable"`
+	EmailNotifyTradingEnable bool     `json:"emailNotifyTradingEnable"`
+	EmailNotifyAccountEnable bool     `json:"emailNotifyAccountEnable"`
+	PopupNotifyTradingEnable bool     `json:"popupNotifyTradingEnable"`
 }
 
 // UserAccountV2 represents a V2 user account detail.

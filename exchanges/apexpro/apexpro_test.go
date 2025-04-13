@@ -2,7 +2,6 @@ package apexpro
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"os"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/encoding/json"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/margin"
@@ -125,6 +125,7 @@ func TestGetNewestTradingDataV2(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
+
 func TestGetNewestTradingDataV1(t *testing.T) {
 	t.Parallel()
 	result, err := ap.GetNewestTradingDataV1(context.Background(), "BTC-USDC", 10)

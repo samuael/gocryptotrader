@@ -442,7 +442,7 @@ func isUpperTriangular(m Matrix) bool {
 // transform a square matrix to upper triangular matrix.
 func upperTriangular(m, shadow Matrix) (Matrix, Matrix, error) {
 	if !IsSquareMatrix(m) {
-		return nil, nil, errors.New("matrix is not square!")
+		return nil, nil, errors.New("matrix is not square")
 	}
 
 	curr := copyMatrixRows(m, 0, row(m))
@@ -478,7 +478,6 @@ func upperTriangular(m, shadow Matrix) (Matrix, Matrix, error) {
 // reduce a upper triangular matrix to identity matrix.
 func reduceToIdentity(m, shadow Matrix) (Matrix, Matrix, error) {
 	var err error
-
 	result := make([][]*fr.Element, row(m))
 	shadowResult := make([][]*fr.Element, row(shadow))
 	for i := 0; i < row(m); i++ {
