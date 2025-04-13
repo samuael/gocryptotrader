@@ -9,16 +9,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/websocket"
+	gws "github.com/gorilla/websocket"
 	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/exchange/websocket"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/fill"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
-	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
@@ -53,9 +53,9 @@ func generatePingMessage() ([]byte, error) {
 // WsConnect creates a websocket connection
 func (ap *Apexpro) WsConnect() error {
 	if !ap.Websocket.IsEnabled() || !ap.IsEnabled() {
-		return stream.ErrWebsocketNotEnabled
+		return websocket.ErrWebsocketNotEnabled
 	}
-	var dialer websocket.Dialer
+	var dialer gws.Dialer
 	dialer.HandshakeTimeout = ap.Config.HTTPTimeout
 	dialer.Proxy = http.ProxyFromEnvironment
 	var err error
@@ -69,9 +69,9 @@ func (ap *Apexpro) WsConnect() error {
 	if err != nil {
 		return err
 	}
-	ap.Websocket.Conn.SetupPingHandler(request.UnAuth, stream.PingHandler{
+	ap.Websocket.Conn.SetupPingHandler(request.UnAuth, websocket.PingHandler{
 		UseGorillaHandler: true,
-		MessageType:       websocket.PongMessage,
+		MessageType:       gws.PongMessage,
 		Message:           payload,
 	})
 	ap.Websocket.Wg.Add(1)
@@ -87,7 +87,7 @@ func (ap *Apexpro) WsConnect() error {
 }
 
 // WsAuth authenticates the websocket connection
-func (ap *Apexpro) WsAuth(dialer *websocket.Dialer) error {
+func (ap *Apexpro) WsAuth(dialer *gws.Dialer) error {
 	creds, err := ap.GetCredentials(context.Background())
 	if err != nil {
 		return err
@@ -232,7 +232,7 @@ func (ap *Apexpro) handleSubscriptionPayload(operation string, subscriptions sub
 	return susbcriptionPayload, nil
 }
 
-func (ap *Apexpro) wsReadData(conn stream.Connection) {
+func (ap *Apexpro) wsReadData(conn websocket.Connection) {
 	defer ap.Websocket.Wg.Done()
 	for {
 		response := conn.ReadMessage()
@@ -268,7 +268,7 @@ func (ap *Apexpro) wsHandleData(respRaw []byte) error {
 		var authResp *WsAuthResponse
 		err = json.Unmarshal(respRaw, &authResp)
 		if err != nil {
-			ap.Websocket.DataHandler <- stream.UnhandledMessageWarning{Message: string(respRaw)}
+			ap.Websocket.DataHandler <- websocket.UnhandledMessageWarning{Message: string(respRaw)}
 		}
 		switch authResp.Topic {
 		case chZKAccountV3:
@@ -493,13 +493,13 @@ func (ap *Apexpro) processCandlestickData(respRaw []byte) error {
 	if err != nil {
 		return err
 	}
-	klineData := make([]stream.KlineData, len(resp.Data))
+	klineData := make([]websocket.KlineData, len(resp.Data))
 	for a := range resp.Data {
 		pair, err := currency.NewPairFromString(resp.Data[a].Symbol)
 		if err != nil {
 			return err
 		}
-		klineData[a] = stream.KlineData{
+		klineData[a] = websocket.KlineData{
 			Timestamp:  resp.Timestamp.Time(),
 			Pair:       pair,
 			AssetType:  asset.Futures,

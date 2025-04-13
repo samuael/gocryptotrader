@@ -10,6 +10,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/exchange/websocket"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/account"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
@@ -21,7 +22,6 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/protocol"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
-	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
 	"github.com/thrasher-corp/gocryptotrader/internal/utils/starkex"
@@ -39,7 +39,7 @@ func (ap *Apexpro) SetDefaults() {
 
 	requestFmt := &currency.PairFormat{Uppercase: true, Delimiter: "-"}
 	configFmt := &currency.PairFormat{Uppercase: true, Delimiter: "-"}
-	err := ap.StoreAssetPairFormat(asset.Futures, currency.PairStore{
+	err := ap.SetAssetPairStore(asset.Futures, currency.PairStore{
 		RequestFormat: requestFmt,
 		ConfigFormat:  configFmt,
 	})
@@ -89,7 +89,7 @@ func (ap *Apexpro) SetDefaults() {
 		log.Errorln(log.ExchangeSys, err)
 	}
 	ap.NetworkID = 1 // 1 for Main Net
-	ap.Websocket = stream.NewWebsocket()
+	ap.Websocket = websocket.NewManager()
 	ap.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
 	ap.WebsocketResponseCheckTimeout = exchange.DefaultWebsocketResponseCheckTimeout
 	ap.WebsocketOrderbookBufferLimit = exchange.DefaultWebsocketOrderbookBufferLimit
@@ -115,7 +115,7 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 	}
 
 	err = ap.Websocket.Setup(
-		&stream.WebsocketSetup{
+		&websocket.ManagerSetup{
 			ExchangeConfig:        exch,
 			DefaultURL:            apexProWebsocket,
 			RunningURL:            wsRunningEndpoint,
@@ -128,7 +128,7 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 	if err != nil {
 		return err
 	}
-	err = ap.Websocket.SetupNewConnection(&stream.ConnectionSetup{
+	err = ap.Websocket.SetupNewConnection(&websocket.ConnectionSetup{
 		URL:                  apexProWebsocket,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
@@ -137,7 +137,7 @@ func (ap *Apexpro) Setup(exch *config.Exchange) error {
 		return err
 	}
 
-	return ap.Websocket.SetupNewConnection(&stream.ConnectionSetup{
+	return ap.Websocket.SetupNewConnection(&websocket.ConnectionSetup{
 		URL:                  apexProPrivateWebsocket,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,

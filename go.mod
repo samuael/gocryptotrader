@@ -17,7 +17,7 @@ require (
 	github.com/kat-co/vala v0.0.0-20170210184112-42e1d8b61f12
 	github.com/leanovate/gopter v0.2.11
 	github.com/lib/pq v1.10.9
-	github.com/mattn/go-sqlite3 v1.14.23
+	github.com/mattn/go-sqlite3 v1.14.27
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/otp v1.4.0
 	github.com/shopspring/decimal v1.4.0
@@ -28,15 +28,15 @@ require (
 	github.com/thrasher-corp/sqlboiler v1.0.1-0.20191001234224-71e17f37a85e
 	github.com/urfave/cli/v2 v2.27.6
 	github.com/volatiletech/null v8.0.0+incompatible
-	golang.org/x/crypto v0.36.0
+	golang.org/x/crypto v0.37.0
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/net v0.38.0
-	golang.org/x/sys v0.31.0
-	golang.org/x/term v0.30.0
-	golang.org/x/text v0.23.0
+	golang.org/x/sys v0.32.0
+	golang.org/x/term v0.31.0
+	golang.org/x/text v0.24.0
 	golang.org/x/time v0.11.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb
-	google.golang.org/grpc v1.71.0
+	google.golang.org/grpc v1.71.1
 	google.golang.org/protobuf v1.36.6
 )
 
