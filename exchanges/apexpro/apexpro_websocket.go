@@ -330,8 +330,15 @@ func (ap *Apexpro) processAccountOrders(respOrders []OrderDetail) error {
 		case "UNTRIGGERED":
 			oStatus = order.Hidden
 		}
+		tif, err := order.StringToTimeInForce(respOrders[o].TimeInForce)
+		if err != nil {
+			return err
+		}
+		if respOrders[o].PostOnly {
+			tif |= order.PostOnly
+		}
 		orders[o] = order.Detail{
-			PostOnly:           respOrders[o].PostOnly,
+			TimeInForce:        tif,
 			ReduceOnly:         respOrders[o].ReduceOnly,
 			Price:              respOrders[o].Price.Float64(),
 			Amount:             respOrders[o].Size.Float64(),

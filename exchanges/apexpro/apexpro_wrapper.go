@@ -488,8 +488,15 @@ func (ap *Apexpro) GetOrderInfo(ctx context.Context, orderID string, _ currency.
 	if err != nil {
 		return nil, err
 	}
+	tif, err := order.StringToTimeInForce(orderDetail.TimeInForce)
+	if err != nil {
+		return nil, err
+	}
+	if orderDetail.PostOnly {
+		tif |= order.PostOnly
+	}
 	return &order.Detail{
-		PostOnly:        orderDetail.PostOnly,
+		TimeInForce:     tif,
 		ReduceOnly:      orderDetail.ReduceOnly,
 		Price:           orderDetail.Price.Float64(),
 		Amount:          orderDetail.Size.Float64(),
@@ -576,8 +583,15 @@ func (ap *Apexpro) GetActiveOrders(ctx context.Context, getOrdersRequest *order.
 		if err != nil {
 			return nil, err
 		}
+		tif, err := order.StringToTimeInForce(orders[a].TimeInForce)
+		if err != nil {
+			return nil, err
+		}
+		if orders[a].PostOnly {
+			tif |= order.PostOnly
+		}
 		orderFilters[a] = order.Detail{
-			PostOnly:        orders[a].PostOnly,
+			TimeInForce:     tif,
 			ReduceOnly:      orders[a].ReduceOnly,
 			Price:           orders[a].Price.Float64(),
 			Amount:          orders[a].Size.Float64(),
@@ -642,8 +656,15 @@ func (ap *Apexpro) GetOrderHistory(ctx context.Context, getOrdersRequest *order.
 		if err != nil {
 			return nil, err
 		}
+		tif, err := order.StringToTimeInForce(orderHistoryResponse.Orders[a].TimeInForce)
+		if err != nil {
+			return nil, err
+		}
+		if orderHistoryResponse.Orders[a].PostOnly {
+			tif |= order.PostOnly
+		}
 		orderFilters = append(orderFilters, order.Detail{
-			PostOnly:        orderHistoryResponse.Orders[a].PostOnly,
+			TimeInForce:     tif,
 			ReduceOnly:      orderHistoryResponse.Orders[a].ReduceOnly,
 			Price:           orderHistoryResponse.Orders[a].Price.Float64(),
 			Amount:          orderHistoryResponse.Orders[a].Size.Float64(),
