@@ -4031,7 +4031,7 @@ func TestPushData(t *testing.T) {
 		if x == "Balance And Position" {
 			ok.API.AuthenticatedSupport = true
 			ok.API.AuthenticatedWebsocketSupport = true
-			ok.SetCredentials("test", "test", "test", "", "", "")
+			ok.SetCredentials("test", "test", "test", "", "", "", "", "", "")
 		} else {
 			ok.API.AuthenticatedSupport = false
 			ok.API.AuthenticatedWebsocketSupport = false
