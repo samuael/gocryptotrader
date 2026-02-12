@@ -40,12 +40,7 @@ func TestSetDataForCurrency(t *testing.T) {
 	if d.data == nil {
 		t.Error("expected not nil")
 	}
-	if d.data[key.ExchangePairAsset{
-		Exchange: exch,
-		Base:     p.Base.Item,
-		Quote:    p.Quote.Item,
-		Asset:    a,
-	}] != nil {
+	if d.data[key.NewExchangeAssetPair(exch, a, p)] != nil {
 		t.Error("expected nil")
 	}
 }
@@ -591,7 +586,6 @@ func TestLast(t *testing.T) {
 	assert.Equal(t, id3, last.GetOffset())
 }
 
-// methods that satisfy the common.Event interface
 func (f fakeEvent) GetOffset() int64 {
 	if f.secretID > 0 {
 		return f.secretID

@@ -4,14 +4,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/exchange/accounts"
 	"github.com/thrasher-corp/gocryptotrader/exchange/websocket"
-	"github.com/thrasher-corp/gocryptotrader/exchanges/account"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/currencystate"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
-	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/protocol"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
@@ -222,7 +222,7 @@ type API struct {
 
 	Endpoints *Endpoints
 
-	credentials account.Credentials
+	credentials accounts.Credentials
 	credMu      sync.RWMutex
 
 	CredentialsValidator config.APICredentialsValidatorConfig
@@ -248,6 +248,7 @@ type Base struct {
 	WebsocketResponseMaxLimit     time.Duration
 	WebsocketOrderbookBufferLimit int64
 	Websocket                     *websocket.Manager
+	Accounts                      *accounts.Accounts
 	*request.Requester
 	Config        *config.Exchange
 	settingsMutex sync.RWMutex
@@ -255,10 +256,10 @@ type Base struct {
 	// increasing potential update speed but decreasing confidence in orderbook
 	// integrity.
 	ValidateOrderbook bool
-	order.ExecutionLimits
 
 	AssetWebsocketSupport
 	*currencystate.States
+	messageSequence common.Counter
 }
 
 // url lookup consts
@@ -278,6 +279,7 @@ const (
 	WebsocketUSDTMargined
 	WebsocketUSDCMargined
 	WebsocketOptions
+	WebsocketTrade
 	WebsocketPrivate
 	WebsocketSpotSupplementary
 	ChainAnalysis
@@ -299,6 +301,7 @@ const (
 	websocketUSDTMarginedURL      = "WebsocketUSDTMarginedURL"
 	websocketUSDCMarginedURL      = "WebsocketUSDCMarginedURL"
 	websocketOptionsURL           = "WebsocketOptionsURL"
+	websocketTradeURL             = "WebsocketTradeURL"
 	websocketPrivateURL           = "WebsocketPrivateURL"
 	websocketSpotSupplementaryURL = "WebsocketSpotSupplementaryURL"
 	chainAnalysisURL              = "ChainAnalysisURL"
@@ -322,6 +325,7 @@ var keyURLs = []URL{
 	WebsocketUSDTMargined,
 	WebsocketUSDCMargined,
 	WebsocketOptions,
+	WebsocketTrade,
 	WebsocketPrivate,
 	WebsocketSpotSupplementary,
 	ChainAnalysis,

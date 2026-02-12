@@ -12,6 +12,7 @@ import (
 
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/config"
+	"github.com/thrasher-corp/gocryptotrader/exchange/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchange/websocket/buffer"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/fill"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/protocol"
@@ -23,18 +24,18 @@ import (
 
 // Public websocket errors
 var (
-	ErrWebsocketNotEnabled  = errors.New("websocket not enabled")
-	ErrAlreadyDisabled      = errors.New("websocket already disabled")
-	ErrNotConnected         = errors.New("websocket is not connected")
-	ErrSignatureTimeout     = errors.New("websocket timeout waiting for response with signature")
-	ErrRequestRouteNotFound = errors.New("request route not found")
-	ErrSignatureNotSet      = errors.New("signature not set")
+	ErrWebsocketNotEnabled     = errors.New("websocket not enabled")
+	ErrAlreadyDisabled         = errors.New("websocket already disabled")
+	ErrWebsocketAlreadyEnabled = errors.New("websocket already enabled")
+	ErrNotConnected            = errors.New("websocket is not connected")
+	ErrSignatureTimeout        = errors.New("websocket timeout waiting for response with signature")
+	ErrRequestRouteNotFound    = errors.New("request route not found")
+	ErrSignatureNotSet         = errors.New("signature not set")
 )
 
 // Private websocket errors
 var (
 	errWebsocketAlreadyInitialised          = errors.New("websocket already initialised")
-	errWebsocketAlreadyEnabled              = errors.New("websocket already enabled")
 	errDefaultURLIsEmpty                    = errors.New("default url is empty")
 	errRunningURLIsEmpty                    = errors.New("running url cannot be empty")
 	errInvalidWebsocketURL                  = errors.New("invalid websocket url")
@@ -60,6 +61,7 @@ var (
 	errExchangeConfigEmpty                  = errors.New("exchange config is empty")
 	errCannotObtainOutboundConnection       = errors.New("cannot obtain outbound connection")
 	errMessageFilterNotComparable           = errors.New("message filter is not comparable")
+	errFailedToAuthenticate                 = errors.New("failed to authenticate")
 )
 
 // Websocket functionality list and state consts
@@ -92,7 +94,7 @@ type Manager struct {
 	exchangeName                  string
 	features                      *protocol.Features
 	m                             sync.Mutex
-	connections                   map[Connection]*connectionWrapper
+	connections                   map[Connection]*websocket
 	subscriptions                 *subscription.Store
 	connector                     func() error
 	rateLimitDefinitions          request.RateLimitDefinitions // rate limiters shared between Websocket and REST connections
@@ -100,8 +102,7 @@ type Manager struct {
 	Unsubscriber                  func(subscription.List) error
 	GenerateSubs                  func() (subscription.List, error)
 	useMultiConnectionManagement  bool
-	DataHandler                   chan any
-	ToRoutine                     chan any
+	DataHandler                   *stream.Relay
 	Match                         *Match
 	ShutdownC                     chan struct{}
 	Wg                            sync.WaitGroup
@@ -115,13 +116,11 @@ type Manager struct {
 	ExchangeLevelReporter         Reporter   // Latency reporter
 	MaxSubscriptionsPerConnection int
 
-	// connectionManager stores all *potential* connections for the exchange, organised within connectionWrapper structs.
-	// Each connectionWrapper one connection (will be expanded soon) tailored for specific exchange functionalities or asset types. // TODO: Expand this to support multiple connections per connectionWrapper
+	// connectionManager stores all *potential* connections for the exchange, organised within websocket structs.
 	// For example, separate connections can be used for Spot, Margin, and Futures trading. This structure is especially useful
 	// for exchanges that differentiate between trading pairs by using different connection endpoints or protocols for various asset classes.
-	// If an exchange does not require such differentiation, all connections may be managed under a single connectionWrapper.
-
-	connectionManager []*connectionWrapper
+	// If an exchange does not require such differentiation, all connections may be managed under a single websocket.
+	connectionManager []*websocket
 }
 
 // ManagerSetup defines variables for setting up a websocket manager
@@ -155,13 +154,13 @@ type ManagerSetup struct {
 	RateLimitDefinitions request.RateLimitDefinitions
 }
 
-// connectionWrapper contains the connection setup details to be used when
-// attempting a new connection. It also contains the subscriptions that are
-// associated with the specific connection.
-type connectionWrapper struct {
+// websocket contains the connection setup details to be used when attempting a new connection. Its subscription store
+// knows of all subscriptions for each connection. Each connection will have its own subscription
+// store to track subscriptions made on that specific connection.
+type websocket struct {
 	setup         *ConnectionSetup
 	subscriptions *subscription.Store
-	connection    Connection
+	connections   []Connection
 }
 
 var globalReporter Reporter
@@ -175,8 +174,7 @@ func SetupGlobalReporter(r Reporter) {
 // NewManager initialises the websocket struct
 func NewManager() *Manager {
 	return &Manager{
-		DataHandler:  make(chan any, jobBuffer),
-		ToRoutine:    make(chan any, jobBuffer),
+		DataHandler:  stream.NewRelay(jobBuffer),
 		ShutdownC:    make(chan struct{}),
 		TrafficAlert: make(chan struct{}, 1),
 		// ReadMessageErrors is buffered for an edge case when `Connect` fails
@@ -188,7 +186,7 @@ func NewManager() *Manager {
 		subscriptions:     subscription.NewStore(),
 		features:          &protocol.Features{},
 		Orderbook:         buffer.Orderbook{},
-		connections:       make(map[Connection]*connectionWrapper),
+		connections:       make(map[Connection]*websocket),
 	}
 }
 
@@ -305,7 +303,7 @@ func (m *Manager) SetupNewConnection(c *ConnectionSetup) error {
 		return err
 	}
 
-	if c.ResponseCheckTimeout == 0 && c.ResponseMaxLimit == 0 && c.RateLimit == nil && c.URL == "" && c.ConnectionLevelReporter == nil && c.RequestIDGenerator == nil {
+	if c.ResponseCheckTimeout == 0 && c.ResponseMaxLimit == 0 && c.RateLimit == nil && c.URL == "" && c.ConnectionLevelReporter == nil {
 		return fmt.Errorf("%w: %w", errConnSetup, errExchangeConfigEmpty)
 	}
 
@@ -326,21 +324,21 @@ func (m *Manager) SetupNewConnection(c *ConnectionSetup) error {
 	}
 
 	if m.useMultiConnectionManagement {
-		// The connection and supporting functions are defined per connection
-		// and the connection wrapper is stored in the connection manager.
+		// The connection and supporting functions are defined per connection and the connection websocket is stored in
+		// the connection manager.
 		if c.URL == "" {
 			return fmt.Errorf("%w: %w", errConnSetup, errDefaultURLIsEmpty)
 		}
 		if c.Connector == nil {
 			return fmt.Errorf("%w: %w", errConnSetup, errWebsocketConnectorUnset)
 		}
-		if c.GenerateSubscriptions == nil {
+		if c.GenerateSubscriptions == nil && !c.SubscriptionsNotRequired {
 			return fmt.Errorf("%w: %w", errConnSetup, errWebsocketSubscriptionsGeneratorUnset)
 		}
-		if c.Subscriber == nil {
+		if c.Subscriber == nil && !c.SubscriptionsNotRequired {
 			return fmt.Errorf("%w: %w", errConnSetup, errWebsocketSubscriberUnset)
 		}
-		if c.Unsubscriber == nil && m.features.Unsubscribe {
+		if c.Unsubscriber == nil && m.features.Unsubscribe && !c.SubscriptionsNotRequired {
 			return fmt.Errorf("%w: %w", errConnSetup, errWebsocketUnsubscriberUnset)
 		}
 		if c.Handler == nil {
@@ -359,25 +357,22 @@ func (m *Manager) SetupNewConnection(c *ConnectionSetup) error {
 				return fmt.Errorf("%w: %w", errConnSetup, errDuplicateConnectionSetup)
 			}
 		}
-		m.connectionManager = append(m.connectionManager, &connectionWrapper{
-			setup:         c,
-			subscriptions: subscription.NewStore(),
-		})
+		m.connectionManager = append(m.connectionManager, &websocket{setup: c, subscriptions: subscription.NewStore()})
 		return nil
 	}
 
 	if c.Authenticated {
-		m.AuthConn = m.getConnectionFromSetup(c)
+		m.AuthConn = m.createConnectionFromSetup(c)
 	} else {
-		m.Conn = m.getConnectionFromSetup(c)
+		m.Conn = m.createConnectionFromSetup(c)
 	}
 
 	return nil
 }
 
-// getConnectionFromSetup returns a websocket connection from a setup
+// createConnectionFromSetup returns a websocket connection from a setup
 // configuration. This is used for setting up new connections on the fly.
-func (m *Manager) getConnectionFromSetup(c *ConnectionSetup) *connection {
+func (m *Manager) createConnectionFromSetup(c *ConnectionSetup) *connection {
 	connectionURL := m.GetWebsocketURL()
 	if c.URL != "" {
 		connectionURL = c.URL
@@ -387,6 +382,10 @@ func (m *Manager) getConnectionFromSetup(c *ConnectionSetup) *connection {
 		// If we are using multi connection management, we can decouple
 		// the match from the global match and have a match per connection.
 		match = NewMatch()
+	}
+	rateLimit := c.RateLimit
+	if c.ConnectionRateLimiter != nil {
+		rateLimit = c.ConnectionRateLimiter()
 	}
 	return &connection{
 		ExchangeName:         m.exchangeName,
@@ -399,22 +398,22 @@ func (m *Manager) getConnectionFromSetup(c *ConnectionSetup) *connection {
 		shutdown:             m.ShutdownC,
 		Wg:                   &m.Wg,
 		Match:                match,
-		RateLimit:            c.RateLimit,
+		RateLimit:            rateLimit,
 		Reporter:             c.ConnectionLevelReporter,
-		requestIDGenerator:   c.RequestIDGenerator,
 		RateLimitDefinitions: m.rateLimitDefinitions,
+		subscriptions:        subscription.NewStore(),
 	}
 }
 
 // Connect initiates a websocket connection by using a package defined connection
 // function
-func (m *Manager) Connect() error {
+func (m *Manager) Connect(ctx context.Context) error {
 	m.m.Lock()
 	defer m.m.Unlock()
-	return m.connect()
+	return m.connect(ctx)
 }
 
-func (m *Manager) connect() error {
+func (m *Manager) connect(ctx context.Context) error {
 	if !m.IsEnabled() {
 		return ErrWebsocketNotEnabled
 	}
@@ -432,9 +431,8 @@ func (m *Manager) connect() error {
 
 	m.setState(connectingState)
 
-	m.Wg.Add(2)
-	go m.monitorFrame(&m.Wg, m.monitorData)
-	go m.monitorFrame(&m.Wg, m.monitorTraffic)
+	m.Wg.Add(1)
+	go m.monitorFrame(ctx, &m.Wg, m.monitorTraffic)
 
 	if !m.useMultiConnectionManagement {
 		if m.connector == nil {
@@ -449,7 +447,7 @@ func (m *Manager) connect() error {
 
 		if m.connectionMonitorRunning.CompareAndSwap(false, true) {
 			// This oversees all connections and does not need to be part of wait group management.
-			go m.monitorFrame(nil, m.monitorConnection)
+			go m.monitorFrame(ctx, nil, m.monitorConnection)
 		}
 
 		subs, err := m.GenerateSubs() // regenerate state on new connection
@@ -457,7 +455,7 @@ func (m *Manager) connect() error {
 			return fmt.Errorf("%s websocket: %w", m.exchangeName, common.AppendError(ErrSubscriptionFailure, err))
 		}
 		if len(subs) != 0 {
-			if err := m.SubscribeToChannels(nil, subs); err != nil {
+			if err := m.SubscribeToChannels(ctx, nil, subs); err != nil {
 				return err
 			}
 
@@ -482,23 +480,27 @@ func (m *Manager) connect() error {
 
 	// TODO: Implement concurrency below.
 	for i := range m.connectionManager {
-		if m.connectionManager[i].setup.GenerateSubscriptions == nil {
-			multiConnectFatalError = fmt.Errorf("cannot connect to [conn:%d] [URL:%s]: %w ", i+1, m.connectionManager[i].setup.URL, errWebsocketSubscriptionsGeneratorUnset)
-			break
-		}
-
-		subs, err := m.connectionManager[i].setup.GenerateSubscriptions() // regenerate state on new connection
-		if err != nil {
-			multiConnectFatalError = fmt.Errorf("%s websocket: %w", m.exchangeName, common.AppendError(ErrSubscriptionFailure, err))
-			break
-		}
-
-		if len(subs) == 0 {
-			// If no subscriptions are generated, we skip the connection
-			if m.verbose {
-				log.Warnf(log.WebsocketMgr, "%s websocket: no subscriptions generated", m.exchangeName)
+		var subs subscription.List
+		if !m.connectionManager[i].setup.SubscriptionsNotRequired {
+			if m.connectionManager[i].setup.GenerateSubscriptions == nil {
+				multiConnectFatalError = fmt.Errorf("cannot connect to [conn:%d] [URL:%s]: %w ", i+1, m.connectionManager[i].setup.URL, errWebsocketSubscriptionsGeneratorUnset)
+				break
 			}
-			continue
+
+			var err error
+			subs, err = m.connectionManager[i].setup.GenerateSubscriptions() // regenerate state on new connection
+			if err != nil {
+				multiConnectFatalError = fmt.Errorf("%s websocket: %w", m.exchangeName, common.AppendError(ErrSubscriptionFailure, err))
+				break
+			}
+
+			if len(subs) == 0 {
+				// If no subscriptions are generated, we skip the connection
+				if m.verbose {
+					log.Warnf(log.WebsocketMgr, "%s websocket: no subscriptions generated", m.exchangeName)
+				}
+				continue
+			}
 		}
 
 		if m.connectionManager[i].setup.Connector == nil {
@@ -509,70 +511,51 @@ func (m *Manager) connect() error {
 			multiConnectFatalError = fmt.Errorf("cannot connect to [conn:%d] [URL:%s]: %w ", i+1, m.connectionManager[i].setup.URL, errWebsocketDataHandlerUnset)
 			break
 		}
-		if m.connectionManager[i].setup.Subscriber == nil {
+		if m.connectionManager[i].setup.Subscriber == nil && !m.connectionManager[i].setup.SubscriptionsNotRequired {
 			multiConnectFatalError = fmt.Errorf("cannot connect to [conn:%d] [URL:%s]: %w ", i+1, m.connectionManager[i].setup.URL, errWebsocketSubscriberUnset)
 			break
 		}
 
-		// TODO: Add window for max subscriptions per connection, to spawn new connections if needed.
-
-		conn := m.getConnectionFromSetup(m.connectionManager[i].setup)
-
-		err = m.connectionManager[i].setup.Connector(context.TODO(), conn)
-		if err != nil {
-			multiConnectFatalError = fmt.Errorf("%v Error connecting %w", m.exchangeName, err)
-			break
-		}
-
-		if !conn.IsConnected() {
-			multiConnectFatalError = fmt.Errorf("%s websocket: [conn:%d] [URL:%s] failed to connect", m.exchangeName, i+1, conn.URL)
-			break
-		}
-
-		m.connections[conn] = m.connectionManager[i]
-		m.connectionManager[i].connection = conn
-
-		m.Wg.Add(1)
-		go m.Reader(context.TODO(), conn, m.connectionManager[i].setup.Handler)
-
-		if m.connectionManager[i].setup.Authenticate != nil && m.CanUseAuthenticatedEndpoints() {
-			err = m.connectionManager[i].setup.Authenticate(context.TODO(), conn)
-			if err != nil {
-				multiConnectFatalError = fmt.Errorf("%s websocket: [conn:%d] [URL:%s] failed to authenticate %w", m.exchangeName, i+1, conn.URL, err)
+		if m.connectionManager[i].setup.SubscriptionsNotRequired && len(subs) == 0 {
+			if err := m.createConnectAndSubscribe(ctx, m.connectionManager[i], nil); err != nil {
+				multiConnectFatalError = fmt.Errorf("cannot connect to [conn:%d] [URL:%s]: %w ", i+1, m.connectionManager[i].setup.URL, err)
 				break
+			}
+			if m.verbose {
+				log.Debugf(log.WebsocketMgr, "%s websocket: [URL:%s] connected", m.exchangeName, m.connectionManager[i].setup.URL)
+			}
+			continue
+		}
+
+		for _, batchedSubs := range common.Batch(subs, m.MaxSubscriptionsPerConnection) {
+			if err := m.createConnectAndSubscribe(ctx, m.connectionManager[i], batchedSubs); err != nil {
+				if errors.Is(err, common.ErrFatal) {
+					multiConnectFatalError = fmt.Errorf("cannot connect to [conn:%d] [URL:%s]: %w ", i+1, m.connectionManager[i].setup.URL, err)
+					break
+				}
+				subscriptionError = common.AppendError(subscriptionError, fmt.Errorf("subscription error on [conn:%d] [URL:%s]: %w ", i+1, m.connectionManager[i].setup.URL, err))
+			}
+			if m.verbose {
+				log.Debugf(log.WebsocketMgr, "%s websocket: [URL:%s] connected. [Total Subs: %d] [Subscribed: %d]", m.exchangeName, m.connectionManager[i].setup.URL, len(subs), len(batchedSubs))
 			}
 		}
 
-		err = m.connectionManager[i].setup.Subscriber(context.TODO(), conn, subs)
-		if err != nil {
-			subscriptionError = common.AppendError(subscriptionError, fmt.Errorf("%v Error subscribing %w", m.exchangeName, err))
-			continue
-		}
-
-		if missing := m.connectionManager[i].subscriptions.Missing(subs); len(missing) > 0 {
-			subscriptionError = common.AppendError(subscriptionError, fmt.Errorf("%v %w %q", m.exchangeName, ErrSubscriptionsNotAdded, missing))
-			continue
-		}
-
-		if m.verbose {
-			log.Debugf(log.WebsocketMgr, "%s websocket: [conn:%d] [URL:%s] connected. [Subscribed: %d]",
-				m.exchangeName,
-				i+1,
-				conn.URL,
-				len(subs))
+		if multiConnectFatalError != nil {
+			break
 		}
 	}
 
 	if multiConnectFatalError != nil {
 		// Roll back any successful connections and flush subscriptions
-		for x := range m.connectionManager {
-			if m.connectionManager[x].connection != nil {
-				if err := m.connectionManager[x].connection.Shutdown(); err != nil {
+		for _, ws := range m.connectionManager {
+			for _, conn := range ws.connections {
+				if err := conn.Shutdown(); err != nil {
 					log.Errorln(log.WebsocketMgr, err)
 				}
-				m.connectionManager[x].connection = nil
+				conn.Subscriptions().Clear()
 			}
-			m.connectionManager[x].subscriptions.Clear()
+			ws.connections = nil
+			ws.subscriptions.Clear()
 		}
 		clear(m.connections)
 		m.setState(disconnectedState) // Flip from connecting to disconnected.
@@ -592,10 +575,62 @@ func (m *Manager) connect() error {
 
 	if m.connectionMonitorRunning.CompareAndSwap(false, true) {
 		// This oversees all connections and does not need to be part of wait group management.
-		go m.monitorFrame(nil, m.monitorConnection)
+		go m.monitorFrame(ctx, nil, m.monitorConnection)
 	}
 
 	return subscriptionError
+}
+
+func (m *Manager) createConnectAndSubscribe(ctx context.Context, ws *websocket, subs subscription.List) error {
+	if m.MaxSubscriptionsPerConnection > 0 && len(subs) > m.MaxSubscriptionsPerConnection {
+		return fmt.Errorf("%w %w: max subs allowed %d, requested %d", common.ErrFatal, errSubscriptionsExceedsLimit, m.MaxSubscriptionsPerConnection, len(subs))
+	}
+
+	conn := m.createConnectionFromSetup(ws.setup)
+
+	if err := ws.setup.Connector(ctx, conn); err != nil {
+		return fmt.Errorf("%w: %w", common.ErrFatal, err)
+	}
+
+	if !conn.IsConnected() {
+		return fmt.Errorf("%w: %w", common.ErrFatal, ErrNotConnected)
+	}
+
+	m.connections[conn] = ws
+	ws.connections = append(ws.connections, conn)
+
+	m.Wg.Add(1)
+	go m.Reader(ctx, conn, ws.setup.Handler)
+
+	if ws.setup.Authenticate != nil && m.CanUseAuthenticatedEndpoints() {
+		if err := ws.setup.Authenticate(ctx, conn); err != nil {
+			return fmt.Errorf("%w %w: %w", common.ErrFatal, errFailedToAuthenticate, err)
+		}
+	}
+
+	if ws.setup.SubscriptionsNotRequired {
+		if len(subs) != 0 {
+			return fmt.Errorf("%w %w: subscriptions were provided but not required", common.ErrFatal, ErrSubscriptionFailure)
+		}
+		return nil
+	}
+
+	if err := ws.setup.Subscriber(ctx, conn, subs); err != nil {
+		return fmt.Errorf("%w: %w", ErrSubscriptionFailure, err)
+	}
+	if missing := ws.subscriptions.Missing(subs); len(missing) > 0 {
+		return fmt.Errorf("%w: %w %q", ErrSubscriptionFailure, ErrSubscriptionsNotAdded, missing)
+	}
+
+	connSubsStore := conn.Subscriptions()
+	for _, sub := range ws.subscriptions.Contained(subs) {
+		// Store subscription against this specific connection for tracking
+		if err := connSubsStore.Add(sub); err != nil {
+			return fmt.Errorf("%w: adding subscriptions to the specific connection subscription store: %w", ErrSubscriptionFailure, err)
+		}
+	}
+
+	return nil
 }
 
 // Disable disables the exchange websocket protocol
@@ -610,13 +645,13 @@ func (m *Manager) Disable() error {
 }
 
 // Enable enables the exchange websocket protocol
-func (m *Manager) Enable() error {
+func (m *Manager) Enable(ctx context.Context) error {
 	if m.IsConnected() || m.IsEnabled() {
-		return fmt.Errorf("%s %w", m.exchangeName, errWebsocketAlreadyEnabled)
+		return fmt.Errorf("%s %w", m.exchangeName, ErrWebsocketAlreadyEnabled)
 	}
 
 	m.setEnabled(true)
-	return m.Connect()
+	return m.Connect(ctx)
 }
 
 // Shutdown attempts to shut down a websocket connection and associated routines
@@ -628,13 +663,12 @@ func (m *Manager) Shutdown() error {
 }
 
 func (m *Manager) shutdown() error {
-	if !m.IsConnected() {
-		return fmt.Errorf("%v %w: %w", m.exchangeName, errCannotShutdown, ErrNotConnected)
-	}
-
-	// TODO: Interrupt connection and or close connection when it is re-established.
 	if m.IsConnecting() {
 		return fmt.Errorf("%v %w: %w ", m.exchangeName, errCannotShutdown, errAlreadyReconnecting)
+	}
+
+	if !m.IsConnected() {
+		return fmt.Errorf("%v %w: %w", m.exchangeName, errCannotShutdown, ErrNotConnected)
 	}
 
 	if m.verbose {
@@ -651,15 +685,16 @@ func (m *Manager) shutdown() error {
 	var nonFatalCloseConnectionErrors error
 
 	// Shutdown managed connections
-	for x := range m.connectionManager {
-		if m.connectionManager[x].connection != nil {
-			if err := m.connectionManager[x].connection.Shutdown(); err != nil {
+	for _, ws := range m.connectionManager {
+		for _, conn := range ws.connections {
+			if err := conn.Shutdown(); err != nil {
 				nonFatalCloseConnectionErrors = common.AppendError(nonFatalCloseConnectionErrors, err)
 			}
-			m.connectionManager[x].connection = nil
-			// Flush any subscriptions from last connection across any managed connections
-			m.connectionManager[x].subscriptions.Clear()
+			conn.Subscriptions().Clear()
 		}
+		ws.connections = nil
+		// Flush any subscriptions from last connection across any managed connections
+		ws.subscriptions.Clear()
 	}
 	// Clean map of old connections
 	clear(m.connections)
@@ -677,11 +712,22 @@ func (m *Manager) shutdown() error {
 	// flush any subscriptions from last connection if needed
 	m.subscriptions.Clear()
 
-	m.setState(disconnectedState)
-
 	close(m.ShutdownC)
+	m.setState(disconnectedState)
 	m.Wg.Wait()
 	m.ShutdownC = make(chan struct{})
+
+	for _, conn := range []Connection{m.Conn, m.AuthConn} {
+		if conn == nil {
+			continue
+		}
+		conn, ok := conn.(*connection)
+		if !ok {
+			return fmt.Errorf("%s websocket: %w", m.exchangeName, common.GetTypeAssertError("*connection", conn))
+		}
+		conn.shutdown = m.ShutdownC
+	}
+
 	if m.verbose {
 		log.Debugf(log.WebsocketMgr, "%v websocket: completed websocket shutdown", m.exchangeName)
 	}
@@ -795,7 +841,7 @@ func (m *Manager) GetWebsocketURL() string {
 }
 
 // SetProxyAddress sets websocket proxy address
-func (m *Manager) SetProxyAddress(proxyAddr string) error {
+func (m *Manager) SetProxyAddress(ctx context.Context, proxyAddr string) error {
 	m.m.Lock()
 	defer m.m.Unlock()
 	if proxyAddr != "" {
@@ -812,9 +858,9 @@ func (m *Manager) SetProxyAddress(proxyAddr string) error {
 		log.Debugf(log.ExchangeSys, "%s websocket: removing websocket proxy", m.exchangeName)
 	}
 
-	for _, wrapper := range m.connectionManager {
-		if wrapper.connection != nil {
-			wrapper.connection.SetProxy(proxyAddr)
+	for _, ws := range m.connectionManager {
+		for _, conn := range ws.connections {
+			conn.SetProxy(proxyAddr)
 		}
 	}
 	if m.Conn != nil {
@@ -832,7 +878,7 @@ func (m *Manager) SetProxyAddress(proxyAddr string) error {
 	if err := m.shutdown(); err != nil {
 		return err
 	}
-	return m.connect()
+	return m.connect(ctx)
 }
 
 // GetProxyAddress returns the current websocket proxy
@@ -876,7 +922,10 @@ func (m *Manager) Reader(ctx context.Context, conn Connection, handler func(ctx 
 			return // Connection has been closed
 		}
 		if err := handler(ctx, conn, resp.Raw); err != nil {
-			m.DataHandler <- fmt.Errorf("connection URL:[%v] error: %w", conn.GetURL(), err)
+			err = fmt.Errorf("connection URL:[%v] error: %w", conn.GetURL(), err)
+			if errSend := m.DataHandler.Send(ctx, err); errSend != nil {
+				log.Errorf(log.WebsocketMgr, "%s: %s %s", m.exchangeName, errSend, err)
+			}
 		}
 	}
 }
@@ -892,16 +941,16 @@ func drain(ch <-chan error) {
 }
 
 // ClosureFrame is a closure function that wraps monitoring variables with observer, if the return is true the frame will exit
-type ClosureFrame func() func() bool
+type ClosureFrame func(ctx context.Context) func() bool
 
 // monitorFrame monitors a specific websocket component or critical system. It will exit if the observer returns true
 // This is used for monitoring data throughput, connection status and other critical websocket components. The waitgroup
 // is optional and is used to signal when the monitor has finished.
-func (m *Manager) monitorFrame(wg *sync.WaitGroup, fn ClosureFrame) {
+func (m *Manager) monitorFrame(ctx context.Context, wg *sync.WaitGroup, fn ClosureFrame) {
 	if wg != nil {
-		defer m.Wg.Done()
+		defer wg.Done()
 	}
-	observe := fn()
+	observe := fn(ctx)
 	for {
 		if observe() {
 			return
@@ -909,43 +958,14 @@ func (m *Manager) monitorFrame(wg *sync.WaitGroup, fn ClosureFrame) {
 	}
 }
 
-// monitorData monitors data throughput and logs if there is a back log of data
-func (m *Manager) monitorData() func() bool {
-	dropped := 0
-	return func() bool { return m.observeData(&dropped) }
-}
-
-// observeData observes data throughput and logs if there is a back log of data
-func (m *Manager) observeData(dropped *int) (exit bool) {
-	select {
-	case <-m.ShutdownC:
-		return true
-	case d := <-m.DataHandler:
-		select {
-		case m.ToRoutine <- d:
-			if *dropped != 0 {
-				log.Infof(log.WebsocketMgr, "%s exchange websocket ToRoutine channel buffer recovered; %d messages were dropped", m.exchangeName, dropped)
-				*dropped = 0
-			}
-		default:
-			if *dropped == 0 {
-				// If this becomes prone to flapping we could drain the buffer, but that's extreme and we'd like to avoid it if possible
-				log.Warnf(log.WebsocketMgr, "%s exchange websocket ToRoutine channel buffer full; dropping messages", m.exchangeName)
-			}
-			*dropped++
-		}
-		return false
-	}
-}
-
 // monitorConnection monitors the connection and attempts to reconnect if the connection is lost
-func (m *Manager) monitorConnection() func() bool {
+func (m *Manager) monitorConnection(ctx context.Context) func() bool {
 	timer := time.NewTimer(m.connectionMonitorDelay)
-	return func() bool { return m.observeConnection(timer) }
+	return func() bool { return m.observeConnection(ctx, timer) }
 }
 
 // observeConnection observes the connection and attempts to reconnect if the connection is lost
-func (m *Manager) observeConnection(t *time.Timer) (exit bool) {
+func (m *Manager) observeConnection(ctx context.Context, t *time.Timer) (exit bool) {
 	select {
 	case err := <-m.ReadMessageErrors:
 		if errors.Is(err, errConnectionFault) {
@@ -958,11 +978,13 @@ func (m *Manager) observeConnection(t *time.Timer) (exit bool) {
 		}
 		// Speedier reconnection, instead of waiting for the next cycle.
 		if m.IsEnabled() && (!m.IsConnected() && !m.IsConnecting()) {
-			if connectErr := m.Connect(); connectErr != nil {
+			if connectErr := m.Connect(ctx); connectErr != nil {
 				log.Errorln(log.WebsocketMgr, connectErr)
 			}
 		}
-		m.DataHandler <- err // hand over the error to the data handler (shutdown and reconnection is priority)
+		if err := m.DataHandler.Send(ctx, err); err != nil {
+			log.Errorf(log.WebsocketMgr, "%v websocket: connectionMonitor data handler err: %s", m.exchangeName, err)
+		}
 	case <-t.C:
 		if m.verbose {
 			log.Debugf(log.WebsocketMgr, "%v websocket: running connection monitor cycle", m.exchangeName)
@@ -984,7 +1006,7 @@ func (m *Manager) observeConnection(t *time.Timer) (exit bool) {
 			return true
 		}
 		if !m.IsConnecting() && !m.IsConnected() {
-			err := m.Connect()
+			err := m.Connect(ctx)
 			if err != nil {
 				log.Errorln(log.WebsocketMgr, err)
 			}
@@ -996,24 +1018,22 @@ func (m *Manager) observeConnection(t *time.Timer) (exit bool) {
 
 // monitorTraffic monitors to see if there has been traffic within the trafficTimeout time window. If there is no traffic
 // the connection is shutdown and will be reconnected by the connectionMonitor routine.
-func (m *Manager) monitorTraffic() func() bool {
-	timer := time.NewTimer(m.trafficTimeout)
-	return func() bool { return m.observeTraffic(timer) }
+func (m *Manager) monitorTraffic(context.Context) func() bool {
+	return func() bool { return m.observeTraffic(m.trafficTimeout) }
 }
 
-func (m *Manager) observeTraffic(t *time.Timer) bool {
+func (m *Manager) observeTraffic(timeout time.Duration) bool {
 	select {
 	case <-m.ShutdownC:
 		if m.verbose {
 			log.Debugf(log.WebsocketMgr, "%v websocket: trafficMonitor shutdown message received", m.exchangeName)
 		}
-	case <-t.C:
+	case <-time.After(timeout):
 		if m.IsConnecting() || signalReceived(m.TrafficAlert) {
-			t.Reset(m.trafficTimeout)
 			return false
 		}
 		if m.verbose {
-			log.Warnf(log.WebsocketMgr, "%v websocket: has not received a traffic alert in %v. Reconnecting", m.exchangeName, m.trafficTimeout)
+			log.Warnf(log.WebsocketMgr, "%v websocket: has not received a traffic alert in %v. Reconnecting", m.exchangeName, timeout)
 		}
 		if m.IsConnected() {
 			go func() { // Without this the m.Shutdown() call below will deadlock
@@ -1023,7 +1043,6 @@ func (m *Manager) observeTraffic(t *time.Timer) bool {
 			}()
 		}
 	}
-	t.Stop()
 	return true
 }
 
@@ -1037,7 +1056,7 @@ func signalReceived(ch chan struct{}) bool {
 	}
 }
 
-// GetConnection returns a connection by message filter (defined in exchange package _wrapper.go websocket connection)
+// GetConnection returns the first available connection for a websocket by message filter (defined in exchange package _wrapper.go websocket connection)
 // for request and response handling in a multi connection context.
 func (m *Manager) GetConnection(messageFilter any) (Connection, error) {
 	if err := common.NilGuard(m); err != nil {
@@ -1058,13 +1077,14 @@ func (m *Manager) GetConnection(messageFilter any) (Connection, error) {
 		return nil, ErrNotConnected
 	}
 
-	for _, wrapper := range m.connectionManager {
-		if wrapper.setup.MessageFilter == messageFilter {
-			if wrapper.connection == nil {
-				return nil, fmt.Errorf("%s: %s %w associated with message filter: '%v'", m.exchangeName, wrapper.setup.URL, ErrNotConnected, messageFilter)
-			}
-			return wrapper.connection, nil
+	for _, ws := range m.connectionManager {
+		if ws.setup.MessageFilter != messageFilter {
+			continue
 		}
+		if len(ws.connections) == 0 {
+			return nil, fmt.Errorf("%s: %s %w associated with message filter: '%v'", m.exchangeName, ws.setup.URL, ErrNotConnected, messageFilter)
+		}
+		return ws.connections[0], nil
 	}
 
 	return nil, fmt.Errorf("%s: %w associated with message filter: '%v'", m.exchangeName, ErrRequestRouteNotFound, messageFilter)

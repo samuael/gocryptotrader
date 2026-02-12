@@ -34,13 +34,11 @@ func main() {
 	var wg sync.WaitGroup
 	for i := range exchange.Exchanges {
 		name := exchange.Exchanges[i]
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := engine.Bot.LoadExchange(name); err != nil {
 				log.Printf("Failed to load exchange %s. Err: %s", name, err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	log.Println("Done.")
@@ -66,8 +64,7 @@ func main() {
 	wg.Wait()
 	log.Println("Done.")
 
-	var dummyInterface exchange.IBotExchange
-	totalWrappers := reflect.TypeOf(&dummyInterface).Elem().NumMethod()
+	totalWrappers := reflect.TypeFor[exchange.IBotExchange]().NumMethod()
 
 	log.Println()
 	for name, funcs := range results {
@@ -91,11 +88,11 @@ func main() {
 // error common.ErrNotYetImplemented to verify whether the wrapper function has
 // been implemented yet.
 func testWrappers(e exchange.IBotExchange) ([]string, error) {
-	iExchange := reflect.TypeOf(&e).Elem()
+	iExchange := reflect.TypeFor[exchange.IBotExchange]()
 	actualExchange := reflect.ValueOf(e)
 	errType := reflect.TypeOf(common.ErrNotYetImplemented)
 
-	contextParam := reflect.TypeOf((*context.Context)(nil)).Elem()
+	contextParam := reflect.TypeFor[context.Context]()
 
 	var funcs []string
 	for x := range iExchange.NumMethod() {

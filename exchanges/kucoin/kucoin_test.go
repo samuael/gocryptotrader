@@ -1,6 +1,7 @@
 package kucoin
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/core"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/encoding/json"
+	"github.com/thrasher-corp/gocryptotrader/exchange/order/limits"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/fundingrate"
@@ -70,12 +72,10 @@ func TestMain(m *testing.M) {
 		asset.Margin:  marginTradablePair,
 		asset.Futures: futuresTradablePair,
 	}
-	fetchedFuturesOrderbook = map[string]bool{}
 
 	os.Exit(m.Run())
 }
 
-// Spot asset test cases starts from here
 func TestGetSymbols(t *testing.T) {
 	t.Parallel()
 	symbols, err := e.GetSymbols(t.Context(), "")
@@ -311,7 +311,7 @@ func TestPostBorrowOrder(t *testing.T) {
 			TimeInForce: "FOK",
 			Size:        0,
 		})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.PostMarginBorrowOrder(t.Context(),
 		&MarginBorrowParam{
@@ -342,7 +342,7 @@ func TestPostRepayment(t *testing.T) {
 	_, err = e.PostRepayment(t.Context(), &RepayParam{Size: 0.05})
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 	_, err = e.PostRepayment(t.Context(), &RepayParam{Currency: currency.ETH})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.PostRepayment(t.Context(), &RepayParam{
@@ -444,12 +444,12 @@ func TestPostOrder(t *testing.T) {
 		Symbol:    spotTradablePair,
 		OrderType: "limit", Size: 0.1,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	_, err = e.PostOrder(t.Context(), &SpotOrderParam{
 		ClientOrderID: customID.String(), Symbol: spotTradablePair, Side: "buy",
 		OrderType: "limit", Price: 234565,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.PostOrder(t.Context(), &SpotOrderParam{
@@ -492,12 +492,12 @@ func TestPostOrderTest(t *testing.T) {
 		Symbol:    spotTradablePair,
 		OrderType: "limit", Size: 0.1,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	_, err = e.PostOrderTest(t.Context(), &SpotOrderParam{
 		ClientOrderID: customID.String(), Symbol: spotTradablePair, Side: "buy",
 		OrderType: "limit", Price: 234565,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
 	result, err := e.PostOrderTest(t.Context(), &SpotOrderParam{
@@ -546,21 +546,21 @@ func TestHandlePostOrder(t *testing.T) {
 		Symbol:    spotTradablePair,
 		OrderType: "limit", Size: 0.1,
 	}, "")
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	_, err = e.HandlePostOrder(t.Context(), &SpotOrderParam{
 		ClientOrderID: customID.String(), Side: "buy",
 		Symbol:    spotTradablePair,
 		OrderType: "limit", Size: 0, Price: 1000,
 	}, "")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	_, err = e.HandlePostOrder(t.Context(), &SpotOrderParam{
 		ClientOrderID: customID.String(), Side: "buy",
 		Symbol:    spotTradablePair,
 		OrderType: "limit", Size: .1, Price: 1000, VisibleSize: -1,
 	}, "")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	_, err = e.HandlePostOrder(t.Context(), &SpotOrderParam{
 		ClientOrderID: customID.String(), Symbol: spotTradablePair, Side: "buy",
@@ -591,12 +591,12 @@ func TestPostMarginOrder(t *testing.T) {
 		Symbol:    marginTradablePair,
 		OrderType: "limit", Size: 0.1,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	_, err = e.PostMarginOrder(t.Context(), &MarginOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de", Symbol: marginTradablePair, Side: "buy",
 		OrderType: "limit", Price: 234565,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	// default order type is limit and margin mode is cross
@@ -643,12 +643,12 @@ func TestPostMarginOrderTest(t *testing.T) {
 		Symbol:    marginTradablePair,
 		OrderType: "limit", Size: 0.1,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	_, err = e.PostMarginOrderTest(t.Context(), &MarginOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de", Symbol: marginTradablePair, Side: "buy",
 		OrderType: "limit", Price: 234565,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
 	// default order type is limit and margin mode is cross
@@ -693,11 +693,11 @@ func TestPostBulkOrder(t *testing.T) {
 
 	arg.Side = "Sell"
 	_, err = e.PostBulkOrder(t.Context(), spotTradablePair.String(), []OrderRequest{arg})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	arg.Price = 1000
 	_, err = e.PostBulkOrder(t.Context(), spotTradablePair.String(), []OrderRequest{arg})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	_, err = e.PostBulkOrder(t.Context(), spotTradablePair.String(), []OrderRequest{
@@ -1086,7 +1086,7 @@ func TestGetUniversalTransfer(t *testing.T) {
 
 	arg.ClientSuppliedOrderID = "64ccc0f164781800010d8c09"
 	_, err = e.GetUniversalTransfer(t.Context(), arg)
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	arg.Amount = 1
 	_, err = e.GetUniversalTransfer(t.Context(), arg)
@@ -1132,7 +1132,7 @@ func TestTransferMainToSubAccount(t *testing.T) {
 	_, err = e.TransferMainToSubAccount(t.Context(), currency.BTC, 1, "", "OUT", "", "", "5caefba7d9575a0688f83c45")
 	require.ErrorIs(t, err, order.ErrClientOrderIDMustBeSet)
 	_, err = e.TransferMainToSubAccount(t.Context(), currency.BTC, 0, "62fcd1969474ea0001fd20e4", "OUT", "", "", "5caefba7d9575a0688f83c45")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.TransferMainToSubAccount(t.Context(), currency.BTC, 1, "62fcd1969474ea0001fd20e4", "", "", "", "5caefba7d9575a0688f83c45")
 	require.ErrorIs(t, err, errTransferDirectionRequired)
 	_, err = e.TransferMainToSubAccount(t.Context(), currency.BTC, 1, "62fcd1969474ea0001fd20e4", "OUT", "", "", "")
@@ -1151,7 +1151,7 @@ func TestMakeInnerTransfer(t *testing.T) {
 	_, err = e.MakeInnerTransfer(t.Context(), 0, currency.USDT, "", "trade", "main", "1", "")
 	require.ErrorIs(t, err, order.ErrClientOrderIDMustBeSet)
 	_, err = e.MakeInnerTransfer(t.Context(), 0, currency.USDT, "62fcd1969474ea0001fd20e4", "", "main", "", "")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.MakeInnerTransfer(t.Context(), 1, currency.USDT, "62fcd1969474ea0001fd20e4", "", "main", "", "")
 	require.ErrorIs(t, err, errAccountTypeMissing)
 	_, err = e.MakeInnerTransfer(t.Context(), 5, currency.USDT, "62fcd1969474ea0001fd20e4", "margin_hf", "", "", "")
@@ -1168,7 +1168,7 @@ func TestTransferToMainOrTradeAccount(t *testing.T) {
 	_, err := e.TransferToMainOrTradeAccount(t.Context(), &FundTransferFuturesParam{})
 	require.ErrorIs(t, err, common.ErrNilPointer)
 	_, err = e.TransferToMainOrTradeAccount(t.Context(), &FundTransferFuturesParam{RecieveAccountType: "MAIN"})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.TransferToMainOrTradeAccount(t.Context(), &FundTransferFuturesParam{Amount: 1, RecieveAccountType: "MAIN"})
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 
@@ -1187,7 +1187,7 @@ func TestTransferToFuturesAccount(t *testing.T) {
 	_, err := e.TransferToFuturesAccount(t.Context(), &FundTransferToFuturesParam{})
 	require.ErrorIs(t, err, common.ErrNilPointer)
 	_, err = e.TransferToFuturesAccount(t.Context(), &FundTransferToFuturesParam{PaymentAccountType: "Main"})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.TransferToFuturesAccount(t.Context(), &FundTransferToFuturesParam{PaymentAccountType: "Main", Amount: 12})
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 
@@ -1314,7 +1314,7 @@ func TestApplyWithdrawal(t *testing.T) {
 	_, err = e.ApplyWithdrawal(t.Context(), currency.ETH, "", "", "", "", "", false, 1)
 	require.ErrorIs(t, err, errAddressRequired)
 	_, err = e.ApplyWithdrawal(t.Context(), currency.ETH, "0x597873884BC3a6C10cB6Eb7C69172028Fa85B25A", "", "", "", "", false, 0)
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.ApplyWithdrawal(t.Context(), currency.ETH, "0x597873884BC3a6C10cB6Eb7C69172028Fa85B25A", "", "", "", "", false, 1)
@@ -1368,7 +1368,6 @@ func TestGetTradingFee(t *testing.T) {
 	assert.Len(t, got, 10)
 }
 
-// futures
 func TestGetFuturesOpenContracts(t *testing.T) {
 	t.Parallel()
 	result, err := e.GetFuturesOpenContracts(t.Context())
@@ -1580,7 +1579,7 @@ func TestPostFuturesOrder(t *testing.T) {
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "limit", Remark: "10",
 		Stop: "up", StopPriceType: "TP", TimeInForce: "", Size: 1, Price: 1000, StopPrice: 0, Leverage: 1, VisibleSize: 0,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.PostFuturesOrder(t.Context(), &FuturesOrderParam{
@@ -1595,9 +1594,9 @@ func TestPostFuturesOrder(t *testing.T) {
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair,
 		OrderType: "limit", Remark: "10", Leverage: 1,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	_, err = e.PostFuturesOrder(t.Context(), &FuturesOrderParam{ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "limit", Remark: "10", Price: 1000, Leverage: 1, VisibleSize: 0})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	result, err = e.PostFuturesOrder(t.Context(), &FuturesOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "limit", Remark: "10",
 		Size: 1, Price: 1000, Leverage: 1, VisibleSize: 0,
@@ -1610,12 +1609,12 @@ func TestPostFuturesOrder(t *testing.T) {
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair,
 		OrderType: "market", Remark: "10", Leverage: 1,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.PostFuturesOrder(t.Context(), &FuturesOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "market", Remark: "10",
 		Size: 1, Leverage: 1, VisibleSize: 0,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	result, err = e.PostFuturesOrder(t.Context(), &FuturesOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de",
@@ -1658,7 +1657,7 @@ func TestFillFuturesPostOrderArgumentFilter(t *testing.T) {
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "limit", Remark: "10",
 		Stop: "up", StopPriceType: "TP", TimeInForce: "", Size: 1, Price: 1000, StopPrice: 0, Leverage: 1, VisibleSize: 0,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	err = e.FillFuturesPostOrderArgumentFilter(&FuturesOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "limit", Remark: "10",
@@ -1671,9 +1670,9 @@ func TestFillFuturesPostOrderArgumentFilter(t *testing.T) {
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair,
 		OrderType: "limit", Remark: "10", Leverage: 1,
 	})
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	err = e.FillFuturesPostOrderArgumentFilter(&FuturesOrderParam{ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "limit", Remark: "10", Price: 1000, Leverage: 1, VisibleSize: 0})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	err = e.FillFuturesPostOrderArgumentFilter(&FuturesOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "limit", Remark: "10",
 		Size: 1, Price: 1000, Leverage: 1, VisibleSize: 0,
@@ -1685,12 +1684,12 @@ func TestFillFuturesPostOrderArgumentFilter(t *testing.T) {
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair,
 		OrderType: "market", Remark: "10", Leverage: 1,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	err = e.FillFuturesPostOrderArgumentFilter(&FuturesOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de", Side: "buy", Symbol: futuresTradablePair, OrderType: "market", Remark: "10",
 		Size: 0, Leverage: 1, VisibleSize: 0,
 	})
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	err = e.FillFuturesPostOrderArgumentFilter(&FuturesOrderParam{
 		ClientOrderID: "5bd6e9286d99522a52e458de",
@@ -1927,7 +1926,7 @@ func TestRemoveMarginManually(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
 	result, err := e.RemoveMarginManually(t.Context(), &WithdrawMarginResponse{
 		Symbol:         "ADAUSDTM",
-		WithdrawAmount: 1,
+		WithdrawAmount: -1,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -2015,7 +2014,7 @@ func TestTransferFuturesFundsToMainAccount(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = e.TransferFuturesFundsToMainAccount(t.Context(), 0, currency.USDT, "MAIN")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.TransferFuturesFundsToMainAccount(t.Context(), 1, currency.EMPTYCODE, "MAIN")
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 	_, err = e.TransferFuturesFundsToMainAccount(t.Context(), 1, currency.ETH, "")
@@ -2030,7 +2029,7 @@ func TestTransferFuturesFundsToMainAccount(t *testing.T) {
 func TestTransferFundsToFuturesAccount(t *testing.T) {
 	t.Parallel()
 	err := e.TransferFundsToFuturesAccount(t.Context(), 0, currency.USDT, "MAIN")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	err = e.TransferFundsToFuturesAccount(t.Context(), 1, currency.EMPTYCODE, "MAIN")
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 	err = e.TransferFundsToFuturesAccount(t.Context(), 1, currency.USDT, "")
@@ -2337,11 +2336,24 @@ func TestGetAuthenticatedServersInstances(t *testing.T) {
 
 func TestPushData(t *testing.T) {
 	t.Parallel()
-	ku := testInstance(t)
-	ku.SetCredentials("mock", "test", "test", "", "", "")
-	ku.API.AuthenticatedSupport = true
-	ku.API.AuthenticatedWebsocketSupport = true
-	testexch.FixtureToDataHandler(t, "testdata/wsHandleData.json", ku.wsHandleData)
+
+	e := testInstance(t)
+	e.SetCredentials("mock", "test", "test", "", "", "")
+	e.API.AuthenticatedSupport = true
+	e.API.AuthenticatedWebsocketSupport = true
+
+	fErrs := testexch.FixtureToDataHandlerWithErrors(t, "testdata/wsHandleData.json", func(ctx context.Context, r []byte) error {
+		if bytes.Contains(r, []byte("FANGLE-ACCOUNTS")) {
+			hold := e.Accounts
+			e.Accounts = nil
+			defer func() { e.Accounts = hold }()
+		}
+		return e.wsHandleData(ctx, r)
+	})
+	e.Websocket.DataHandler.Close()
+	assert.Len(t, e.Websocket.DataHandler.C, 29, "Should see correct number of messages")
+	require.Len(t, fErrs, 1, "Must get exactly one error message")
+	assert.ErrorContains(t, fErrs[0].Err, "cannot save holdings: nil pointer: *accounts.Accounts")
 }
 
 func TestGenerateSubscriptions(t *testing.T) {
@@ -2594,7 +2606,7 @@ func TestWithdrawCryptocurrencyFunds(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.WithdrawCryptocurrencyFunds(t.Context(), &withdraw.Request{
 		Exchange: e.Name,
-		Amount:   0.00000000001,
+		Amount:   -0.1,
 		Currency: currency.BTC,
 		Crypto: withdraw.CryptoRequest{
 			Address: core.BitcoinDonationAddress,
@@ -2932,7 +2944,7 @@ func TestGetFundingHistory(t *testing.T) {
 }
 
 func getFirstTradablePairOfAssets(ctx context.Context) {
-	if err := e.UpdateTradablePairs(ctx, true); err != nil {
+	if err := e.UpdateTradablePairs(ctx); err != nil {
 		log.Fatalf("Kucoin error while updating tradable pairs. %v", err)
 	}
 	enabledPairs, err := e.GetEnabledPairs(asset.Spot)
@@ -2953,12 +2965,12 @@ func getFirstTradablePairOfAssets(ctx context.Context) {
 	futuresTradablePair.Delimiter = ""
 }
 
-func TestUpdateAccountInfo(t *testing.T) {
+func TestUpdateAccountBalances(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
 	assetTypes := e.GetAssetTypes(true)
 	for _, assetType := range assetTypes {
-		result, err := e.UpdateAccountInfo(t.Context(), assetType)
+		result, err := e.UpdateAccountBalances(t.Context(), assetType)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 	}
@@ -2990,13 +3002,13 @@ func TestProcessMarketSnapshot(t *testing.T) {
 	t.Parallel()
 	ku := testInstance(t)
 	testexch.FixtureToDataHandler(t, "testdata/wsMarketSnapshot.json", ku.wsHandleData)
-	close(ku.Websocket.DataHandler)
-	assert.Len(t, ku.Websocket.DataHandler, 4, "Should see 4 tickers")
+	ku.Websocket.DataHandler.Close()
+	assert.Len(t, ku.Websocket.DataHandler.C, 4, "Should see 4 tickers")
 	seenAssetTypes := map[asset.Item]int{}
-	for resp := range ku.Websocket.DataHandler {
-		switch v := resp.(type) {
+	for resp := range ku.Websocket.DataHandler.C {
+		switch v := resp.Data.(type) {
 		case *ticker.Price:
-			switch len(ku.Websocket.DataHandler) {
+			switch len(ku.Websocket.DataHandler.C) {
 			case 3:
 				assert.Equal(t, asset.Margin, v.AssetType, "AssetType")
 				assert.Equal(t, time.UnixMilli(1700555342007), v.LastUpdated, "datetime")
@@ -3104,6 +3116,11 @@ func TestSubscribeTickerAll(t *testing.T) {
 	t.Parallel()
 
 	ku := testInstance(t)
+	go func() { // drain websocket messages when subscribed to all tickers
+		for {
+			<-ku.Websocket.DataHandler.C
+		}
+	}()
 	ku.Features.Subscriptions = subscription.List{}
 	testexch.SetupWs(t, ku)
 
@@ -3275,27 +3292,6 @@ func TestGetFuturesPositionOrders(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-func TestUpdateOrderExecutionLimits(t *testing.T) {
-	t.Parallel()
-	err := e.UpdateOrderExecutionLimits(t.Context(), asset.Binary)
-	require.ErrorIs(t, err, asset.ErrNotSupported)
-
-	assets := []asset.Item{asset.Spot, asset.Futures, asset.Margin}
-	for x := range assets {
-		err = e.UpdateOrderExecutionLimits(t.Context(), assets[x])
-		assert.NoError(t, err)
-
-		enabled, err := e.GetEnabledPairs(assets[x])
-		assert.NoError(t, err)
-
-		for y := range enabled {
-			lim, err := e.GetOrderExecutionLimits(assets[x], enabled[y])
-			assert.NoErrorf(t, err, "%v %s %v", err, enabled[y], assets[x])
-			assert.NotEmptyf(t, lim, "limit cannot be empty")
-		}
-	}
-}
-
 func BenchmarkIntervalToString(b *testing.B) {
 	for b.Loop() {
 		result, err := IntervalToString(kline.OneWeek)
@@ -3361,11 +3357,11 @@ func TestValidatePlaceOrderParams(t *testing.T) {
 	require.ErrorIs(t, err, order.ErrSideIsInvalid)
 	arg.Side = "Sell"
 	err = arg.ValidatePlaceOrderParams()
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	arg.Price = 323423423
 	arg.Size = 0
 	err = arg.ValidatePlaceOrderParams()
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	arg.Size = 1
 	err = arg.ValidatePlaceOrderParams()
 	assert.NoError(t, err)
@@ -3570,7 +3566,7 @@ func TestCancelSpecifiedNumberHFOrdersByOrderID(t *testing.T) {
 	_, err = e.CancelSpecifiedNumberHFOrdersByOrderID(t.Context(), "1", "", 10.0)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
 	_, err = e.CancelSpecifiedNumberHFOrdersByOrderID(t.Context(), "1", spotTradablePair.String(), 0)
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.CancelSpecifiedNumberHFOrdersByOrderID(t.Context(), "1", spotTradablePair.String(), 10.0)
@@ -3699,19 +3695,19 @@ func TestPlaceOCOOrder(t *testing.T) {
 
 	arg.Side = "Sell"
 	_, err = e.PlaceOCOOrder(t.Context(), arg)
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	arg.Price = 1000
 	_, err = e.PlaceOCOOrder(t.Context(), arg)
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	arg.Size = .1
 	_, err = e.PlaceOCOOrder(t.Context(), arg)
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	arg.StopPrice = .1
 	_, err = e.PlaceOCOOrder(t.Context(), arg)
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	arg.LimitPrice = .1
 	_, err = e.PlaceOCOOrder(t.Context(), arg)
@@ -3829,11 +3825,11 @@ func TestSendPlaceMarginHFOrder(t *testing.T) {
 
 	arg.Symbol = marginTradablePair
 	_, err = e.SendPlaceMarginHFOrder(t.Context(), arg, "")
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 
 	arg.Price = 1000
 	_, err = e.SendPlaceMarginHFOrder(t.Context(), arg, "")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 }
 
 func TestPlaceMarginHFOrder(t *testing.T) {
@@ -3995,7 +3991,7 @@ func TestMarginLendingSubscription(t *testing.T) {
 	_, err := e.MarginLendingSubscription(t.Context(), currency.EMPTYCODE, 1, 0.22)
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 	_, err = e.MarginLendingSubscription(t.Context(), currency.ETH, 0, 0.22)
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.MarginLendingSubscription(t.Context(), currency.ETH, 1, 0)
 	require.ErrorIs(t, err, errMissingInterestRate)
 
@@ -4010,7 +4006,7 @@ func TestRedemption(t *testing.T) {
 	_, err := e.Redemption(t.Context(), currency.EMPTYCODE, 1, "1245")
 	require.ErrorIs(t, err, currency.ErrCurrencyCodeEmpty)
 	_, err = e.Redemption(t.Context(), currency.ETH, 0, "1245")
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.Redemption(t.Context(), currency.ETH, 1, "")
 	require.ErrorIs(t, err, errMissingPurchaseOrderNumber)
 
@@ -4078,13 +4074,14 @@ func TestGetCurrencyTradeURL(t *testing.T) {
 // testInstance returns a local Kucoin for isolated testing
 func testInstance(tb testing.TB) *Exchange {
 	tb.Helper()
-	kucoin := new(Exchange)
-	require.NoError(tb, testexch.Setup(kucoin), "Test instance Setup must not error")
-	kucoin.obm = &orderbookManager{
+	e := new(Exchange)
+	require.NoError(tb, testexch.Setup(e), "Test instance Setup must not error")
+	e.obm = &orderbookManager{
 		state: make(map[currency.Code]map[currency.Code]map[asset.Item]*update),
 		jobs:  make(chan job, maxWSOrderbookJobs),
 	}
-	return kucoin
+	e.fetchedFuturesOrderbook = map[string]bool{}
+	return e
 }
 
 func TestGetTradingPairActualFees(t *testing.T) {
@@ -4122,7 +4119,7 @@ func TestGetMaximumOpenPositionSize(t *testing.T) {
 	_, err := e.GetMaximumOpenPositionSize(t.Context(), "", 1, 1)
 	require.ErrorIs(t, err, currency.ErrSymbolStringEmpty)
 	_, err = e.GetMaximumOpenPositionSize(t.Context(), futuresTradablePair.String(), 0., 1)
-	require.ErrorIs(t, err, order.ErrPriceBelowMin)
+	require.ErrorIs(t, err, limits.ErrPriceBelowMin)
 	_, err = e.GetMaximumOpenPositionSize(t.Context(), futuresTradablePair.String(), 1, 0)
 	require.ErrorIs(t, err, errInvalidLeverage)
 
@@ -4145,7 +4142,7 @@ func TestSubscribeToEarnFixedIncomeProduct(t *testing.T) {
 	_, err := e.SubscribeToEarnFixedIncomeProduct(t.Context(), "", "MAIN", 12.2)
 	require.ErrorIs(t, err, errProductIDMissing)
 	_, err = e.SubscribeToEarnFixedIncomeProduct(t.Context(), "1232412", "MAIN", 0)
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 	_, err = e.SubscribeToEarnFixedIncomeProduct(t.Context(), "1232412", "", 12.2)
 	require.ErrorIs(t, err, errAccountTypeMissing)
 
@@ -4160,7 +4157,7 @@ func TestRedeemByEarnHoldingID(t *testing.T) {
 	_, err := e.RedeemByEarnHoldingID(t.Context(), "", SpotTradeType, "1", 1)
 	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
 	_, err = e.RedeemByEarnHoldingID(t.Context(), "123231", "Main", "1", 0)
-	require.ErrorIs(t, err, order.ErrAmountBelowMin)
+	require.ErrorIs(t, err, limits.ErrAmountBelowMin)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.RedeemByEarnHoldingID(t.Context(), "123231", SpotTradeType, "1", 1)
@@ -4427,7 +4424,7 @@ func TestGetHistoricalFundingRates(t *testing.T) {
 func TestProcessFuturesKline(t *testing.T) {
 	t.Parallel()
 	data := fmt.Sprintf(`{"symbol":%q,"candles":["1714964400","63815.1","63890.8","63928.5","63797.8","17553.0","17553"],"time":1714964823722}`, futuresTradablePair.String())
-	err := e.processFuturesKline([]byte(data), "1hour")
+	err := e.processFuturesKline(t.Context(), []byte(data), "1hour")
 	assert.NoError(t, err)
 }
 

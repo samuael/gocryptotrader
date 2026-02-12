@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 		e.SetCredentials(apiKey, apiSecret, "", "", "", "")
 	}
 
-	if err := e.UpdateTradablePairs(context.Background(), false); err != nil {
+	if err := e.UpdateTradablePairs(context.Background()); err != nil {
 		log.Fatalf("HitBTC UpdateTradablePairs error: %s", err)
 	}
 
@@ -276,8 +276,7 @@ func TestGetOrderHistory(t *testing.T) {
 	}
 }
 
-// Any tests below this line have the ability to impact your orders on the exchange. Enable canManipulateRealOrders to run them
-// ----------------------------------------------------------------------------------------------------------------------------
+// TestSubmitOrder and below can impact your orders on the exchange. Enable canManipulateRealOrders to run them
 func TestSubmitOrder(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCannotManipulateOrders(t, e, canManipulateRealOrders)
@@ -437,14 +436,14 @@ func setupWsAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go e.wsReadData()
+	go e.wsReadData(t.Context())
 	err = e.wsLogin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	timer := time.NewTimer(time.Second)
 	select {
-	case loginError := <-e.Websocket.DataHandler:
+	case loginError := <-e.Websocket.DataHandler.C:
 		t.Fatal(loginError)
 	case <-timer.C:
 	}
@@ -546,7 +545,7 @@ func TestWsGetActiveOrdersJSON(t *testing.T) {
     }
   ]
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -568,9 +567,9 @@ func TestWsGetCurrenciesJSON(t *testing.T) {
     "delisted": false,
     "payoutFee": "0.001"
   },
-  "id": 123
+  "id": "c4ce77f5-1c50-435a-b623-4961191ca129"
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -589,9 +588,9 @@ func TestWsGetSymbolsJSON(t *testing.T) {
     "provideLiquidityRate": "-0.0001",
     "feeCurrency": "BTC"
   },
-  "id": 123
+  "id": "1c847290-b366-412b-b8f5-dc630ed5b147"
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -614,7 +613,7 @@ func TestWsTicker(t *testing.T) {
     "symbol": "BTCUSD"
   }
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -658,7 +657,7 @@ func TestWsOrderbook(t *testing.T) {
     "timestamp": "2018-11-19T05:00:28.193Z"
   }
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -688,7 +687,7 @@ func TestWsOrderbook(t *testing.T) {
     "timestamp": "2018-11-19T05:00:28.700Z"
   }
 }`)
-	err = e.wsHandleData(pressXToJSON)
+	err = e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -719,7 +718,7 @@ func TestWsOrderNotification(t *testing.T) {
     "tradeFee": "-0.000000005"
   }
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -744,9 +743,9 @@ func TestWsSubmitOrderJSON(t *testing.T) {
     "updatedAt": "2017-10-20T12:29:43.166Z",
     "reportType": "new"
   },
-  "id": 123
+  "id": "99f55c70-1166-49a7-87e9-3b54a00ad893"
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -771,9 +770,9 @@ func TestWsCancelOrderJSON(t *testing.T) {
     "updatedAt": "2017-10-20T12:31:26.174Z",
     "reportType": "canceled"
   },
-  "id": 123
+  "id": "2ce46937-2770-4453-ac99-ee87939bf5bb"
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -799,9 +798,9 @@ func TestWsCancelReplaceJSON(t *testing.T) {
     "reportType": "replaced",
     "originalRequestClientOrderId": "9cbe79cb6f864b71a811402a48d4b5b1"
   },
-  "id": 123
+  "id": "91e925d3-3b95-4e29-8ae7-938fd5006709"
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -827,9 +826,9 @@ func TestWsGetTradesRequestResponse(t *testing.T) {
       "reserved": "0.00200000"
     }
   ],
-  "id": 123
+  "id": "4b1f1391-215e-4d12-972c-5cea9d50edf4"
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -857,9 +856,9 @@ func TestWsGetActiveOrdersRequestJSON(t *testing.T) {
       "originalRequestClientOrderId": "9cbe79cb6f864b71a811402a48d4b5b1"
     }
   ],
-  "id": 123
+  "id": "9e67b440-2eec-445a-be3a-e81f962c8391"
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -896,7 +895,7 @@ func TestWsTrades(t *testing.T) {
     "symbol": "BTCUSD"
   }
 }`)
-	err := e.wsHandleData(pressXToJSON)
+	err := e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -917,7 +916,7 @@ func TestWsTrades(t *testing.T) {
     "symbol": "BTCUSD"
   }
 }    `)
-	err = e.wsHandleData(pressXToJSON)
+	err = e.wsHandleData(t.Context(), pressXToJSON)
 	if err != nil {
 		t.Error(err)
 	}
@@ -992,9 +991,14 @@ func TestGetOrderInfo(t *testing.T) {
 
 func TestFetchTradablePairs(t *testing.T) {
 	t.Parallel()
-	if _, err := e.FetchTradablePairs(t.Context(), asset.Spot); err != nil {
-		t.Fatal(err)
-	}
+
+	_, err := e.FetchTradablePairs(t.Context(), asset.Futures)
+	assert.ErrorIs(t, err, asset.ErrNotSupported)
+
+	r, err := e.FetchTradablePairs(t.Context(), asset.Spot)
+	require.NoError(t, err)
+	require.NotEmpty(t, r)
+	assert.Contains(t, r, spotPair, "BTC-USD should be in the fetched pairs")
 }
 
 func TestGetCurrencyTradeURL(t *testing.T) {

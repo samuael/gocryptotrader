@@ -81,10 +81,9 @@ func TestGetTrades(t *testing.T) {
 
 func TestGetAccountInfo(t *testing.T) {
 	t.Parallel()
-	_, err := e.UpdateAccountInfo(t.Context(), asset.Spot)
-	if err == nil {
-		t.Error("GetAccountInfo() Expected error")
-	}
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	_, err := e.UpdateAccountBalances(t.Context(), asset.Spot)
+	require.NoError(t, err)
 }
 
 func TestGetOpenOrders(t *testing.T) {
@@ -340,8 +339,7 @@ func TestGetOrderHistory(t *testing.T) {
 	}
 }
 
-// Any tests below this line have the ability to impact your orders on the exchange. Enable canManipulateRealOrders to run them
-// ----------------------------------------------------------------------------------------------------------------------------
+// TestSubmitOrder and below can impact your orders on the exchange. Enable canManipulateRealOrders to run them
 func TestSubmitOrder(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCannotManipulateOrders(t, e, canManipulateRealOrders)

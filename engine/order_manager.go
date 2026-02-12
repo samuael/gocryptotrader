@@ -349,7 +349,7 @@ func (m *OrderManager) validate(exch exchange.IBotExchange, newOrder *order.Subm
 	}
 
 	if newOrder.Exchange == "" {
-		return ErrExchangeNameIsEmpty
+		return common.ErrExchangeNameNotSet
 	}
 
 	if err := newOrder.Validate(exch.GetTradingRequirements()); err != nil {
@@ -1080,7 +1080,7 @@ func (s *store) getByDetail(det *order.Detail) *order.Detail {
 	return nil
 }
 
-// Add Adds an order to the orderStore for tracking the lifecycle
+// add adds an order to the orderStore for tracking the lifecycle
 func (s *store) add(det *order.Detail) error {
 	if det == nil {
 		return errNilOrder

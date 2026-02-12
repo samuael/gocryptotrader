@@ -10676,6 +10676,89 @@
     }
    ]
   },
+  "/v5/asset/exchange/convert-execute": {
+   "POST": [
+    {
+     "data": {
+      "result": {
+       "exchangeStatus": "processing",
+       "quoteTxId": "10175108571334212336947200"
+      },
+      "retCode": 0,
+      "retExtInfo": {},
+      "retMsg": "ok",
+      "time": 1758693503803
+     },
+     "queryString": "",
+     "bodyParams": "{\"quoteTxId\":\"10175108571334212336947200\"}",
+     "headers": {
+      "Content-Type": [
+       "application/json"
+      ],
+      "X-Bapi-Api-Key": [
+       ""
+      ],
+      "X-Bapi-Recv-Window": [
+       "5000"
+      ],
+      "X-Bapi-Sign": [
+       "8ac32a4d321aae758172178e0626903e90960372d0e8361e6920f5e7c1e2b1d4"
+      ],
+      "X-Bapi-Timestamp": [
+       "1758693503260"
+      ]
+     }
+    }
+   ]
+  },
+  "/v5/asset/exchange/convert-result-query": {
+   "GET": [
+    {
+     "data": {
+      "result": {
+       "result": {
+        "accountType": "eb_convert_uta",
+        "convertRate": "0.046765815395",
+        "createdAt": "1754528298061",
+        "exchangeStatus": "success",
+        "exchangeTxId": "10414247553864074960678912",
+        "extInfo": {},
+        "fromAmount": "49.96",
+        "fromCoin": "PIRATE",
+        "fromCoinType": "crypto",
+        "toAmount": "2.3364201371342",
+        "toCoin": "USDT",
+        "toCoinType": "crypto",
+        "userId": "74199870"
+       }
+      },
+      "retCode": 0,
+      "retExtInfo": {},
+      "retMsg": "ok",
+      "time": 1758260135835
+     },
+     "queryString": "accountType=eb_convert_uta\u0026quoteTxId=10414247553864074960678912",
+     "bodyParams": "",
+     "headers": {
+      "Content-Type": [
+       "application/x-www-form-urlencoded"
+      ],
+      "X-Bapi-Api-Key": [
+       ""
+      ],
+      "X-Bapi-Recv-Window": [
+       "5000"
+      ],
+      "X-Bapi-Sign": [
+       "af98ed1cf332f7d3fbdbbeecf47e5e9aae011388ac6bf40a73b3337843124f2e"
+      ],
+      "X-Bapi-Timestamp": [
+       "1758260135697"
+      ]
+     }
+    }
+   ]
+  },
   "/v5/asset/exchange/order-record": {
    "GET": [
     {
@@ -10706,6 +10789,421 @@
       ],
       "X-Bapi-Timestamp": [
        "1700071702199"
+      ]
+     }
+    }
+   ]
+  },
+  "/v5/asset/exchange/query-coin-list": {
+   "GET": [
+    {
+     "data": {
+      "result": {
+       "coins": [
+        {
+         "accuracyLength": 8,
+         "balance": "",
+         "coin": "AGLD",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "AGLD",
+         "icon": "https://s1.bycsi.com/app/assets/token/71c30ccc0c343d2f6ab830262ac7a5f8.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/8eb2f2348cc917081be4c28b797bd930.svg",
+         "singleFromMaxLimit": "15200",
+         "singleFromMinLimit": "0.015",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": ""
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "",
+         "coin": "AGLA",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "AGLA",
+         "icon": "https://s1.bycsi.com/app/assets/token/1857d5971bed49d9b411032f54243128.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/5bc128beb4db5e6091b3c4211e7e4c4e.svg",
+         "singleFromMaxLimit": "9907900",
+         "singleFromMinLimit": "10",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": ""
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "",
+         "coin": "NEAR",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "NEAR",
+         "icon": "https://www.bybit.com/bycsi-root/app/assets/token/3fafab371c0c1e42362813593034ee42.svg",
+         "iconNight": "https://www.bybit.com/bycsi-root/app/assets/token/3fafab371c0c1e42362813593034ee42.svg",
+         "singleFromMaxLimit": "4000",
+         "singleFromMinLimit": "0.004",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": ""
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "",
+         "coin": "AIOZ",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "AIOZ",
+         "icon": "https://s1.bycsi.com/app/assets/token/603ff078bc4c032bc93bbcba375008ac.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/1ff40bb0bdcaae69fdc0cdb27b4d769d.svg",
+         "singleFromMaxLimit": "30400",
+         "singleFromMinLimit": "0.03",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": ""
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "",
+         "coin": "WLD",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "WLD",
+         "icon": "https://s1.bycsi.com/app/assets/token/ba1f955e2b609920ebc2fce92feaa006.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/ba1f955e2b609920ebc2fce92feaa006.svg",
+         "singleFromMaxLimit": "7000",
+         "singleFromMinLimit": "0.007",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": ""
+        }
+       ]
+      },
+      "retCode": 0,
+      "retExtInfo": {},
+      "retMsg": "ok",
+      "time": 1758256916514
+     },
+     "queryString": "accountType=eb_convert_uta\u0026coin=USDT\u0026side=1",
+     "bodyParams": "",
+     "headers": {
+      "Content-Type": [
+       "application/x-www-form-urlencoded"
+      ],
+      "X-Bapi-Api-Key": [
+       ""
+      ],
+      "X-Bapi-Recv-Window": [
+       "5000"
+      ],
+      "X-Bapi-Sign": [
+       "3b10c29cba3b135d12d1ebda5f752976c84c3f443350f3719e517a72cb262292"
+      ],
+      "X-Bapi-Timestamp": [
+       "1758259225338"
+      ]
+     }
+    },
+    {
+     "data": {
+      "result": {
+       "coins": [
+        {
+         "accuracyLength": 8,
+         "balance": "0",
+         "coin": "AGLD",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "AGLD",
+         "icon": "https://s1.bycsi.com/app/assets/token/71c30ccc0c343d2f6ab830262ac7a5f8.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/8eb2f2348cc917081be4c28b797bd930.svg",
+         "singleFromMaxLimit": "15200",
+         "singleFromMinLimit": "0.015",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": "0"
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "",
+         "coin": "AGLA",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "AGLA",
+         "icon": "https://s1.bycsi.com/app/assets/token/1857d5971bed49d9b411032f54243128.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/5bc128beb4db5e6091b3c4211e7e4c4e.svg",
+         "singleFromMaxLimit": "9907900",
+         "singleFromMinLimit": "10",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": ""
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "0",
+         "coin": "NEAR",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "NEAR",
+         "icon": "https://www.bybit.com/bycsi-root/app/assets/token/3fafab371c0c1e42362813593034ee42.svg",
+         "iconNight": "https://www.bybit.com/bycsi-root/app/assets/token/3fafab371c0c1e42362813593034ee42.svg",
+         "singleFromMaxLimit": "4000",
+         "singleFromMinLimit": "0.004",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": "0"
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "0.0052",
+         "coin": "AIOZ",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "AIOZ",
+         "icon": "https://s1.bycsi.com/app/assets/token/603ff078bc4c032bc93bbcba375008ac.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/1ff40bb0bdcaae69fdc0cdb27b4d769d.svg",
+         "singleFromMaxLimit": "30400",
+         "singleFromMinLimit": "0.03",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": "0.0017732"
+        },
+        {
+         "accuracyLength": 8,
+         "balance": "0",
+         "coin": "WLD",
+         "coinType": "crypto",
+         "dailyFromMaxLimit": "0",
+         "dailyFromMinLimit": "0",
+         "dailyToMaxLimit": "0",
+         "dailyToMinLimit": "0",
+         "disableFrom": false,
+         "disableTo": false,
+         "fullName": "WLD",
+         "icon": "https://s1.bycsi.com/app/assets/token/ba1f955e2b609920ebc2fce92feaa006.svg",
+         "iconNight": "https://s1.bycsi.com/app/assets/token/ba1f955e2b609920ebc2fce92feaa006.svg",
+         "singleFromMaxLimit": "7000",
+         "singleFromMinLimit": "0.007",
+         "singleToMaxLimit": "0",
+         "singleToMinLimit": "0",
+         "timePeriod": 0,
+         "uBalance": "0"
+        }
+       ]
+      },
+      "retCode": 0,
+      "retExtInfo": {},
+      "retMsg": "ok",
+      "time": 1758256841574
+     },
+     "queryString": "accountType=eb_convert_uta\u0026side=0",
+     "bodyParams": "",
+     "headers": {
+      "Content-Type": [
+       "application/x-www-form-urlencoded"
+      ],
+      "X-Bapi-Api-Key": [
+       ""
+      ],
+      "X-Bapi-Recv-Window": [
+       "5000"
+      ],
+      "X-Bapi-Sign": [
+       "3e2ae23929ba5d2855dc20cb0ad81d6b975411ffc727ce52f3f9e21c966fbe0e"
+      ],
+      "X-Bapi-Timestamp": [
+       "1758259225549"
+      ]
+     }
+    }
+   ]
+  },
+  "/v5/asset/exchange/query-convert-history": {
+   "GET": [
+    {
+     "data": {
+      "result": {
+       "list": [
+        {
+         "accountType": "eb_convert_uta",
+         "convertRate": "0.35585068565",
+         "createdAt": "1754880224953",
+         "exchangeStatus": "success",
+         "exchangeTxId": "104231555340214158196736",
+         "extInfo": {},
+         "fromAmount": "7.9952",
+         "fromCoin": "UXLINK",
+         "fromCoinType": "crypto",
+         "toAmount": "2.84509740190888",
+         "toCoin": "USDT",
+         "toCoinType": "crypto",
+         "userId": "74199870"
+        },
+        {
+         "accountType": "eb_convert_uta",
+         "convertRate": "0.76800370605",
+         "createdAt": "1754880224437",
+         "exchangeStatus": "success",
+         "exchangeTxId": "10164127555340212031606784",
+         "extInfo": {},
+         "fromAmount": "1.002",
+         "fromCoin": "ME",
+         "fromCoinType": "crypto",
+         "toAmount": "0.7695397134621",
+         "toCoin": "USDT",
+         "toCoinType": "crypto",
+         "userId": "74199870"
+        },
+        {
+         "accountType": "eb_convert_uta",
+         "convertRate": "1.470836214",
+         "createdAt": "1754880223928",
+         "exchangeStatus": "success",
+         "exchangeTxId": "101214251555340209864749056",
+         "extInfo": {},
+         "fromAmount": "1.9984",
+         "fromCoin": "VIRTUAL",
+         "fromCoinType": "crypto",
+         "toAmount": "2.9393190900576",
+         "toCoin": "USDT",
+         "toCoinType": "crypto",
+         "userId": "74199870"
+        },
+        {
+         "accountType": "eb_convert_uta",
+         "convertRate": "0.046765815395",
+         "createdAt": "1754528298061",
+         "exchangeStatus": "success",
+         "exchangeTxId": "10414247553864074960678912",
+         "extInfo": {},
+         "fromAmount": "49.96",
+         "fromCoin": "PIRATE",
+         "fromCoinType": "crypto",
+         "toAmount": "2.3364201371342",
+         "toCoin": "USDT",
+         "toCoinType": "crypto",
+         "userId": "74199870"
+        }
+       ]
+      },
+      "retCode": 0,
+      "retExtInfo": {},
+      "retMsg": "ok",
+      "time": 1758260485735
+     },
+     "queryString": "accountType=eb_convert_uta",
+     "bodyParams": "",
+     "headers": {
+      "Content-Type": [
+       "application/x-www-form-urlencoded"
+      ],
+      "X-Bapi-Api-Key": [
+       ""
+      ],
+      "X-Bapi-Recv-Window": [
+       "5000"
+      ],
+      "X-Bapi-Sign": [
+       "d48d942ee6ed14a088beb153bc0d069048834a983ddf1258b3512e90a5980ffb"
+      ],
+      "X-Bapi-Timestamp": [
+       "1758260485632"
+      ]
+     }
+    }
+   ]
+  },
+  "/v5/asset/exchange/quote-apply": {
+   "POST": [
+    {
+     "data": {
+      "result": {
+       "exchangeRate": "2.848499537750000000",
+       "expiredTime": "1758693506127",
+       "extTaxAndFee": [],
+       "fromAmount": "0.0088",
+       "fromCoin": "XRP",
+       "fromCoinType": "crypto",
+       "quoteTxId": "10175108571334212336947200",
+       "requestId": "",
+       "toAmount": "0.0250667959322",
+       "toCoin": "USDT",
+       "toCoinType": "crypto"
+      },
+      "retCode": 0,
+      "retExtInfo": {},
+      "retMsg": "ok",
+      "time": 1758693491155
+     },
+     "queryString": "",
+     "bodyParams": "{\"accountType\":\"eb_convert_uta\",\"fromCoin\":\"XRP\",\"toCoin\":\"USDT\",\"requestAmount\":\"0.0088\",\"requestCoin\":\"XRP\"}",
+     "headers": {
+      "Content-Type": [
+       "application/json"
+      ],
+      "X-Bapi-Api-Key": [
+       ""
+      ],
+      "X-Bapi-Recv-Window": [
+       "5000"
+      ],
+      "X-Bapi-Sign": [
+       "48767e64f637c452bc48304d368f214a80ff31aa3b014e60eb7f384b18b25240"
+      ],
+      "X-Bapi-Timestamp": [
+       "1758693491006"
       ]
      }
     }

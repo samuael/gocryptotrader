@@ -15,10 +15,12 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/common/key"
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
+	"github.com/thrasher-corp/gocryptotrader/dispatch"
 	"github.com/thrasher-corp/gocryptotrader/engine"
+	"github.com/thrasher-corp/gocryptotrader/exchange/accounts"
+	"github.com/thrasher-corp/gocryptotrader/exchange/order/limits"
 	"github.com/thrasher-corp/gocryptotrader/exchange/websocket"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
-	"github.com/thrasher-corp/gocryptotrader/exchanges/account"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/collateral"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/deposit"
@@ -49,9 +51,9 @@ func TestAllExchangeWrappers(t *testing.T) {
 	t.Parallel()
 	cfg := config.GetConfig()
 	err := cfg.LoadConfig("../../testdata/configtest.json", true)
-	if err != nil {
-		t.Fatal("load config error", err)
-	}
+	require.NoError(t, err, "LoadConfig must not error")
+	err = dispatch.EnsureRunning(dispatch.DefaultMaxWorkers, dispatch.DefaultJobsLimit)
+	require.NoError(t, err, "dispatch.EnsureRunning must not error")
 	for i := range cfg.Exchanges {
 		name := strings.ToLower(cfg.Exchanges[i].Name)
 		t.Run(name+" wrapper tests", func(t *testing.T) {
@@ -91,22 +93,19 @@ func setupExchange(ctx context.Context, t *testing.T, name string, cfg *config.C
 	exch.SetDefaults()
 	exchCfg.API.AuthenticatedSupport = true
 	exchCfg.API.Credentials = getExchangeCredentials(name)
-
 	err = exch.Setup(exchCfg)
 	if err != nil {
 		t.Fatalf("Cannot setup %v exchange Setup %v", name, err)
 	}
 
-	err = exch.UpdateTradablePairs(ctx, true)
+	err = exch.UpdateTradablePairs(ctx)
 	require.Truef(t, errors.Is(err, context.DeadlineExceeded) || err == nil, "Exchange %s UpdateTradablePairs must not error: %s", name, err)
 	b := exch.GetBase()
-
 	assets := b.CurrencyPairs.GetAssetTypes(false)
 	require.NotEmptyf(t, assets, "Exchange %s must have assets", name)
 	for _, a := range assets {
 		require.NoErrorf(t, b.CurrencyPairs.SetAssetEnabled(a, true), "Exchange %s SetAssetEnabled must not error for asset %s: %s", name, a, err)
 	}
-
 	// Add +1 to len to verify that exchanges can handle requests with unset pairs and assets
 	assetPairs := make([]assetPair, 0, len(assets)+1)
 assets:
@@ -182,7 +181,7 @@ type testCtxKey string
 
 func executeExchangeWrapperTests(ctx context.Context, t *testing.T, exch exchange.IBotExchange, assetParams []assetPair) {
 	t.Helper()
-	iExchange := reflect.TypeOf(&exch).Elem()
+	iExchange := reflect.TypeFor[exchange.IBotExchange]()
 	actualExchange := reflect.ValueOf(exch)
 	for x := range iExchange.NumMethod() {
 		methodName := iExchange.Method(x).Name
@@ -190,7 +189,6 @@ func executeExchangeWrapperTests(ctx context.Context, t *testing.T, exch exchang
 			continue
 		}
 		method := actualExchange.MethodByName(methodName)
-
 		var assetLen int
 		for y := range method.Type().NumIn() {
 			input := method.Type().In(y)
@@ -279,33 +277,33 @@ type MethodArgumentGenerator struct {
 }
 
 var (
-	currencyPairParam    = reflect.TypeOf((*currency.Pair)(nil)).Elem()
-	klineParam           = reflect.TypeOf((*kline.Interval)(nil)).Elem()
-	contextParam         = reflect.TypeOf((*context.Context)(nil)).Elem()
-	timeParam            = reflect.TypeOf((*time.Time)(nil)).Elem()
-	codeParam            = reflect.TypeOf((*currency.Code)(nil)).Elem()
-	currencyPairsParam   = reflect.TypeOf((*currency.Pairs)(nil)).Elem()
-	withdrawRequestParam = reflect.TypeOf((**withdraw.Request)(nil)).Elem()
-	stringParam          = reflect.TypeOf((*string)(nil)).Elem()
-	feeBuilderParam      = reflect.TypeOf((**exchange.FeeBuilder)(nil)).Elem()
-	credentialsParam     = reflect.TypeOf((**account.Credentials)(nil)).Elem()
-	orderSideParam       = reflect.TypeOf((*order.Side)(nil)).Elem()
-	collateralModeParam  = reflect.TypeOf((*collateral.Mode)(nil)).Elem()
-	marginTypeParam      = reflect.TypeOf((*margin.Type)(nil)).Elem()
-	int64Param           = reflect.TypeOf((*int64)(nil)).Elem()
-	float64Param         = reflect.TypeOf((*float64)(nil)).Elem()
+	currencyPairParam    = reflect.TypeFor[currency.Pair]()
+	klineParam           = reflect.TypeFor[kline.Interval]()
+	contextParam         = reflect.TypeFor[context.Context]()
+	timeParam            = reflect.TypeFor[time.Time]()
+	codeParam            = reflect.TypeFor[currency.Code]()
+	currencyPairsParam   = reflect.TypeFor[currency.Pairs]()
+	withdrawRequestParam = reflect.TypeFor[*withdraw.Request]()
+	stringParam          = reflect.TypeFor[string]()
+	feeBuilderParam      = reflect.TypeFor[*exchange.FeeBuilder]()
+	credentialsParam     = reflect.TypeFor[*accounts.Credentials]()
+	orderSideParam       = reflect.TypeFor[order.Side]()
+	collateralModeParam  = reflect.TypeFor[collateral.Mode]()
+	marginTypeParam      = reflect.TypeFor[margin.Type]()
+	int64Param           = reflect.TypeFor[int64]()
+	float64Param         = reflect.TypeFor[float64]()
 	// types with asset in params
-	assetParam                  = reflect.TypeOf((*asset.Item)(nil)).Elem()
-	orderSubmitParam            = reflect.TypeOf((**order.Submit)(nil)).Elem()
-	orderModifyParam            = reflect.TypeOf((**order.Modify)(nil)).Elem()
-	orderCancelParam            = reflect.TypeOf((**order.Cancel)(nil)).Elem()
-	orderCancelsParam           = reflect.TypeOf((*[]order.Cancel)(nil)).Elem()
-	getOrdersRequestParam       = reflect.TypeOf((**order.MultiOrderRequest)(nil)).Elem()
-	positionChangeRequestParam  = reflect.TypeOf((**margin.PositionChangeRequest)(nil)).Elem()
-	positionSummaryRequestParam = reflect.TypeOf((**futures.PositionSummaryRequest)(nil)).Elem()
-	positionsRequestParam       = reflect.TypeOf((**futures.PositionsRequest)(nil)).Elem()
-	latestRateRequest           = reflect.TypeOf((**fundingrate.LatestRateRequest)(nil)).Elem()
-	pairKeySliceParam           = reflect.TypeOf((*[]key.PairAsset)(nil)).Elem()
+	assetParam                  = reflect.TypeFor[asset.Item]()
+	orderSubmitParam            = reflect.TypeFor[*order.Submit]()
+	orderModifyParam            = reflect.TypeFor[*order.Modify]()
+	orderCancelParam            = reflect.TypeFor[*order.Cancel]()
+	orderCancelsParam           = reflect.TypeFor[[]order.Cancel]()
+	getOrdersRequestParam       = reflect.TypeFor[*order.MultiOrderRequest]()
+	positionChangeRequestParam  = reflect.TypeFor[*margin.PositionChangeRequest]()
+	positionSummaryRequestParam = reflect.TypeFor[*futures.PositionSummaryRequest]()
+	positionsRequestParam       = reflect.TypeFor[*futures.PositionsRequest]()
+	latestRateRequest           = reflect.TypeFor[*fundingrate.LatestRateRequest]()
+	pairKeySliceParam           = reflect.TypeFor[[]key.PairAsset]()
 )
 
 // generateMethodArg determines the argument type and returns a pre-made
@@ -338,7 +336,7 @@ func generateMethodArg(ctx context.Context, t *testing.T, argGenerator *MethodAr
 			Asset: argGenerator.AssetParams.Asset,
 		})
 	case argGenerator.MethodInputType.AssignableTo(credentialsParam):
-		input = reflect.ValueOf(&account.Credentials{
+		input = reflect.ValueOf(&accounts.Credentials{
 			Key:             "test",
 			Secret:          "test",
 			ClientID:        "test",
@@ -390,6 +388,7 @@ func generateMethodArg(ctx context.Context, t *testing.T, argGenerator *MethodAr
 			Description:   "1337",
 			Amount:        1,
 			ClientOrderID: "1337",
+			WalletID:      "7331",
 		}
 		if argGenerator.MethodName == "WithdrawCryptocurrencyFunds" {
 			req.Type = withdraw.Crypto
@@ -613,10 +612,9 @@ var unsupportedAssets = []asset.Item{
 
 var unsupportedExchangeNames = []string{
 	"testexch",
-	"bitflyer",    // Bitflyer has many "ErrNotYetImplemented, which is true, but not what we care to test for here
-	"btse",        // 	TODO rm once timeout issues resolved
-	"poloniex",    // 	outdated API // TODO rm once updated
-	"coinbasepro", // 	outdated API // TODO rm once updated
+	"bitflyer", // Bitflyer has many "ErrNotYetImplemented, which is true, but not what we care to test for here
+	"btse",     // TODO rm once timeout issues resolved
+	"poloniex", // outdated API // TODO rm once updated
 }
 
 // cryptoChainPerExchange holds the deposit address chain per exchange
@@ -644,11 +642,21 @@ var acceptableErrors = []error{
 	futures.ErrNotFuturesAsset,           // Is thrown when a futures function receives a non-futures asset
 	currency.ErrSymbolStringEmpty,        // Is thrown when a symbol string is empty for blank MatchSymbol func checks
 	futures.ErrNotPerpetualFuture,        // Is thrown when a futures function receives a non-perpetual future
-	order.ErrExchangeLimitNotLoaded,      // Is thrown when the limits aren't loaded for a particular exchange, asset, pair
-	order.ErrCannotValidateAsset,         // Is thrown when attempting to get order limits from an asset that is not yet loaded
-	order.ErrCannotValidateBaseCurrency,  // Is thrown when attempting to get order limits from an base currency that is not yet loaded
-	order.ErrCannotValidateQuoteCurrency, // Is thrown when attempting to get order limits from an quote currency that is not yet loaded
-	account.ErrExchangeHoldingsNotFound,
+	limits.ErrExchangeLimitNotLoaded,     // Is thrown when the limits aren't loaded for a particular exchange, asset, pair
+	limits.ErrOrderLimitNotFound,         // Is thrown when the order limit isn't found for a particular exchange, asset, pair
+	limits.ErrEmptyLevels,                // Is thrown if limits are not provided for the asset
+	limits.ErrPriceBelowMin,
+	limits.ErrPriceExceedsMax,
+	limits.ErrPriceExceedsStep,
+	limits.ErrAmountBelowMin,
+	limits.ErrAmountExceedsMax,
+	limits.ErrAmountExceedsStep,
+	limits.ErrNotionalValue,
+	limits.ErrMarketAmountBelowMin,
+	limits.ErrMarketAmountExceedsMax,
+	limits.ErrMarketAmountExceedsStep,
+	accounts.ErrNoBalances,
+	accounts.ErrNoSubAccounts,
 	ticker.ErrTickerNotFound,
 	orderbook.ErrOrderbookNotFound,
 	websocket.ErrNotConnected,

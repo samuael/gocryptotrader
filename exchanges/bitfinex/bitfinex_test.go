@@ -141,27 +141,21 @@ func TestUpdateTradablePairs(t *testing.T) {
 
 func TestUpdateOrderExecutionLimits(t *testing.T) {
 	t.Parallel()
-	tests := map[asset.Item][]currency.Pair{
-		asset.Spot: {
-			currency.NewPair(currency.ETH, currency.UST),
-			currency.NewPair(currency.BTC, currency.UST),
-		},
-	}
-	for assetItem, pairs := range tests {
-		if err := e.UpdateOrderExecutionLimits(t.Context(), assetItem); err != nil {
-			t.Errorf("Error fetching %s pairs for test: %v", assetItem, err)
-			continue
-		}
-		for _, pair := range pairs {
-			limits, err := e.GetOrderExecutionLimits(assetItem, pair)
-			if err != nil {
-				t.Errorf("GetOrderExecutionLimits() error during TestExecutionLimits; Asset: %s Pair: %s Err: %v", assetItem, pair, err)
-				continue
+	for _, a := range e.GetAssetTypes(false) {
+		t.Run(a.String(), func(t *testing.T) {
+			t.Parallel()
+			switch a {
+			case asset.Spot:
+				require.NoError(t, e.UpdateOrderExecutionLimits(t.Context(), a), "UpdateOrderExecutionLimits must not error")
+				pairs, err := e.CurrencyPairs.GetPairs(a, false)
+				require.NoError(t, err, "GetPairs must not error")
+				l, err := e.GetOrderExecutionLimits(a, pairs[0])
+				require.NoError(t, err, "GetOrderExecutionLimits must not error")
+				assert.Positive(t, l.MinimumBaseAmount, "MinimumBaseAmount should be positive")
+			default:
+				require.ErrorIs(t, e.UpdateOrderExecutionLimits(t.Context(), a), common.ErrNotYetImplemented)
 			}
-			if limits.MinimumBaseAmount == 0 {
-				t.Errorf("UpdateOrderExecutionLimits empty minimum base amount; Pair: %s Expected Limit: %v", pair, limits.MinimumBaseAmount)
-			}
-		}
+		})
 	}
 }
 
@@ -413,11 +407,8 @@ func TestGetLeaderboard(t *testing.T) {
 func TestGetAccountFees(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
-
-	_, err := e.UpdateAccountInfo(t.Context(), asset.Spot)
-	if err != nil {
-		t.Error("GetAccountInfo error", err)
-	}
+	_, err := e.UpdateAccountBalances(t.Context(), asset.Spot)
+	assert.NoError(t, err)
 }
 
 func TestGetWithdrawalFee(t *testing.T) {
@@ -518,7 +509,7 @@ func TestUpdateTicker(t *testing.T) {
 func TestUpdateTickers(t *testing.T) {
 	t.Parallel()
 
-	e := new(Exchange) //nolint:govet // Intentional shadow
+	e := new(Exchange)
 	require.NoError(t, testexch.Setup(e), "Test instance Setup must not error")
 	testexch.UpdatePairsOnce(t, e)
 
@@ -928,8 +919,7 @@ func TestGetOrderHistory(t *testing.T) {
 	}
 }
 
-// Any tests below this line have the ability to impact your orders on the exchange. Enable canManipulateRealOrders to run them
-// ----------------------------------------------------------------------------------------------------------------------------
+// TestSubmitOrder and below can impact your orders on the exchange. Enable canManipulateRealOrders to run them
 func TestSubmitOrder(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCannotManipulateOrders(t, e, canManipulateRealOrders)
@@ -1129,8 +1119,8 @@ func TestWSAuth(t *testing.T) {
 	var resp map[string]any
 	catcher := func() (ok bool) {
 		select {
-		case v := <-e.Websocket.ToRoutine:
-			resp, ok = v.(map[string]any)
+		case v := <-e.Websocket.DataHandler.C:
+			resp, ok = v.Data.(map[string]any)
 		default:
 		}
 		return
@@ -1146,7 +1136,7 @@ func TestWSAuth(t *testing.T) {
 func TestGenerateSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	e := new(Exchange) //nolint:govet // Intentional shadow
+	e := new(Exchange)
 	require.NoError(t, testexch.Setup(e), "Setup must not error")
 	e.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	require.True(t, e.Websocket.CanUseAuthenticatedEndpoints(), "CanUseAuthenticatedEndpoints must return true")
@@ -1192,14 +1182,14 @@ func TestGenerateSubscriptions(t *testing.T) {
 // TestWSSubscribe tests Subscribe and Unsubscribe functionality
 // See also TestSubscribeReq which covers key and symbol conversion
 func TestWSSubscribe(t *testing.T) {
-	e := new(Exchange) //nolint:govet // Intentional shadow
+	e := new(Exchange)
 	require.NoError(t, testexch.Setup(e), "TestInstance must not error")
 	testexch.SetupWs(t, e)
 	err := e.Subscribe(subscription.List{{Channel: subscription.TickerChannel, Pairs: currency.Pairs{currency.NewBTCUSD()}, Asset: asset.Spot}})
 	require.NoError(t, err, "Subrcribe must not error")
 	catcher := func() (ok bool) {
-		i := <-e.Websocket.ToRoutine
-		_, ok = i.(*ticker.Price)
+		i := <-e.Websocket.DataHandler.C
+		_, ok = i.Data.(*ticker.Price)
 		return
 	}
 	assert.Eventually(t, catcher, sharedtestvalues.WebsocketResponseDefaultTimeout, time.Millisecond*10, "Ticker response should arrive")
@@ -1210,13 +1200,6 @@ func TestWSSubscribe(t *testing.T) {
 
 	err = e.Subscribe(subscription.List{{Channel: subscription.TickerChannel, Pairs: currency.Pairs{currency.NewBTCUSD()}, Asset: asset.Spot}})
 	require.ErrorContains(t, err, "subscribe: dup (code: 10301)", "Duplicate subscription must error correctly")
-
-	assert.EventuallyWithT(t, func(t *assert.CollectT) {
-		i := <-e.Websocket.ToRoutine
-		e, ok := i.(error)
-		require.True(t, ok, "must find an error")
-		assert.ErrorContains(t, e, "subscribe: dup (code: 10301)", "error should be correct")
-	}, sharedtestvalues.WebsocketResponseDefaultTimeout, time.Millisecond*10, "error response should go to ToRoutine")
 
 	subs, err = e.GetSubscriptions()
 	require.NoError(t, err, "GetSubscriptions must not error")
@@ -1383,12 +1366,12 @@ func TestWSOrderBook(t *testing.T) {
 func TestWSAllTrades(t *testing.T) {
 	t.Parallel()
 
-	e := new(Exchange) //nolint:govet // Intentional shadow
+	e := new(Exchange)
 	require.NoError(t, testexch.Setup(e), "Test instance Setup must not error")
 	err := e.Websocket.AddSubscriptions(e.Websocket.Conn, &subscription.Subscription{Asset: asset.Spot, Pairs: currency.Pairs{btcusdPair}, Channel: subscription.AllTradesChannel, Key: 18788})
 	require.NoError(t, err, "AddSubscriptions must not error")
 	testexch.FixtureToDataHandler(t, "testdata/wsAllTrades.json", e.wsHandleData)
-	close(e.Websocket.DataHandler)
+	e.Websocket.DataHandler.Close()
 	expJSON := []string{
 		`{"TID":"412685577","AssetType":"spot","Side":"BUY","Price":176.3,"Amount":11.1998,"Timestamp":"2020-01-29T03:27:24.802Z"}`,
 		`{"TID":"412685578","AssetType":"spot","Side":"SELL","Price":176.29952759,"Amount":5,"Timestamp":"2020-01-29T03:28:04.802Z"}`,
@@ -1398,11 +1381,11 @@ func TestWSAllTrades(t *testing.T) {
 		`{"TID":"5690221203","AssetType":"marginFunding","Side":"BUY","Price":102550,"Amount":0.00991467,"Timestamp":"2024-12-15T04:30:18.019Z"}`,
 		`{"TID":"5690221204","AssetType":"marginFunding","Side":"SELL","Price":102540,"Amount":0.01925285,"Timestamp":"2024-12-15T04:30:18.094Z"}`,
 	}
-	require.Len(t, e.Websocket.DataHandler, len(expJSON), "Must see correct number of trades")
-	for resp := range e.Websocket.DataHandler {
-		switch v := resp.(type) {
+	require.Len(t, e.Websocket.DataHandler.C, len(expJSON), "Must see correct number of trades")
+	for resp := range e.Websocket.DataHandler.C {
+		switch v := resp.Data.(type) {
 		case trade.Data:
-			i := 6 - len(e.Websocket.DataHandler)
+			i := 6 - len(e.Websocket.DataHandler.C)
 			exp := trade.Data{
 				Exchange:     e.Name,
 				CurrencyPair: btcusdPair,

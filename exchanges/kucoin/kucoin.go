@@ -19,11 +19,11 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/encoding/json"
+	"github.com/thrasher-corp/gocryptotrader/exchange/order/limits"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
-	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/types"
 )
@@ -31,10 +31,11 @@ import (
 // Exchange implements exchange.IBotExchange and contains additional specific api methods for interacting with Kucoin
 type Exchange struct {
 	exchange.Base
-	obm *orderbookManager
+	obmMutex                     sync.Mutex
+	obm                          *orderbookManager
+	fetchedFuturesOrderbookMutex sync.Mutex
+	fetchedFuturesOrderbook      map[string]bool
 }
-
-var locker sync.Mutex
 
 const (
 	kucoinAPIURL = "https://api.kucoin.com/api"
@@ -98,33 +99,6 @@ func (e *Exchange) GetMarketList(ctx context.Context) ([]string, error) {
 	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, marketListEPL, "/v1/markets", &resp)
 }
 
-// processOB constructs an orderbook.Level instances from slice of numbers.
-func processOB(ob [][2]types.Number) []orderbook.Level {
-	o := make([]orderbook.Level, len(ob))
-	for x := range ob {
-		o[x].Amount = ob[x][1].Float64()
-		o[x].Price = ob[x][0].Float64()
-	}
-	return o
-}
-
-// constructOrderbook parse checks and constructs an *Orderbook instance from *orderbookResponse.
-func constructOrderbook(o *orderbookResponse) (*Orderbook, error) {
-	s := Orderbook{
-		Bids: processOB(o.Bids),
-		Asks: processOB(o.Asks),
-		Time: o.Time.Time(),
-	}
-	if o.Sequence != "" {
-		var err error
-		s.Sequence, err = strconv.ParseInt(o.Sequence, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &s, nil
-}
-
 // GetPartOrderbook20 gets orderbook for a specified pair with depth 20
 func (e *Exchange) GetPartOrderbook20(ctx context.Context, symbol string) (*Orderbook, error) {
 	if symbol == "" {
@@ -133,11 +107,10 @@ func (e *Exchange) GetPartOrderbook20(ctx context.Context, symbol string) (*Orde
 	params := url.Values{}
 	params.Set("symbol", symbol)
 	var o *orderbookResponse
-	err := e.SendHTTPRequest(ctx, exchange.RestSpot, partOrderbook20EPL, common.EncodeURLValues("/v1/market/orderbook/level2_20", params), &o)
-	if err != nil {
+	if err := e.SendHTTPRequest(ctx, exchange.RestSpot, partOrderbook20EPL, common.EncodeURLValues("/v1/market/orderbook/level2_20", params), &o); err != nil {
 		return nil, err
 	}
-	return constructOrderbook(o)
+	return &Orderbook{Asks: o.Asks, Bids: o.Bids, Time: o.Time.Time(), Sequence: o.Sequence.Int64()}, nil
 }
 
 // GetPartOrderbook100 gets orderbook for a specified pair with depth 100
@@ -148,11 +121,10 @@ func (e *Exchange) GetPartOrderbook100(ctx context.Context, symbol string) (*Ord
 	params := url.Values{}
 	params.Set("symbol", symbol)
 	var o *orderbookResponse
-	err := e.SendHTTPRequest(ctx, exchange.RestSpot, partOrderbook100EPL, common.EncodeURLValues("/v1/market/orderbook/level2_100", params), &o)
-	if err != nil {
+	if err := e.SendHTTPRequest(ctx, exchange.RestSpot, partOrderbook100EPL, common.EncodeURLValues("/v1/market/orderbook/level2_100", params), &o); err != nil {
 		return nil, err
 	}
-	return constructOrderbook(o)
+	return &Orderbook{Asks: o.Asks, Bids: o.Bids, Time: o.Time.Time(), Sequence: o.Sequence.Int64()}, nil
 }
 
 // GetOrderbook gets full orderbook for a specified pair
@@ -163,11 +135,10 @@ func (e *Exchange) GetOrderbook(ctx context.Context, symbol string) (*Orderbook,
 	params := url.Values{}
 	params.Set("symbol", symbol)
 	var o *orderbookResponse
-	err := e.SendAuthHTTPRequest(ctx, exchange.RestSpot, fullOrderbookEPL, http.MethodGet, common.EncodeURLValues("/v3/market/orderbook/level2", params), nil, &o)
-	if err != nil {
+	if err := e.SendAuthHTTPRequest(ctx, exchange.RestSpot, fullOrderbookEPL, http.MethodGet, common.EncodeURLValues("/v3/market/orderbook/level2", params), nil, &o); err != nil {
 		return nil, err
 	}
-	return constructOrderbook(o)
+	return &Orderbook{Asks: o.Asks, Bids: o.Bids, Time: o.Time.Time(), Sequence: o.Sequence.Int64()}, nil
 }
 
 // GetTradeHistory gets trade history of the specified pair
@@ -313,7 +284,7 @@ func (e *Exchange) PostMarginBorrowOrder(ctx context.Context, arg *MarginBorrowP
 		return nil, errTimeInForceRequired
 	}
 	if arg.Size <= 0 {
-		return nil, fmt.Errorf("%w , size = %f", order.ErrAmountBelowMin, arg.Size)
+		return nil, fmt.Errorf("%w , size = %f", limits.ErrAmountBelowMin, arg.Size)
 	}
 	var resp *BorrowAndRepaymentOrderResp
 	return resp, e.SendAuthHTTPRequest(ctx, exchange.RestSpot, postMarginBorrowOrderEPL, http.MethodPost, "/v3/margin/borrow", arg, &resp)
@@ -365,7 +336,7 @@ func (e *Exchange) PostRepayment(ctx context.Context, arg *RepayParam) (*BorrowA
 		return nil, currency.ErrCurrencyCodeEmpty
 	}
 	if arg.Size <= 0 {
-		return nil, fmt.Errorf("%w , size = %f", order.ErrAmountBelowMin, arg.Size)
+		return nil, fmt.Errorf("%w , size = %f", limits.ErrAmountBelowMin, arg.Size)
 	}
 	var resp *BorrowAndRepaymentOrderResp
 	return resp, e.SendAuthHTTPRequest(ctx, exchange.RestSpot, postMarginRepaymentEPL, http.MethodPost, "/v3/margin/repay", arg, &resp)
@@ -509,10 +480,10 @@ func (a *PlaceHFParam) ValidatePlaceOrderParams() error {
 	}
 	a.Side = strings.ToLower(a.Side)
 	if a.Price <= 0 {
-		return order.ErrPriceBelowMin
+		return limits.ErrPriceBelowMin
 	}
 	if a.Size <= 0 {
-		return order.ErrAmountBelowMin
+		return limits.ErrAmountBelowMin
 	}
 	return nil
 }
@@ -646,7 +617,7 @@ func (e *Exchange) CancelSpecifiedNumberHFOrdersByOrderID(ctx context.Context, o
 		return nil, currency.ErrSymbolStringEmpty
 	}
 	if cancelSize == 0 {
-		return nil, fmt.Errorf("%w, cancel size is required", order.ErrAmountBelowMin)
+		return nil, fmt.Errorf("%w, cancel size is required", limits.ErrAmountBelowMin)
 	}
 	params := url.Values{}
 	params.Set("symbol", symbol)
@@ -837,13 +808,13 @@ func (e *Exchange) HandlePostOrder(ctx context.Context, arg *SpotOrderParam, pat
 	switch arg.OrderType {
 	case order.Limit.Lower(), "":
 		if arg.Price <= 0 {
-			return "", fmt.Errorf("%w, price =%.3f", order.ErrPriceBelowMin, arg.Price)
+			return "", fmt.Errorf("%w, price =%.3f", limits.ErrPriceBelowMin, arg.Price)
 		}
 		if arg.Size <= 0 {
-			return "", order.ErrAmountBelowMin
+			return "", limits.ErrAmountBelowMin
 		}
 		if arg.VisibleSize < 0 {
-			return "", fmt.Errorf("%w, visible size must be non-zero positive value", order.ErrAmountBelowMin)
+			return "", fmt.Errorf("%w, visible size must be non-zero positive value", limits.ErrAmountBelowMin)
 		}
 	case order.Market.Lower():
 		if arg.Size == 0 && arg.Funds == 0 {
@@ -887,13 +858,13 @@ func (e *Exchange) SendPostMarginOrder(ctx context.Context, arg *MarginOrderPara
 	switch arg.OrderType {
 	case order.Limit.Lower(), "":
 		if arg.Price <= 0 {
-			return nil, fmt.Errorf("%w, price=%.3f", order.ErrPriceBelowMin, arg.Price)
+			return nil, fmt.Errorf("%w, price=%.3f", limits.ErrPriceBelowMin, arg.Price)
 		}
 		if arg.Size <= 0 {
-			return nil, order.ErrAmountBelowMin
+			return nil, limits.ErrAmountBelowMin
 		}
 		if arg.VisibleSize < 0 {
-			return nil, fmt.Errorf("%w, visible size must be non-zero positive value", order.ErrAmountBelowMin)
+			return nil, fmt.Errorf("%w, visible size must be non-zero positive value", limits.ErrAmountBelowMin)
 		}
 	case order.Market.Lower():
 		sum := arg.Size + arg.Funds
@@ -929,10 +900,10 @@ func (e *Exchange) PostBulkOrder(ctx context.Context, symbol string, orderList [
 		}
 		orderList[i].Side = strings.ToLower(orderList[i].Side)
 		if orderList[i].Price <= 0 {
-			return nil, order.ErrPriceBelowMin
+			return nil, limits.ErrPriceBelowMin
 		}
 		if orderList[i].Size <= 0 {
-			return nil, order.ErrAmountBelowMin
+			return nil, limits.ErrAmountBelowMin
 		}
 	}
 	arg := &struct {
@@ -1089,7 +1060,7 @@ func (e *Exchange) PostStopOrder(ctx context.Context, clientOID, side, symbol, o
 	if stop != "" {
 		arg["stop"] = stop
 		if stopPrice <= 0 {
-			return "", fmt.Errorf("%w, stopPrice is required", order.ErrPriceBelowMin)
+			return "", fmt.Errorf("%w, stopPrice is required", limits.ErrPriceBelowMin)
 		}
 		arg["stopPrice"] = strconv.FormatFloat(stopPrice, 'f', -1, 64)
 	}
@@ -1103,11 +1074,11 @@ func (e *Exchange) PostStopOrder(ctx context.Context, clientOID, side, symbol, o
 	switch orderType {
 	case order.Limit.Lower(), "":
 		if price <= 0 {
-			return "", order.ErrPriceBelowMin
+			return "", limits.ErrPriceBelowMin
 		}
 		arg["price"] = strconv.FormatFloat(price, 'f', -1, 64)
 		if size <= 0 {
-			return "", fmt.Errorf("%w, size is required", order.ErrAmountBelowMin)
+			return "", fmt.Errorf("%w, size is required", limits.ErrAmountBelowMin)
 		}
 		arg["size"] = strconv.FormatFloat(size, 'f', -1, 64)
 		if timeInForce != "" {
@@ -1265,16 +1236,16 @@ func (e *Exchange) PlaceOCOOrder(ctx context.Context, arg *OCOOrderParams) (stri
 	}
 	arg.Side = strings.ToLower(arg.Side)
 	if arg.Price <= 0 {
-		return "", order.ErrPriceBelowMin
+		return "", limits.ErrPriceBelowMin
 	}
 	if arg.Size <= 0 {
-		return "", order.ErrAmountBelowMin
+		return "", limits.ErrAmountBelowMin
 	}
 	if arg.StopPrice <= 0 {
-		return "", fmt.Errorf("%w stop price = %f", order.ErrPriceBelowMin, arg.StopPrice)
+		return "", fmt.Errorf("%w stop price = %f", limits.ErrPriceBelowMin, arg.StopPrice)
 	}
 	if arg.LimitPrice <= 0 {
-		return "", fmt.Errorf("%w limit price = %f", order.ErrPriceBelowMin, arg.LimitPrice)
+		return "", fmt.Errorf("%w limit price = %f", limits.ErrPriceBelowMin, arg.LimitPrice)
 	}
 	if arg.ClientOrderID == "" {
 		return "", order.ErrClientOrderIDMustBeSet
@@ -1405,10 +1376,10 @@ func (e *Exchange) SendPlaceMarginHFOrder(ctx context.Context, arg *PlaceMarginH
 		return nil, currency.ErrCurrencyPairEmpty
 	}
 	if arg.Price <= 0 {
-		return nil, order.ErrPriceBelowMin
+		return nil, limits.ErrPriceBelowMin
 	}
 	if arg.Size <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return nil, limits.ErrAmountBelowMin
 	}
 	var resp *MarginHFOrderResponse
 	return resp, e.SendAuthHTTPRequest(ctx, exchange.RestSpot, placeMarginOrderEPL, http.MethodPost, path, arg, &resp)
@@ -1927,7 +1898,7 @@ func (e *Exchange) GetUniversalTransfer(ctx context.Context, arg *UniversalTrans
 		return "", order.ErrClientOrderIDMustBeSet
 	}
 	if arg.Amount <= 0 {
-		return "", order.ErrAmountBelowMin
+		return "", limits.ErrAmountBelowMin
 	}
 	if arg.FromAccountType == "" {
 		return "", fmt.Errorf("%w, empty fromAccountType", errAccountTypeMissing)
@@ -1951,7 +1922,7 @@ func (e *Exchange) TransferMainToSubAccount(ctx context.Context, ccy currency.Co
 		return "", currency.ErrCurrencyCodeEmpty
 	}
 	if amount <= 0 {
-		return "", order.ErrAmountBelowMin
+		return "", limits.ErrAmountBelowMin
 	}
 	if direction == "" {
 		return "", errTransferDirectionRequired
@@ -1992,7 +1963,7 @@ func (e *Exchange) MakeInnerTransfer(ctx context.Context, amount float64, ccy cu
 		return "", order.ErrClientOrderIDMustBeSet
 	}
 	if amount <= 0 {
-		return "", order.ErrAmountBelowMin
+		return "", limits.ErrAmountBelowMin
 	}
 	if paymentAccountType == "" {
 		return "", fmt.Errorf("%w sending account type is required", errAccountTypeMissing)
@@ -2029,7 +2000,7 @@ func (e *Exchange) TransferToMainOrTradeAccount(ctx context.Context, arg *FundTr
 		return nil, common.ErrNilPointer
 	}
 	if arg.Amount <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return nil, limits.ErrAmountBelowMin
 	}
 	if arg.Currency.IsEmpty() {
 		return nil, currency.ErrCurrencyCodeEmpty
@@ -2047,7 +2018,7 @@ func (e *Exchange) TransferToFuturesAccount(ctx context.Context, arg *FundTransf
 		return nil, common.ErrNilPointer
 	}
 	if arg.Amount <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return nil, limits.ErrAmountBelowMin
 	}
 	if arg.Currency.IsEmpty() {
 		return nil, currency.ErrCurrencyCodeEmpty
@@ -2227,7 +2198,7 @@ func (e *Exchange) ApplyWithdrawal(ctx context.Context, ccy currency.Code, addre
 		return "", fmt.Errorf("%w, empty withdrawal address", errAddressRequired)
 	}
 	if amount <= 0 {
-		return "", order.ErrAmountBelowMin
+		return "", limits.ErrAmountBelowMin
 	}
 	arg := &struct {
 		Currency      currency.Code `json:"currency"`
@@ -2311,7 +2282,7 @@ func (e *Exchange) MarginLendingSubscription(ctx context.Context, ccy currency.C
 		return nil, currency.ErrCurrencyCodeEmpty
 	}
 	if size <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return nil, limits.ErrAmountBelowMin
 	}
 	if interestRate <= 0 {
 		return nil, errMissingInterestRate
@@ -2335,7 +2306,7 @@ func (e *Exchange) Redemption(ctx context.Context, ccy currency.Code, size float
 		return nil, currency.ErrCurrencyCodeEmpty
 	}
 	if size <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return nil, limits.ErrAmountBelowMin
 	}
 	if purchaseOrderNo == "" {
 		return nil, errMissingPurchaseOrderNumber
@@ -2603,7 +2574,7 @@ func (e *Exchange) SubscribeToEarnFixedIncomeProduct(ctx context.Context, produc
 		return nil, errProductIDMissing
 	}
 	if amount <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return nil, limits.ErrAmountBelowMin
 	}
 	if accountType == "" {
 		return nil, errAccountTypeMissing
@@ -2626,7 +2597,7 @@ func (e *Exchange) RedeemByEarnHoldingID(ctx context.Context, orderID, fromAccou
 		return nil, order.ErrOrderIDNotSet
 	}
 	if amount <= 0 {
-		return nil, order.ErrAmountBelowMin
+		return nil, limits.ErrAmountBelowMin
 	}
 	params := url.Values{}
 	params.Set("orderId", orderID)
