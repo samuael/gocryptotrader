@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	wsAPIURL = ""
+	wsAPIURL = "wss://open-api-ws.bingx.com/market"
 )
 
 // WsConnect creates a new websocket connection.
@@ -26,7 +26,6 @@ func (e *Exchange) WsConnect() error {
 	}
 
 	if e.Websocket.CanUseAuthenticatedEndpoints() {
-		// Add WebSocket authentication logic here.
 	}
 
 	if err := e.Websocket.Conn.Dial(ctx, &dialer, http.Header{}, nil); err != nil {
@@ -44,13 +43,11 @@ func (e *Exchange) generateSubscriptions() (subscription.List, error) {
 
 // Subscribe sends websocket messages to receive data for a list of channels
 func (e *Exchange) Subscribe(_ subscription.List) error {
-	// ctx := context.TODO()
 	return nil
 }
 
 // Unsubscribe sends websocket messages to stop receiving data for a list of channels
 func (e *Exchange) Unsubscribe(_ subscription.List) error {
-	// ctx := context.TODO()
 	return nil
 }
 
@@ -63,13 +60,11 @@ func (e *Exchange) wsReadData(ctx context.Context) {
 			return
 		}
 		if err := e.wsHandleData(ctx, resp.Raw); err != nil {
-			// e.Websocket.DataHandler &lt;- err
 		}
 	}
 }
 
 // wsHandleData processes a websocket incoming data.
 func (e *Exchange) wsHandleData(ctx context.Context, respData []byte) error {
-	// Implement message parsing and handling logic here.
 	return nil
 }
