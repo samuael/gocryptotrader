@@ -1,13 +1,16 @@
 package bingx
 
 import (
+	"encoding/hex"
 	"log"
+	"net/url"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	testexch "github.com/thrasher-corp/gocryptotrader/internal/testing/exchange"
@@ -21,8 +24,9 @@ const (
 )
 
 var (
-	e       *Exchange
-	btcUSDT currency.Pair
+	e           *Exchange
+	btcUSDT     currency.Pair
+	coinMBTCUSD currency.Pair
 )
 
 func TestMain(m *testing.M) {
@@ -40,6 +44,8 @@ func TestMain(m *testing.M) {
 
 	btcUSDT = currency.NewBTCUSDT()
 	btcUSDT.Delimiter = currency.DashDelimiter
+	coinMBTCUSD = currency.NewPair(currency.BTC, currency.USD)
+	coinMBTCUSD.Delimiter = currency.DashDelimiter
 	os.Exit(m.Run())
 }
 
@@ -261,4 +267,77 @@ func TestGetSwapTradingRules(t *testing.T) {
 	result, err := e.GetSwapTradingRules(t.Context(), btcUSDT)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+}
+
+func TestGetCoinMContracts(t *testing.T) {
+	t.Parallel()
+	result, err := e.GetCoinMContracts(t.Context(), currency.EMPTYPAIR)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+
+	result, err = e.GetCoinMContracts(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestGetCoinMMarkPriceAndFundingRate(t *testing.T) {
+	t.Parallel()
+	result, err := e.GetCoinMMarkPriceAndFundingRate(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+
+	result, err = e.GetCoinMMarkPriceAndFundingRate(t.Context(), currency.EMPTYPAIR)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestGetCoinMOpenInterest(t *testing.T) {
+	t.Parallel()
+	result, err := e.GetCoinMOpenInterest(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestGetCoinMKlineData(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetCoinMKlineData(t.Context(), currency.EMPTYPAIR, kline.OneHour, time.Time{}, time.Time{}, 0, 5)
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+
+	_, err = e.GetCoinMKlineData(t.Context(), coinMBTCUSD, kline.Interval(0), time.Time{}, time.Time{}, 0, 5)
+	require.ErrorIs(t, err, kline.ErrInvalidInterval)
+
+	result, err := e.GetCoinMKlineData(t.Context(), coinMBTCUSD, kline.OneHour, time.Time{}, time.Time{}, 0, 5)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMOrderbookDepth(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetCoinMOrderbookDepth(t.Context(), currency.EMPTYPAIR, 5)
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+
+	result, err := e.GetCoinMOrderbookDepth(t.Context(), coinMBTCUSD, 5)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinM24HrTickerPriceChange(t *testing.T) {
+	t.Parallel()
+	result, err := e.GetCoinM24HrTickerPriceChange(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestSignaturePayload(t *testing.T) {
+	t.Parallel()
+	params := url.Values{}
+	params.Set("symbol", "BTC-USDT")
+	params.Set("recvWindow", "0")
+	params.Set("timestamp", "1696751141337")
+	signingString := signaturePayload(params)
+	assert.Equal(t, "recvWindow=0&symbol=BTC-USDT&timestamp=1696751141337", signingString, "signaturePayload should sort and concatenate parameters")
+
+	hmacSigned, err := crypto.GetHMAC(crypto.HashSHA256, []byte(signingString), []byte("SECRET_KEY"))
+	require.NoError(t, err, "GetHMAC must not error")
+	assert.Equal(t, "fe041f159118c90ac13eab4d32f9e2d75b80ca6fe17ca8acd290aba864753ce2", hex.EncodeToString(hmacSigned), "signature should match the documented HMAC-SHA256 value")
 }

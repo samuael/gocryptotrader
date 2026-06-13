@@ -281,3 +281,67 @@ type SwapTradingRules struct {
 	SellMinPrice        types.Number `json:"sellMinPrice"`
 	MarketRatio         types.Number `json:"marketRatio"`
 }
+
+// CoinMContract represents a coin-margined (Coin-M) futures contract and its trading rules.
+type CoinMContract struct {
+	Symbol         currency.Pair `json:"symbol"`
+	PricePrecision uint64        `json:"pricePrecision"`
+	MinTickSize    types.Number  `json:"minTickSize"`
+	MinTradeValue  types.Number  `json:"minTradeValue"`
+	MinQuantity    types.Number  `json:"minQty"`
+	Status         uint64        `json:"status"`
+	TimeOnline     types.Time    `json:"timeOnline"`
+	DisplayName    string        `json:"displayName"`
+}
+
+// CoinMMarkPriceFundingRate represents the latest mark price, index price and funding rate for a coin-margined futures symbol.
+type CoinMMarkPriceFundingRate struct {
+	Symbol          currency.Pair `json:"symbol"`
+	MarkPrice       types.Number  `json:"markPrice"`
+	IndexPrice      types.Number  `json:"indexPrice"`
+	LastFundingRate types.Number  `json:"lastFundingRate"`
+	NextFundingTime types.Time    `json:"nextFundingTime"`
+}
+
+// CoinMOpenInterest represents the open interest of a coin-margined futures symbol.
+type CoinMOpenInterest struct {
+	OpenInterest types.Number  `json:"openInterest"`
+	Symbol       currency.Pair `json:"symbol"`
+	Timestamp    types.Time    `json:"timestamp"`
+}
+
+// CoinMCandle represents a coin-margined futures kline entry.
+type CoinMCandle struct {
+	Open   types.Number `json:"open"`
+	Close  types.Number `json:"close"`
+	High   types.Number `json:"high"`
+	Low    types.Number `json:"low"`
+	Volume types.Number `json:"volume"`
+	Time   types.Time   `json:"time"`
+}
+
+// CoinMOrderbookDepth represents the order book depth of a coin-margined futures symbol.
+type CoinMOrderbookDepth struct {
+	Timestamp types.Time                       `json:"T"`
+	Bids      orderbook.LevelsArrayPriceAmount `json:"bids"`
+	Asks      orderbook.LevelsArrayPriceAmount `json:"asks"`
+}
+
+// CoinMTicker24Hr represents the 24-hour rolling window price change statistics for a coin-margined futures symbol.
+type CoinMTicker24Hr struct {
+	Symbol             currency.Pair `json:"symbol"`
+	PriceChange        types.Number  `json:"priceChange"`
+	PriceChangePercent string        `json:"priceChangePercent"`
+	LastPrice          types.Number  `json:"lastPrice"`
+	LastQuantity       types.Number  `json:"lastQty"`
+	HighPrice          types.Number  `json:"highPrice"`
+	LowPrice           types.Number  `json:"lowPrice"`
+	Volume             types.Number  `json:"volume"`
+	QuoteVolume        types.Number  `json:"quoteVolume"`
+	OpenPrice          types.Number  `json:"openPrice"`
+	CloseTime          types.Time    `json:"closeTime"`
+	BidPrice           types.Number  `json:"bidPrice"`
+	BidQuantity        types.Number  `json:"bidQty"`
+	AskPrice           types.Number  `json:"askPrice"`
+	AskQuantity        types.Number  `json:"askQty"`
+}

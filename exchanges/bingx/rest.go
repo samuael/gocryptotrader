@@ -2,13 +2,17 @@ package bingx
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common"
+	"github.com/thrasher-corp/gocryptotrader/common/crypto"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
@@ -425,6 +429,94 @@ func (e *Exchange) GetSwapTradingRules(ctx context.Context, symbol currency.Pair
 	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/tradingRules", params, &resp)
 }
 
+// ---------------------------- Coin Marginid Futures ----------------------
+
+// GetCoinMContracts retrieves coin-margined (Coin-M) futures contracts and their trading rules.
+func (e *Exchange) GetCoinMContracts(ctx context.Context, symbol currency.Pair) ([]*CoinMContract, error) {
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	var resp []*CoinMContract
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/contracts", params, &resp)
+}
+
+// GetCoinMMarkPriceAndFundingRate retrieves the latest mark price, index price and funding rate for coin-margined futures symbols.
+func (e *Exchange) GetCoinMMarkPriceAndFundingRate(ctx context.Context, symbol currency.Pair) ([]*CoinMMarkPriceFundingRate, error) {
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	var resp []*CoinMMarkPriceFundingRate
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/premiumIndex", params, &resp)
+}
+
+// GetCoinMOpenInterest retrieves the open interest of coin-margined futures symbols.
+func (e *Exchange) GetCoinMOpenInterest(ctx context.Context, symbol currency.Pair) ([]*CoinMOpenInterest, error) {
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	var resp []*CoinMOpenInterest
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/openInterest", params, &resp)
+}
+
+// GetCoinMKlineData retrieves candlestick data for a coin-margined futures symbol. Only the last 30 days of data is available.
+func (e *Exchange) GetCoinMKlineData(ctx context.Context, symbol currency.Pair, interval kline.Interval, startTime, endTime time.Time, timeZone, limit uint64) ([]*CoinMCandle, error) {
+	if symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	if interval == kline.Interval(0) {
+		return nil, kline.ErrInvalidInterval
+	}
+	if !startTime.IsZero() && !endTime.IsZero() {
+		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
+			return nil, err
+		}
+	}
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+	params.Set("interval", intervalToString(interval))
+	if !startTime.IsZero() {
+		params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
+	}
+	if !endTime.IsZero() {
+		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
+	}
+	if timeZone != 0 {
+		params.Set("timeZone", strconv.FormatUint(timeZone, 10))
+	}
+	if limit != 0 {
+		params.Set("limit", strconv.FormatUint(limit, 10))
+	}
+	var resp []*CoinMCandle
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/klines", params, &resp)
+}
+
+// GetCoinMOrderbookDepth retrieves the order book depth for a coin-margined futures symbol.
+func (e *Exchange) GetCoinMOrderbookDepth(ctx context.Context, symbol currency.Pair, limit uint64) (*CoinMOrderbookDepth, error) {
+	if symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+	if limit != 0 {
+		params.Set("limit", strconv.FormatUint(limit, 10))
+	}
+	var resp *CoinMOrderbookDepth
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/depth", params, &resp)
+}
+
+// GetCoinM24HrTickerPriceChange retrieves the 24-hour rolling window price change statistics for coin-margined futures symbols.
+func (e *Exchange) GetCoinM24HrTickerPriceChange(ctx context.Context, symbol currency.Pair) ([]*CoinMTicker24Hr, error) {
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	var resp []*CoinMTicker24Hr
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/ticker", params, &resp)
+}
+
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (e *Exchange) SendHTTPRequest(ctx context.Context, ep exchange.URL, path string, params url.Values, result any) error {
 	endpoint, err := e.API.Endpoints.GetURL(ep)
@@ -458,4 +550,64 @@ func (e *Exchange) SendHTTPRequest(ctx context.Context, ep exchange.URL, path st
 		return fmt.Errorf("failed with error code: %d message: %s", resp.Code, resp.Msg)
 	}
 	return nil
+}
+
+// SendAuthenticatedHTTPRequest signs and sends an authenticated HTTP request
+func (e *Exchange) SendAuthenticatedHTTPRequest(ctx context.Context, ep exchange.URL, method, path string, params url.Values, result any) error {
+	creds, err := e.GetCredentials(ctx)
+	if err != nil {
+		return err
+	}
+	endpoint, err := e.API.Endpoints.GetURL(ep)
+	if err != nil {
+		return err
+	}
+	if params == nil {
+		params = url.Values{}
+	}
+	resp := &ResponseWrapper{
+		Data: result,
+	}
+	newRequest := func() (*request.Item, error) {
+		params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
+		hmacSigned, err := crypto.GetHMAC(crypto.HashSHA256, []byte(signaturePayload(params)), []byte(creds.Secret))
+		if err != nil {
+			return nil, err
+		}
+		return &request.Item{
+			Method:                 method,
+			Path:                   endpoint + common.EncodeURLValues(path, params) + "&signature=" + hex.EncodeToString(hmacSigned),
+			Headers:                map[string]string{"X-BX-APIKEY": creds.Key},
+			Result:                 resp,
+			Verbose:                e.Verbose,
+			HTTPDebugging:          e.HTTPDebugging,
+			HTTPRecording:          e.HTTPRecording,
+			HTTPMockDataSliceLimit: e.HTTPMockDataSliceLimit,
+		}, nil
+	}
+	if err := e.SendPayload(ctx, request.Unset, newRequest, request.AuthenticatedRequest); err != nil {
+		return err
+	}
+	if resp.Code != 0 || resp.Msg != "" {
+		return fmt.Errorf("failed with error code: %d message: %s", resp.Code, resp.Msg)
+	}
+	return nil
+}
+
+func signaturePayload(params url.Values) string {
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var sb strings.Builder
+	for i, key := range keys {
+		if i > 0 {
+			sb.WriteString("&")
+		}
+		sb.WriteString(key)
+		sb.WriteString("=")
+		sb.WriteString(params.Get(key))
+	}
+	return sb.String()
 }
