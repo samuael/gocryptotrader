@@ -3,6 +3,7 @@ package bingx
 import (
 	"encoding/hex"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/margin"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
 	testexch "github.com/thrasher-corp/gocryptotrader/internal/testing/exchange"
 )
@@ -1179,4 +1181,15 @@ func TestAdjustCoinMIsolatedMargin(t *testing.T) {
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	err = e.AdjustCoinMIsolatedMargin(t.Context(), coinMBTCUSD, 0.01, 1, "LONG")
 	require.NoError(t, err)
+}
+
+func TestRateLimitDefinitions(t *testing.T) {
+	t.Parallel()
+	rl, err := request.New("BingX_RateLimit", http.DefaultClient, request.WithLimiter(rateLimits))
+	require.NoError(t, err)
+	for epl := spotV1CommonSymbolsEPL; epl <= coinMV1TradePositionMarginEPL; epl++ {
+		_, ok := rateLimits[epl]
+		require.Truef(t, ok, "endpoint limit %d must have a rate limit definition", epl)
+		require.NoErrorf(t, rl.InitiateRateLimit(t.Context(), epl), "InitiateRateLimit must not error for endpoint limit %d", epl)
+	}
 }

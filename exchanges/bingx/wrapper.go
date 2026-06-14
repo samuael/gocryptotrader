@@ -113,14 +113,19 @@ func (e *Exchange) SetDefaults() {
 		},
 		Subscriptions: defaultSubscriptions,
 	}
-	// TODO: SET THE EXCHANGES RATE LIMIT HERE
 	var err error
 	e.Requester, err = request.New(e.Name, common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
 
-	// TODO: SET THE URLs HERE
+	e.Requester, err = request.New(e.Name,
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		request.WithLimiter(rateLimits))
+	if err != nil {
+		log.Errorln(log.ExchangeSys, err)
+	}
+
 	e.API.Endpoints = e.NewEndpoints()
 	if err = e.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
 		exchange.RestSpot:      apiURL,

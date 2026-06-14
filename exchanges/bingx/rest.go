@@ -57,7 +57,7 @@ func (e *Exchange) GetSpotSymbols(ctx context.Context, symbol currency.Pair) (*C
 		params.Set("symbol", symbol.String())
 	}
 	var resp *ConfigSymbols
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/common/symbols", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/common/symbols", params, &resp, spotV1CommonSymbolsEPL)
 }
 
 // GetMarketTrades retrieve the most recent market trades for a specified symbol.
@@ -71,7 +71,7 @@ func (e *Exchange) GetMarketTrades(ctx context.Context, symbol currency.Pair, li
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SpotTradeInfo
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/market/trades", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/market/trades", params, &resp, spotV1MarketTradesEPL)
 }
 
 // GetSpotOrderbookDepth get the order book depth for a specified symbol
@@ -85,7 +85,7 @@ func (e *Exchange) GetSpotOrderbookDepth(ctx context.Context, symbol currency.Pa
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp *SpotOrderbookDetail
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/market/depth", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/market/depth", params, &resp, spotV1MarketDepthEPL)
 }
 
 // GetSpotKlineData load candlestick data for aspecific symbol.
@@ -116,7 +116,7 @@ func (e *Exchange) GetSpotKlineData(ctx context.Context, symbol currency.Pair, i
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SpotCandle
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v2/market/kline", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v2/market/kline", params, &resp, spotV2MarketKlineEPL)
 }
 
 // intervalToString converts a kline.Interval into the string representation expected by the BingX API.
@@ -142,7 +142,7 @@ func (e *Exchange) Get24HrTickerPriceChange(ctx context.Context, symbol currency
 		params.Set("symbol", symbol.String())
 	}
 	var resp []*SpotTicker24Hr
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/ticker/24hr", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/ticker/24hr", params, &resp, spotV1Ticker24hrEPL)
 }
 
 // GetSpotOrderbookAggregation retrieves the aggregated order book depth for a symbol
@@ -159,7 +159,7 @@ func (e *Exchange) GetSpotOrderbookAggregation(ctx context.Context, symbol curre
 		params.Set("type", depthType)
 	}
 	var resp *SpotOrderbookDetail
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v2/market/depth", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v2/market/depth", params, &resp, spotV2MarketDepthEPL)
 }
 
 // GetSpotSymbolPriceTicker retrieves the latest market price for a symbol.
@@ -170,7 +170,7 @@ func (e *Exchange) GetSpotSymbolPriceTicker(ctx context.Context, symbol currency
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp []*SpotPriceTicker
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v2/ticker/price", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v2/ticker/price", params, &resp, spotV2TickerPriceEPL)
 }
 
 // GetSpotSymbolOrderbookTicker retrieves the best bid and ask price and quantity for a symbol.
@@ -181,7 +181,7 @@ func (e *Exchange) GetSpotSymbolOrderbookTicker(ctx context.Context, symbol curr
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp []*SpotBookTicker
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/ticker/bookTicker", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "spot/v1/ticker/bookTicker", params, &resp, spotV1TickerBookTickerEPL)
 }
 
 // GetHistoricalKlineData retrieves historical candlestick data for a symbol over different time intervals.
@@ -209,7 +209,7 @@ func (e *Exchange) GetHistoricalKlineData(ctx context.Context, symbol currency.P
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SpotCandle
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "market/his/v1/kline", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "market/his/v1/kline", params, &resp, marketHisV1KlineEPL)
 }
 
 // GetOldSpotTrades retrieves historical trade records for a symbol.
@@ -226,7 +226,7 @@ func (e *Exchange) GetOldSpotTrades(ctx context.Context, symbol currency.Pair, l
 		params.Set("fromId", fromID)
 	}
 	var resp []*HistoricalSpotTrade
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "market/his/v1/trade", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "market/his/v1/trade", params, &resp, marketHisV1TradeEPL)
 }
 
 // params validates and converts a PlaceSpotOrderRequest into url.Values
@@ -270,7 +270,7 @@ func (e *Exchange) PlaceSpotOrder(ctx context.Context, arg *PlaceSpotOrderReques
 		return nil, err
 	}
 	var resp *SpotOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/order", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/order", params, &resp, spotV1TradeOrderEPL)
 }
 
 // PlaceMultipleSpotOrders submits up to five spot orders in a single request.
@@ -300,7 +300,7 @@ func (e *Exchange) PlaceMultipleSpotOrders(ctx context.Context, args []PlaceSpot
 		params.Set("sync", "true")
 	}
 	var resp *SpotOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/batchOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/batchOrders", params, &resp, spotV1TradeBatchOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -326,7 +326,7 @@ func (e *Exchange) CancelSpotOrder(ctx context.Context, symbol currency.Pair, or
 		params.Set("cancelRestrictions", cancelRestrictions)
 	}
 	var resp *SpotOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancel", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancel", params, &resp, spotV1TradeCancelEPL)
 }
 
 // CancelMultipleSpotOrders cancels multiple spot orders by order ID or client order ID
@@ -349,7 +349,7 @@ func (e *Exchange) CancelMultipleSpotOrders(ctx context.Context, symbol currency
 		params.Set("clientOrderIDs", clientOrderIDs)
 	}
 	var resp *SpotCancelOrdersResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelOrders", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelOrders", params, &resp, spotV1TradeCancelOrdersEPL)
 }
 
 // CancelAllSpotOpenOrders cancels all open spot orders
@@ -359,7 +359,7 @@ func (e *Exchange) CancelAllSpotOpenOrders(ctx context.Context, symbol currency.
 		params.Set("symbol", symbol.String())
 	}
 	var resp *SpotOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelOpenOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelOpenOrders", params, &resp, spotV1TradeCancelOpenOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -388,7 +388,7 @@ func (e *Exchange) CancelReplaceSpotOrder(ctx context.Context, cancelReplaceMode
 		params.Set("cancelRestrictions", cancelRestrictions)
 	}
 	var resp *SpotCancelReplaceResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/order/cancelReplace", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/order/cancelReplace", params, &resp, spotV1TradeOrderCancelReplaceEPL)
 }
 
 // GetSpotOrderDetails retrieves the details of a spot order
@@ -408,7 +408,7 @@ func (e *Exchange) GetSpotOrderDetails(ctx context.Context, symbol currency.Pair
 		params.Set("clientOrderID", clientOrderID)
 	}
 	var resp *SpotOrderDetail
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/query", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/query", params, &resp, spotV1TradeQueryEPL)
 }
 
 // GetSpotOpenOrders retrieves all current open spot orders.
@@ -418,7 +418,7 @@ func (e *Exchange) GetSpotOpenOrders(ctx context.Context, symbol currency.Pair) 
 		params.Set("symbol", symbol.String())
 	}
 	var resp *SpotOrderDetailsResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/openOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/openOrders", params, &resp, spotV1TradeOpenOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -457,7 +457,7 @@ func (e *Exchange) GetSpotOrderHistory(ctx context.Context, symbol currency.Pair
 		params.Set("type", orderType)
 	}
 	var resp *SpotOrderDetailsResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/historyOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/historyOrders", params, &resp, spotV1TradeHistoryOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -490,7 +490,7 @@ func (e *Exchange) GetSpotTransactionDetails(ctx context.Context, symbol currenc
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp *SpotTradesResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/myTrades", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/myTrades", params, &resp, spotV1TradeMyTradesEPL); err != nil {
 		return nil, err
 	}
 	return resp.Fills, nil
@@ -504,7 +504,7 @@ func (e *Exchange) GetSpotCommissionRate(ctx context.Context, symbol currency.Pa
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp *SpotCommissionRate
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/user/commissionRate", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/user/commissionRate", params, &resp, spotV1UserCommissionRateEPL)
 }
 
 // SetSpotCancelAllAfter sets or clears a countdown that cancels all open spot orders after a timeout.
@@ -519,7 +519,7 @@ func (e *Exchange) SetSpotCancelAllAfter(ctx context.Context, requestType string
 	params.Set("type", requestType)
 	params.Set("timeOut", strconv.FormatInt(timeout, 10))
 	var resp *SpotCancelAllAfterResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelAllAfter", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelAllAfter", params, &resp, spotV1TradeCancelAllAfterEPL)
 }
 
 // CreateSpotOCOOrder creates a one-cancels-the-other (OCO) order.
@@ -565,7 +565,7 @@ func (e *Exchange) CreateSpotOCOOrder(ctx context.Context, arg *CreateSpotOCOOrd
 		params.Set("recvWindow", strconv.FormatInt(arg.RecvWindow, 10))
 	}
 	var resp []*SpotOCOOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/oco/order", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/oco/order", params, &resp, spotV1OcoOrderEPL)
 }
 
 // CancelSpotOCOOrder cancels an OCO order list by order ID or client order ID.
@@ -581,7 +581,7 @@ func (e *Exchange) CancelSpotOCOOrder(ctx context.Context, orderID, clientOrderI
 		params.Set("clientOrderId", clientOrderID)
 	}
 	var resp *SpotOCOCancelResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/oco/cancel", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/oco/cancel", params, &resp, spotV1OcoCancelEPL)
 }
 
 // GetSpotOCOOrderList retrieves a single OCO order list by group ID or client order ID.
@@ -597,7 +597,7 @@ func (e *Exchange) GetSpotOCOOrderList(ctx context.Context, orderListID, clientO
 		params.Set("clientOrderId", clientOrderID)
 	}
 	var resp []*SpotOCOOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/orderList", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/orderList", params, &resp, spotV1OcoOrderListEPL)
 }
 
 // GetSpotOpenOCOOrders retrieves all open OCO order lists.
@@ -606,7 +606,7 @@ func (e *Exchange) GetSpotOpenOCOOrders(ctx context.Context, pageIndex, pageSize
 	params.Set("pageIndex", strconv.FormatUint(pageIndex, 10))
 	params.Set("pageSize", strconv.FormatUint(pageSize, 10))
 	var resp []*SpotOCOOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/openOrderList", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/openOrderList", params, &resp, spotV1OcoOpenOrderListEPL)
 }
 
 // GetSpotOCOHistory retrieves the OCO order list history.
@@ -626,7 +626,7 @@ func (e *Exchange) GetSpotOCOHistory(ctx context.Context, startTime, endTime tim
 		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
 	}
 	var resp []*SpotOCOOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/historyOrderList", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/historyOrderList", params, &resp, spotV1OcoHistoryOrderListEPL)
 }
 
 // --------------------- SWAP Endpoints -----------------------------
@@ -638,7 +638,7 @@ func (e *Exchange) GetSwapContracts(ctx context.Context, symbol currency.Pair) (
 		params.Set("symbol", symbol.String())
 	}
 	var resp []*SwapContractDetail
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/contracts", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/contracts", params, &resp, swapV2QuoteContractsEPL)
 }
 
 // GetSwapOrderbookDepth retrieves the order book depth for a perpetual futures symbol.
@@ -652,7 +652,7 @@ func (e *Exchange) GetSwapOrderbookDepth(ctx context.Context, symbol currency.Pa
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp *SwapOrderbookDepth
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/depth", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/depth", params, &resp, swapV2QuoteDepthEPL)
 }
 
 // GetSwapRecentTrades retrieves the most recent trades for a perpetual futures symbol.
@@ -666,7 +666,7 @@ func (e *Exchange) GetSwapRecentTrades(ctx context.Context, symbol currency.Pair
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SwapTrade
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/trades", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/trades", params, &resp, swapV2QuoteTradesEPL)
 }
 
 // GetSwapMarkPriceAndFundingRate retrieves the current mark price, index price and funding rate.
@@ -675,13 +675,13 @@ func (e *Exchange) GetSwapMarkPriceAndFundingRate(ctx context.Context, symbol cu
 		params := url.Values{}
 		params.Set("symbol", symbol.String())
 		var resp *SwapMarkPriceFundingRate
-		if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/premiumIndex", params, &resp); err != nil {
+		if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/premiumIndex", params, &resp, swapV2QuotePremiumIndexEPL); err != nil {
 			return nil, err
 		}
 		return []*SwapMarkPriceFundingRate{resp}, nil
 	}
 	var resp []*SwapMarkPriceFundingRate
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/premiumIndex", nil, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/premiumIndex", nil, &resp, swapV2QuotePremiumIndexEPL)
 }
 
 // GetSwapFundingRateHistory retrieves historical funding rates.
@@ -705,7 +705,7 @@ func (e *Exchange) GetSwapFundingRateHistory(ctx context.Context, symbol currenc
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SwapFundingRate
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/fundingRate", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/fundingRate", params, &resp, swapV2QuoteFundingRateEPL)
 }
 
 // GetSwapKlineData retrieves candlestick data for a perpetual futures symbol.
@@ -737,7 +737,7 @@ func (e *Exchange) GetSwapKlineData(ctx context.Context, symbol currency.Pair, i
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SwapCandle
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v3/quote/klines", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v3/quote/klines", params, &resp, swapV3QuoteKlinesEPL)
 }
 
 // GetSwapOpenInterest retrieves the open interest of a perpetual futures symbol.
@@ -748,7 +748,7 @@ func (e *Exchange) GetSwapOpenInterest(ctx context.Context, symbol currency.Pair
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp *SwapOpenInterest
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/openInterest", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/openInterest", params, &resp, swapV2QuoteOpenInterestEPL)
 }
 
 // GetSwap24HrTickerPriceChange retrieves the 24-hour rolling window price change statistics.
@@ -758,13 +758,13 @@ func (e *Exchange) GetSwap24HrTickerPriceChange(ctx context.Context, symbol curr
 		params := url.Values{}
 		params.Set("symbol", symbol.String())
 		var resp *SwapTicker24Hr
-		if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/ticker", params, &resp); err != nil {
+		if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/ticker", params, &resp, swapV2QuoteTickerEPL); err != nil {
 			return nil, err
 		}
 		return []*SwapTicker24Hr{resp}, nil
 	}
 	var resp []*SwapTicker24Hr
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/ticker", nil, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/ticker", nil, &resp, swapV2QuoteTickerEPL)
 }
 
 // GetSwapHistoricalTrades retrieves historical trade records of all users for a perpetual futures symbol.
@@ -780,7 +780,7 @@ func (e *Exchange) GetSwapHistoricalTrades(ctx context.Context, symbol currency.
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SwapTrade
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/market/historicalTrades", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/market/historicalTrades", params, &resp, swapV1MarketHistoricalTradesEPL)
 }
 
 // GetSwapSymbolOrderbookTicker retrieves the best bid and ask price and quantity for a perpetual futures symbol.
@@ -791,7 +791,7 @@ func (e *Exchange) GetSwapSymbolOrderbookTicker(ctx context.Context, symbol curr
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp *SwapBookTickerResponse
-	if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/bookTicker", params, &resp); err != nil {
+	if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v2/quote/bookTicker", params, &resp, swapV2QuoteBookTickerEPL); err != nil {
 		return nil, err
 	}
 	return &resp.BookTicker, nil
@@ -823,7 +823,7 @@ func (e *Exchange) GetSwapMarkPriceKlineData(ctx context.Context, symbol currenc
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp []*SwapMarkPriceCandle
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/market/markPriceKlines", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/market/markPriceKlines", params, &resp, swapV1MarketMarkPriceKlinesEPL)
 }
 
 // GetSwapSymbolPriceTicker retrieves the latest transaction price
@@ -832,13 +832,13 @@ func (e *Exchange) GetSwapSymbolPriceTicker(ctx context.Context, symbol currency
 		params := url.Values{}
 		params.Set("symbol", symbol.String())
 		var resp *SwapPriceTicker
-		if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/ticker/price", params, &resp); err != nil {
+		if err := e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/ticker/price", params, &resp, swapV1TickerPriceEPL); err != nil {
 			return nil, err
 		}
 		return []*SwapPriceTicker{resp}, nil
 	}
 	var resp []*SwapPriceTicker
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/ticker/price", nil, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/ticker/price", nil, &resp, swapV1TickerPriceEPL)
 }
 
 // GetSwapTradingRules retrieves the trading rules for a perpetual futures symbol
@@ -849,7 +849,7 @@ func (e *Exchange) GetSwapTradingRules(ctx context.Context, symbol currency.Pair
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp *SwapTradingRules
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/tradingRules", params, &resp)
+	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "swap/v1/tradingRules", params, &resp, swapV1TradingRulesEPL)
 }
 
 // ---------------------------- Coin Marginid Futures ----------------------
@@ -919,7 +919,7 @@ func (e *Exchange) TestSwapOrder(ctx context.Context, arg *PlaceSwapOrderRequest
 		return nil, err
 	}
 	var resp *SwapOrderAckResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/order/test", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/order/test", params, &resp, swapV2TradeOrderTestEPL); err != nil {
 		return nil, err
 	}
 	return &resp.Order, nil
@@ -932,7 +932,7 @@ func (e *Exchange) PlaceSwapOrder(ctx context.Context, arg *PlaceSwapOrderReques
 		return nil, err
 	}
 	var resp *SwapOrderAckResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/order", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/order", params, &resp, swapPlaceOrderEPL); err != nil {
 		return nil, err
 	}
 	return &resp.Order, nil
@@ -959,7 +959,7 @@ func (e *Exchange) ModifySwapOrder(ctx context.Context, symbol currency.Pair, or
 	}
 	setFloat(params, "quantity", quantity)
 	var resp *SwapModifyOrderResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/amend", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/amend", params, &resp, swapV1TradeAmendEPL)
 }
 
 // PlaceMultipleSwapOrders submits up to five perpetual futures orders in a single request.
@@ -986,7 +986,7 @@ func (e *Exchange) PlaceMultipleSwapOrders(ctx context.Context, args []PlaceSwap
 	params := url.Values{}
 	params.Set("batchOrders", string(payload))
 	var resp *SwapOrderAckListResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/batchOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/batchOrders", params, &resp, swapV2TradeBatchOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -999,7 +999,7 @@ func (e *Exchange) CloseAllSwapPositions(ctx context.Context, symbol currency.Pa
 		params.Set("symbol", symbol.String())
 	}
 	var resp *SwapCloseAllPositionsResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/closeAllPositions", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/closeAllPositions", params, &resp, swapV2TradeCloseAllPositionsEPL)
 }
 
 // CancelSwapOrder cancels an active perpetual futures order.
@@ -1019,7 +1019,7 @@ func (e *Exchange) CancelSwapOrder(ctx context.Context, symbol currency.Pair, or
 		params.Set("clientOrderId", clientOrderID)
 	}
 	var resp *SwapOrderDetailResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodDelete, "swap/v2/trade/order", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodDelete, "swap/v2/trade/order", params, &resp, swapCancelOrderEPL); err != nil {
 		return nil, err
 	}
 	return resp.Order, nil
@@ -1050,7 +1050,7 @@ func (e *Exchange) CancelMultipleSwapOrders(ctx context.Context, symbol currency
 		params.Set("clientOrderIdList", string(payload))
 	}
 	var resp *SwapCancelOrdersResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodDelete, "swap/v2/trade/batchOrders", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodDelete, "swap/v2/trade/batchOrders", params, &resp, swapV2TradeBatchOrdersEPL)
 }
 
 // CancelAllSwapOpenOrders cancels all open perpetual futures orders, optionally filtered by symbol and order type.
@@ -1064,7 +1064,7 @@ func (e *Exchange) CancelAllSwapOpenOrders(ctx context.Context, symbol currency.
 	}
 	params.Set("type", orderType)
 	var resp *SwapCancelOrdersResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodDelete, "swap/v2/trade/allOpenOrders", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodDelete, "swap/v2/trade/allOpenOrders", params, &resp, swapV2TradeAllOpenOrdersEPL)
 }
 
 // GetSwapOpenOrders retrieves all current open perpetual futures orders, optionally filtered by symbol and order type.
@@ -1077,7 +1077,7 @@ func (e *Exchange) GetSwapOpenOrders(ctx context.Context, symbol currency.Pair, 
 		params.Set("type", orderType)
 	}
 	var resp *SwapOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/openOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/openOrders", params, &resp, swapV2TradeOpenOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -1097,7 +1097,7 @@ func (e *Exchange) GetSwapPendingOrderStatus(ctx context.Context, symbol currenc
 		params.Set("clientOrderId", clientOrderID)
 	}
 	var resp *SwapOrderDetailResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/openOrder", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/openOrder", params, &resp, swapV2TradeOpenOrderEPL); err != nil {
 		return nil, err
 	}
 	return resp.Order, nil
@@ -1117,7 +1117,7 @@ func (e *Exchange) GetSwapOrderDetails(ctx context.Context, symbol currency.Pair
 		params.Set("clientOrderId", clientOrderID)
 	}
 	var resp *SwapOrderDetailResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/order", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/order", params, &resp, swapQueryOrderEPL); err != nil {
 		return nil, err
 	}
 	return resp.Order, nil
@@ -1131,7 +1131,7 @@ func (e *Exchange) GetSwapMarginType(ctx context.Context, symbol currency.Pair) 
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp *SwapMarginTypeResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/marginType", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/marginType", params, &resp, swapV2TradeMarginTypeEPL)
 }
 
 // ChangeSwapMarginType changes the margin mode of a perpetual futures symbol.
@@ -1145,7 +1145,7 @@ func (e *Exchange) ChangeSwapMarginType(ctx context.Context, symbol currency.Pai
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	params.Set("marginType", marginType)
-	return e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/marginType", params, &struct{}{})
+	return e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/marginType", params, &struct{}{}, swapV2TradeMarginTypeEPL)
 }
 
 // GetSwapLeverage retrieves the leverage and available positions for a perpetual futures symbol.
@@ -1156,7 +1156,7 @@ func (e *Exchange) GetSwapLeverage(ctx context.Context, symbol currency.Pair) (*
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp *SwapLeverage
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/leverage", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/leverage", params, &resp, swapV2TradeLeverageEPL)
 }
 
 // SetSwapLeverage sets the leverage for the long or short side of a perpetual futures symbol.
@@ -1175,7 +1175,7 @@ func (e *Exchange) SetSwapLeverage(ctx context.Context, symbol currency.Pair, si
 	params.Set("side", side)
 	params.Set("leverage", strconv.FormatInt(leverage, 10))
 	var resp *SwapLeverage
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/leverage", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/leverage", params, &resp, swapV2TradeLeverageEPL)
 }
 
 // GetSwapForceOrders retrieves the user's liquidation (force) order history.
@@ -1205,7 +1205,7 @@ func (e *Exchange) GetSwapForceOrders(ctx context.Context, symbol currency.Pair,
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp *SwapOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/forceOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/forceOrders", params, &resp, swapV2TradeForceOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -1238,7 +1238,7 @@ func (e *Exchange) GetSwapOrderHistory(ctx context.Context, symbol currency.Pair
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp *SwapOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/allOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/allOrders", params, &resp, swapV2TradeAllOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -1266,7 +1266,7 @@ func (e *Exchange) ModifyIsolatedPositionMargin(ctx context.Context, symbol curr
 		params.Set("positionId", strconv.FormatInt(positionID, 10))
 	}
 	var resp *SwapPositionMarginResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/positionMargin", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/positionMargin", params, &resp, swapV2TradePositionMarginEPL)
 }
 
 // GetSwapHistoricalTransactionOrders retrieves historical transaction orders for a perpetual futures symbol.
@@ -1291,7 +1291,7 @@ func (e *Exchange) GetSwapHistoricalTransactionOrders(ctx context.Context, symbo
 	params.Set("startTs", strconv.FormatInt(startTime.UnixMilli(), 10))
 	params.Set("endTs", strconv.FormatInt(endTime.UnixMilli(), 10))
 	var resp *SwapFillOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/allFillOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/allFillOrders", params, &resp, swapV2TradeAllFillOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.FillOrders, nil
@@ -1305,13 +1305,13 @@ func (e *Exchange) SetSwapPositionMode(ctx context.Context, dualSidePosition str
 	params := url.Values{}
 	params.Set("dualSidePosition", dualSidePosition)
 	var resp *SwapPositionModeResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/positionSide/dual", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/positionSide/dual", params, &resp, swapSetPositionModeEPL)
 }
 
 // GetSwapPositionMode retrieves the current position mode.
 func (e *Exchange) GetSwapPositionMode(ctx context.Context) (*SwapPositionModeResponse, error) {
 	var resp *SwapPositionModeResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/positionSide/dual", nil, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/positionSide/dual", nil, &resp, swapGetPositionModeEPL)
 } // swap/v1/positionSide/dual
 
 // CancelReplaceSwapOrder cancels an existing perpetual futures order and submits a new one.
@@ -1337,7 +1337,7 @@ func (e *Exchange) CancelReplaceSwapOrder(ctx context.Context, cancelReplaceMode
 		params.Set("cancelRestrictions", cancelRestrictions)
 	}
 	var resp *SwapCancelReplaceResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/cancelReplace", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/cancelReplace", params, &resp, swapV1TradeCancelReplaceEPL)
 }
 
 // BatchCancelReplaceSwapOrders cancels a batch of perpetual futures orders and places new ones.
@@ -1348,7 +1348,7 @@ func (e *Exchange) BatchCancelReplaceSwapOrders(ctx context.Context, batchOrders
 	params := url.Values{}
 	params.Set("batchOrders", batchOrders)
 	var resp []SwapCancelReplaceResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/batchCancelReplace", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/batchCancelReplace", params, &resp, swapV1TradeBatchCancelReplaceEPL)
 }
 
 // SetSwapCancelAllAfter sets or clears a countdown that cancels all open orders after a timeout.
@@ -1363,7 +1363,7 @@ func (e *Exchange) SetSwapCancelAllAfter(ctx context.Context, requestType string
 	params.Set("type", requestType)
 	params.Set("timeOut", strconv.FormatInt(timeout, 10))
 	var resp *SwapCancelAllAfterResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/cancelAllAfter", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/cancelAllAfter", params, &resp, swapV2TradeCancelAllAfterEPL)
 }
 
 // CloseSwapPositionByID closes a position at market price using its position ID.
@@ -1374,7 +1374,7 @@ func (e *Exchange) CloseSwapPositionByID(ctx context.Context, positionID string)
 	params := url.Values{}
 	params.Set("positionId", positionID)
 	var resp *SwapClosePositionResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/closePosition", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/closePosition", params, &resp, swapV1TradeClosePositionEPL)
 }
 
 // GetAllSwapOrders retrieves the full perpetual futures order history including conditional orders.
@@ -1401,7 +1401,7 @@ func (e *Exchange) GetAllSwapOrders(ctx context.Context, symbol currency.Pair, o
 		params.Set("limit", strconv.FormatUint(limit, 10))
 	}
 	var resp *SwapOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/fullOrder", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/fullOrder", params, &resp, swapV1TradeFullOrderEPL); err != nil {
 		return nil, err
 	}
 	return resp.Orders, nil
@@ -1415,7 +1415,7 @@ func (e *Exchange) GetSwapMaintMarginRatio(ctx context.Context, symbol currency.
 	params := url.Values{}
 	params.Set("symbol", symbol.String())
 	var resp []*SwapMaintMarginRatio
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/maintMarginRatio", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/maintMarginRatio", params, &resp, swapV1MaintMarginRatioEPL)
 }
 
 // GetSwapTransactionDetails retrieves historical transaction details for a perpetual futures symbol.
@@ -1445,7 +1445,7 @@ func (e *Exchange) GetSwapTransactionDetails(ctx context.Context, symbol currenc
 	params.Set("startTs", strconv.FormatInt(startTime.UnixMilli(), 10))
 	params.Set("endTs", strconv.FormatInt(endTime.UnixMilli(), 10))
 	var resp *SwapFillHistoryResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/fillHistory", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/fillHistory", params, &resp, swapV2TradeFillHistoryEPL)
 }
 
 // GetSwapPositionHistory retrieves the closed position history for a perpetual futures symbol.
@@ -1473,7 +1473,7 @@ func (e *Exchange) GetSwapPositionHistory(ctx context.Context, symbol currency.P
 		params.Set("pageSize", strconv.FormatUint(pageSize, 10))
 	}
 	var resp []*SwapPositionHistory
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/positionHistory", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/positionHistory", params, &resp, swapV1TradePositionHistoryEPL)
 }
 
 // GetSwapIsolatedMarginChangeHistory retrieves the isolated margin change history for a position.
@@ -1495,7 +1495,7 @@ func (e *Exchange) GetSwapIsolatedMarginChangeHistory(ctx context.Context, symbo
 	params.Set("pageIndex", strconv.FormatUint(pageIndex, 10))
 	params.Set("pageSize", strconv.FormatUint(pageSize, 10))
 	var resp *SwapMarginChangeHistoryResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/positionMargin/history", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/positionMargin/history", params, &resp, swapV1PositionMarginHistoryEPL)
 }
 
 // ApplyVST applies for VST funds on the BingX demo trading account.
@@ -1508,7 +1508,7 @@ func (e *Exchange) ApplyVST(ctx context.Context, adjustType string, amount int64
 		params.Set("amount", strconv.FormatInt(amount, 10))
 	}
 	var resp *SwapVSTResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/getVst", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v2/trade/getVst", params, &resp, swapV2TradeGetVstEPL)
 }
 
 // PlaceTWAPOrder submits a time-weighted average price (TWAP) order.
@@ -1542,7 +1542,7 @@ func (e *Exchange) PlaceTWAPOrder(ctx context.Context, arg *PlaceTWAPOrderReques
 		params.Set("recvWindow", strconv.FormatInt(arg.RecvWindow, 10))
 	}
 	var resp *SwapTWAPOrderResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/twap/order", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/twap/order", params, &resp, swapV1TwapOrderEPL)
 }
 
 // GetTWAPOpenOrders retrieves the open TWAP orders, optionally filtered by symbol.
@@ -1552,7 +1552,7 @@ func (e *Exchange) GetTWAPOpenOrders(ctx context.Context, symbol currency.Pair) 
 		params.Set("symbol", symbol.String())
 	}
 	var resp *SwapTWAPOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/twap/openOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/twap/openOrders", params, &resp, swapV1TwapOpenOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.List, nil
@@ -1572,7 +1572,7 @@ func (e *Exchange) GetTWAPHistoricalOrders(ctx context.Context, symbol currency.
 	params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
 	params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
 	var resp *SwapTWAPOrdersResponse
-	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/twap/historyOrders", params, &resp); err != nil {
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/twap/historyOrders", params, &resp, swapV1TwapHistoryOrdersEPL); err != nil {
 		return nil, err
 	}
 	return resp.List, nil
@@ -1586,7 +1586,7 @@ func (e *Exchange) GetTWAPOrderDetails(ctx context.Context, mainOrderID string) 
 	params := url.Values{}
 	params.Set("mainOrderId", mainOrderID)
 	var resp *SwapTWAPOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/twap/orderDetail", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/twap/orderDetail", params, &resp, swapV1TwapOrderDetailEPL)
 }
 
 // CancelTWAPOrder cancels a TWAP order.
@@ -1597,7 +1597,7 @@ func (e *Exchange) CancelTWAPOrder(ctx context.Context, mainOrderID string) (*Sw
 	params := url.Values{}
 	params.Set("mainOrderId", mainOrderID)
 	var resp *SwapTWAPOrder
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/twap/cancelOrder", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/twap/cancelOrder", params, &resp, swapV1TwapCancelOrderEPL)
 }
 
 // SwitchMultiAssetsMode switches between single-asset and multi-assets margin mode.
@@ -1608,25 +1608,25 @@ func (e *Exchange) SwitchMultiAssetsMode(ctx context.Context, assetMode string) 
 	params := url.Values{}
 	params.Set("assetMode", assetMode)
 	var resp *SwapAssetModeResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/assetMode", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/assetMode", params, &resp, swapV1TradeAssetModeEPL)
 }
 
 // GetMultiAssetsMode retrieves the current multi-assets margin mode.
 func (e *Exchange) GetMultiAssetsMode(ctx context.Context) (*SwapAssetModeResponse, error) {
 	var resp *SwapAssetModeResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/assetMode", nil, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/assetMode", nil, &resp, swapV1TradeAssetModeEPL)
 }
 
 // GetMultiAssetsRules retrieves the margin asset rules under multi-assets mode.
 func (e *Exchange) GetMultiAssetsRules(ctx context.Context) ([]*SwapMultiAssetsRule, error) {
 	var resp []*SwapMultiAssetsRule
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/multiAssetsRules", nil, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/trade/multiAssetsRules", nil, &resp, swapV1TradeMultiAssetsRulesEPL)
 }
 
 // GetMultiAssetsMargin retrieves the margin asset balances under multi-assets mode.
 func (e *Exchange) GetMultiAssetsMargin(ctx context.Context) ([]*SwapMultiAssetsMargin, error) {
 	var resp []*SwapMultiAssetsMargin
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/user/marginAssets", nil, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v1/user/marginAssets", nil, &resp, swapV1UserMarginAssetsEPL)
 }
 
 // OneClickReversePosition reverses an open position immediately or via a planned trigger.
@@ -1647,7 +1647,7 @@ func (e *Exchange) OneClickReversePosition(ctx context.Context, reverseType stri
 		params.Set("workingType", workingType)
 	}
 	var resp *SwapReversePositionResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/reverse", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/reverse", params, &resp, swapV1TradeReverseEPL)
 }
 
 // SetHedgeModeAutoAddMargin toggles automatic margin addition for a hedge-mode position.
@@ -1667,11 +1667,11 @@ func (e *Exchange) SetHedgeModeAutoAddMargin(ctx context.Context, symbol currenc
 	params.Set("functionSwitch", functionSwitch)
 	setFloat(params, "amount", amount)
 	var resp *SwapAutoAddMarginResponse
-	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/autoAddMargin", params, &resp)
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/autoAddMargin", params, &resp, swapV1TradeAutoAddMarginEPL)
 }
 
 // SendHTTPRequest sends an unauthenticated HTTP request
-func (e *Exchange) SendHTTPRequest(ctx context.Context, ep exchange.URL, path string, params url.Values, result any) error {
+func (e *Exchange) SendHTTPRequest(ctx context.Context, ep exchange.URL, path string, params url.Values, result any, f request.EndpointLimit) error {
 	endpoint, err := e.API.Endpoints.GetURL(ep)
 	if err != nil {
 		return err
@@ -1694,7 +1694,7 @@ func (e *Exchange) SendHTTPRequest(ctx context.Context, ep exchange.URL, path st
 		HTTPRecording:          e.HTTPRecording,
 		HTTPMockDataSliceLimit: e.HTTPMockDataSliceLimit,
 	}
-	if err := e.SendPayload(ctx, request.Unset, func() (*request.Item, error) {
+	if err := e.SendPayload(ctx, f, func() (*request.Item, error) {
 		return item, nil
 	}, request.UnauthenticatedRequest); err != nil {
 		return err
@@ -1706,7 +1706,7 @@ func (e *Exchange) SendHTTPRequest(ctx context.Context, ep exchange.URL, path st
 }
 
 // SendAuthenticatedHTTPRequest signs and sends an authenticated HTTP request
-func (e *Exchange) SendAuthenticatedHTTPRequest(ctx context.Context, ep exchange.URL, method, path string, params url.Values, result any) error {
+func (e *Exchange) SendAuthenticatedHTTPRequest(ctx context.Context, ep exchange.URL, method, path string, params url.Values, result any, f request.EndpointLimit) error {
 	creds, err := e.GetCredentials(ctx)
 	if err != nil {
 		return err
@@ -1738,7 +1738,7 @@ func (e *Exchange) SendAuthenticatedHTTPRequest(ctx context.Context, ep exchange
 			HTTPMockDataSliceLimit: e.HTTPMockDataSliceLimit,
 		}, nil
 	}
-	if err := e.SendPayload(ctx, request.Unset, newRequest, request.AuthenticatedRequest); err != nil {
+	if err := e.SendPayload(ctx, f, newRequest, request.AuthenticatedRequest); err != nil {
 		return err
 	}
 	if resp.Code != 0 || resp.Msg != "" {
