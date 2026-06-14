@@ -68,11 +68,9 @@ type SpotCandle struct {
 	Amount    float64
 }
 
-// UnmarshalJSON deserializes JSON payload into SpotCandle.
-// BingX returns each candle as a positional array in the order: open time, open, high, low, close, volume, close time, quote volume.
+// UnmarshalJSON deserializes JSON payload into SpotCandle
 func (s *SpotCandle) UnmarshalJSON(data []byte) error {
-	target := []any{&s.Timestamp, &s.Open, &s.High, &s.Low, &s.Close, &s.Quantity, &s.CloseTime, &s.Amount}
-	return json.Unmarshal(data, &target)
+	return json.Unmarshal(data, &[]any{&s.Timestamp, &s.Open, &s.High, &s.Low, &s.Close, &s.Quantity, &s.CloseTime, &s.Amount})
 }
 
 // SpotTicker24Hr represents the 24-hour rolling window price change statistics for a symbol.
@@ -396,7 +394,7 @@ type SwapOrderAckResponse struct {
 
 // SwapOrderAckListResponse wraps a list of order acknowledgements returned by the batch order endpoint.
 type SwapOrderAckListResponse struct {
-	Orders []SwapOrderAck `json:"orders"`
+	Orders []*SwapOrderAck `json:"orders"`
 }
 
 // SwapOrder represents a perpetual futures order's full details.
@@ -431,12 +429,12 @@ type SwapOrder struct {
 
 // SwapOrderDetailResponse wraps a single order's full details.
 type SwapOrderDetailResponse struct {
-	Order SwapOrder `json:"order"`
+	Order *SwapOrder `json:"order"`
 }
 
 // SwapOrdersResponse wraps a list of perpetual futures orders.
 type SwapOrdersResponse struct {
-	Orders []SwapOrder `json:"orders"`
+	Orders []*SwapOrder `json:"orders"`
 }
 
 // SwapFailedOrder represents an order that could not be cancelled.
@@ -449,8 +447,8 @@ type SwapFailedOrder struct {
 
 // SwapCancelOrdersResponse represents the result of cancelling multiple or all open orders.
 type SwapCancelOrdersResponse struct {
-	Success []SwapOrder       `json:"success"`
-	Failed  []SwapFailedOrder `json:"failed"`
+	Success []*SwapOrder       `json:"success"`
+	Failed  []*SwapFailedOrder `json:"failed"`
 }
 
 // SwapModifyOrderResponse represents the result of amending an order's quantity.
@@ -518,7 +516,7 @@ type SwapFillOrder struct {
 
 // SwapFillOrdersResponse wraps a list of historical transaction orders.
 type SwapFillOrdersResponse struct {
-	FillOrders []SwapFillOrder `json:"fill_orders"`
+	FillOrders []*SwapFillOrder `json:"fill_orders"`
 }
 
 // SwapPositionModeResponse represents the dual side position mode setting.
@@ -600,8 +598,8 @@ type SwapFillDetail struct {
 
 // SwapFillHistoryResponse wraps a list of historical transaction details.
 type SwapFillHistoryResponse struct {
-	FillHistoryOrders []SwapFillDetail `json:"fill_history_orders"`
-	Total             int64            `json:"total"`
+	FillHistoryOrders []*SwapFillDetail `json:"fill_history_orders"`
+	Total             int64             `json:"total"`
 }
 
 // SwapPositionHistory represents a closed position record for a perpetual futures symbol.
@@ -636,8 +634,8 @@ type SwapMarginChange struct {
 
 // SwapMarginChangeHistoryResponse wraps a list of isolated margin change records.
 type SwapMarginChangeHistoryResponse struct {
-	Records []SwapMarginChange `json:"records"`
-	Total   int64              `json:"total"`
+	Records []*SwapMarginChange `json:"records"`
+	Total   int64               `json:"total"`
 }
 
 // SwapVSTResponse represents the result of applying for VST testnet funds.
@@ -687,8 +685,8 @@ type SwapTWAPOrder struct {
 
 // SwapTWAPOrdersResponse wraps a list of TWAP orders.
 type SwapTWAPOrdersResponse struct {
-	List  []SwapTWAPOrder `json:"list"`
-	Total int64           `json:"total"`
+	List  []*SwapTWAPOrder `json:"list"`
+	Total int64            `json:"total"`
 }
 
 // SwapAssetModeResponse represents the multi-assets margin mode setting.
@@ -744,4 +742,333 @@ type SwapAutoAddMarginResponse struct {
 	PositionID     int64         `json:"positionId"`
 	FunctionSwitch string        `json:"functionSwitch"`
 	Amount         types.Number  `json:"amount"`
+}
+
+// ---------------------------- Spot Trade Endpoints ----------------------
+
+// PlaceSpotOrderRequest holds the parameters for placing a spot order.
+type PlaceSpotOrderRequest struct {
+	Symbol           currency.Pair
+	Side             string
+	OrderType        string
+	StopPrice        float64
+	Quantity         float64
+	QuoteOrderQty    float64
+	Price            float64
+	NewClientOrderID string
+	TimeInForce      string
+	RecvWindow       int64
+}
+
+// SpotOrder represents a spot order returned by the place, cancel and open order endpoints.
+type SpotOrder struct {
+	Symbol              currency.Pair `json:"symbol"`
+	OrderID             int64         `json:"orderId"`
+	TransactTime        types.Time    `json:"transactTime"`
+	Price               types.Number  `json:"price"`
+	StopPrice           types.Number  `json:"stopPrice"`
+	OrigQty             types.Number  `json:"origQty"`
+	ExecutedQty         types.Number  `json:"executedQty"`
+	CummulativeQuoteQty types.Number  `json:"cummulativeQuoteQty"`
+	Status              string        `json:"status"`
+	Type                string        `json:"type"`
+	Side                string        `json:"side"`
+	ClientOrderID       string        `json:"clientOrderID"`
+}
+
+// SpotOrdersResponse wraps a list of spot orders.
+type SpotOrdersResponse struct {
+	Orders []*SpotOrder `json:"orders"`
+}
+
+// SpotCancelFail represents an order that could not be cancelled within a batch cancel request.
+type SpotCancelFail struct {
+	OrderID string `json:"orderId"`
+	Error   string `json:"error"`
+}
+
+// SpotCancelOrdersResponse represents the result of cancelling multiple spot orders.
+type SpotCancelOrdersResponse struct {
+	Fails  []*SpotCancelFail `json:"fails"`
+	Orders []*SpotOrder      `json:"orders"`
+}
+
+// SpotCancelReplaceResult represents the outcome of the cancel or open leg of a cancel-replace operation.
+type SpotCancelReplaceResult struct {
+	Code   int64  `json:"code"`
+	Msg    string `json:"msg"`
+	Result bool   `json:"result"`
+}
+
+// SpotCancelReplaceResponse represents the result of cancelling an existing spot order and placing a new one.
+type SpotCancelReplaceResponse struct {
+	CancelResult        *SpotCancelReplaceResult `json:"cancelResult"`
+	OpenResult          *SpotCancelReplaceResult `json:"openResult"`
+	OrderOpenResponse   *SpotOrder               `json:"orderOpenResponse"`
+	OrderCancelResponse *SpotOrder               `json:"orderCancelResponse"`
+}
+
+// SpotOrderDetail represents the full details of a spot order.
+type SpotOrderDetail struct {
+	Symbol              currency.Pair `json:"symbol"`
+	OrderID             int64         `json:"orderId"`
+	Price               types.Number  `json:"price"`
+	StopPrice           types.Number  `json:"StopPrice"`
+	OrigQty             types.Number  `json:"origQty"`
+	ExecutedQty         types.Number  `json:"executedQty"`
+	CummulativeQuoteQty types.Number  `json:"cummulativeQuoteQty"`
+	Status              string        `json:"status"`
+	Type                string        `json:"type"`
+	Side                string        `json:"side"`
+	Time                types.Time    `json:"time"`
+	UpdateTime          types.Time    `json:"updateTime"`
+	OrigQuoteOrderQty   types.Number  `json:"origQuoteOrderQty"`
+	Fee                 types.Number  `json:"fee"`
+	FeeAsset            currency.Code `json:"feeAsset"`
+	ClientOrderID       string        `json:"clientOrderID"`
+	AveragePrice        types.Number  `json:"avgPrice"`
+}
+
+// SpotOrderDetailsResponse wraps a list of detailed spot orders.
+type SpotOrderDetailsResponse struct {
+	Orders []*SpotOrderDetail `json:"orders"`
+}
+
+// SpotTrade represents a spot trade fill.
+type SpotTrade struct {
+	Symbol          currency.Pair `json:"symbol"`
+	ID              int64         `json:"id"`
+	OrderID         int64         `json:"orderId"`
+	Price           types.Number  `json:"price"`
+	Quantity        types.Number  `json:"qty"`
+	QuoteQty        types.Number  `json:"quoteQty"`
+	Commission      types.Number  `json:"commission"`
+	CommissionAsset currency.Code `json:"commissionAsset"`
+	Time            types.Time    `json:"time"`
+	IsBuyer         bool          `json:"isBuyer"`
+	IsMaker         bool          `json:"isMaker"`
+}
+
+// SpotTradesResponse wraps a list of spot trade fills.
+type SpotTradesResponse struct {
+	Fills []*SpotTrade `json:"fills"`
+}
+
+// SpotCommissionRate represents the maker and taker commission rates for a spot symbol.
+type SpotCommissionRate struct {
+	TakerCommissionRate float64 `json:"takerCommissionRate"`
+	MakerCommissionRate float64 `json:"makerCommissionRate"`
+}
+
+// SpotCancelAllAfterResponse represents the result of setting a countdown to cancel all spot orders.
+type SpotCancelAllAfterResponse struct {
+	TriggerTime types.Time `json:"triggerTime"`
+	Status      string     `json:"status"`
+	Note        string     `json:"note"`
+}
+
+// CreateSpotOCOOrderRequest holds the parameters for creating a one-cancels-the-other (OCO) order.
+type CreateSpotOCOOrderRequest struct {
+	Symbol             currency.Pair
+	Side               string
+	Quantity           float64
+	LimitPrice         float64
+	OrderPrice         float64
+	TriggerPrice       float64
+	ListClientOrderID  string
+	AboveClientOrderID string
+	BelowClientOrderID string
+	RecvWindow         int64
+}
+
+// SpotOCOOrder represents a single leg of an OCO order.
+type SpotOCOOrder struct {
+	TransactionTime types.Time    `json:"transactionTime"`
+	OrderID         string        `json:"orderId"`
+	ClientOrderID   string        `json:"clientOrderId"`
+	Symbol          currency.Pair `json:"symbol"`
+	OrderType       string        `json:"orderType"`
+	Side            string        `json:"side"`
+	TriggerPrice    types.Number  `json:"triggerPrice"`
+	Price           types.Number  `json:"price"`
+	Quantity        types.Number  `json:"quantity"`
+	OrderListID     string        `json:"orderListId"`
+	Status          string        `json:"status"`
+}
+
+// SpotOCOCancelResponse represents the result of cancelling an OCO order list.
+type SpotOCOCancelResponse struct {
+	OrderID       string `json:"orderId"`
+	ClientOrderID string `json:"clientOrderId"`
+}
+
+// ---------------------------- Coin-M Futures Trade Endpoints ----------------------
+
+// PlaceCoinMOrderRequest holds the parameters for placing a coin-margined futures order.
+type PlaceCoinMOrderRequest struct {
+	Symbol        currency.Pair
+	Type          string
+	Side          string
+	PositionSide  string
+	Price         float64
+	Quantity      float64
+	StopPrice     float64
+	WorkingType   string
+	StopLoss      float64
+	TakeProfit    float64
+	ClientOrderID string
+	TimeInForce   string
+	RecvWindow    int64
+}
+
+// CoinMOrderAck represents the acknowledgement returned when placing a coin-margined futures order.
+type CoinMOrderAck struct {
+	Symbol        currency.Pair `json:"symbol"`
+	OrderID       int64         `json:"orderId"`
+	Side          string        `json:"side"`
+	PositionSide  string        `json:"positionSide"`
+	Type          string        `json:"type"`
+	Price         types.Number  `json:"price"`
+	Quantity      types.Number  `json:"quantity"`
+	StopPrice     types.Number  `json:"stopPrice"`
+	WorkingType   string        `json:"workingType"`
+	TimeInForce   string        `json:"timeInForce"`
+	ClientOrderID string        `json:"clientOrderId"`
+}
+
+// CoinMOrder represents a coin-margined futures order's full details.
+type CoinMOrder struct {
+	Time          types.Time    `json:"time"`
+	Symbol        currency.Pair `json:"symbol"`
+	Side          string        `json:"side"`
+	Type          string        `json:"type"`
+	PositionSide  string        `json:"positionSide"`
+	ReduceOnly    string        `json:"reduceOnly"`
+	Quantity      types.Number  `json:"quantity"`
+	CumQuote      types.Number  `json:"cumQuote"`
+	Status        string        `json:"status"`
+	StopPrice     types.Number  `json:"stopPrice"`
+	Price         types.Number  `json:"price"`
+	OrigQty       types.Number  `json:"origQty"`
+	AveragePrice  types.Number  `json:"avgPrice"`
+	ExecutedQty   types.Number  `json:"executedQty"`
+	OrderID       int64         `json:"orderId"`
+	Profit        types.Number  `json:"profit"`
+	Commission    types.Number  `json:"commission"`
+	UpdateTime    types.Time    `json:"updateTime"`
+	WorkingType   string        `json:"workingType"`
+	TimeInForce   string        `json:"timeInForce"`
+	ClientOrderID string        `json:"clientOrderId"`
+	Leverage      string        `json:"leverage"`
+}
+
+// CoinMOrderDetailResponse wraps a single coin-margined futures order.
+type CoinMOrderDetailResponse struct {
+	Order CoinMOrder `json:"order"`
+}
+
+// CoinMOrdersResponse wraps a list of coin-margined futures orders.
+type CoinMOrdersResponse struct {
+	Orders []CoinMOrder `json:"orders"`
+}
+
+// CoinMFailedOrder represents an order that could not be cancelled.
+type CoinMFailedOrder struct {
+	OrderID      string `json:"orderId"`
+	ClientID     string `json:"clientOrderId"`
+	ErrorCode    int64  `json:"errorCode"`
+	ErrorMessage string `json:"errorMessage"`
+}
+
+// CoinMCancelOrdersResponse represents the result of cancelling all open coin-margined futures orders.
+type CoinMCancelOrdersResponse struct {
+	Success []CoinMOrder       `json:"success"`
+	Failed  []CoinMFailedOrder `json:"failed"`
+}
+
+// CoinMFailedPosition represents a position that could not be closed.
+type CoinMFailedPosition struct {
+	PositionID string `json:"positionId"`
+	ErrorCode  int64  `json:"errCode"`
+	ErrorMsg   string `json:"errorMsg"`
+}
+
+// CoinMCloseAllPositionsResponse represents the result of a bulk position close.
+type CoinMCloseAllPositionsResponse struct {
+	Success []string              `json:"success"`
+	Failed  []CoinMFailedPosition `json:"failed"`
+}
+
+// CoinMLeverage represents the leverage and available position information for a coin-margined futures symbol.
+type CoinMLeverage struct {
+	Symbol            currency.Pair `json:"symbol"`
+	LongLeverage      int64         `json:"longLeverage"`
+	ShortLeverage     int64         `json:"shortLeverage"`
+	MaxLongLeverage   int64         `json:"maxLongLeverage"`
+	MaxShortLeverage  int64         `json:"maxShortLeverage"`
+	AvailableLongVol  types.Number  `json:"availableLongVol"`
+	AvailableShortVol types.Number  `json:"availableShortVol"`
+}
+
+// CoinMCommissionRate represents the maker and taker commission rates for coin-margined futures.
+type CoinMCommissionRate struct {
+	TakerCommissionRate types.Number `json:"takerCommissionRate"`
+	MakerCommissionRate types.Number `json:"makerCommissionRate"`
+}
+
+// CoinMPosition represents an open coin-margined futures position.
+type CoinMPosition struct {
+	Symbol             currency.Pair `json:"symbol"`
+	PositionID         int64         `json:"positionId"`
+	PositionSide       string        `json:"positionSide"`
+	Isolated           bool          `json:"isolated"`
+	PositionAmt        types.Number  `json:"positionAmt"`
+	AvailableAmt       types.Number  `json:"availableAmt"`
+	UnrealizedProfit   types.Number  `json:"unrealizedProfit"`
+	InitialMargin      types.Number  `json:"initialMargin"`
+	LiquidationPrice   float64       `json:"liquidationPrice"`
+	AveragePrice       types.Number  `json:"avgPrice"`
+	Leverage           int64         `json:"leverage"`
+	MarkPrice          types.Number  `json:"markPrice"`
+	RiskRate           types.Number  `json:"riskRate"`
+	MaxMarginReduction types.Number  `json:"maxMarginReduction"`
+	UpdateTime         types.Time    `json:"updateTime"`
+}
+
+// CoinMAccountAsset represents a coin-margined futures account asset balance.
+type CoinMAccountAsset struct {
+	Asset            currency.Code `json:"asset"`
+	Balance          types.Number  `json:"balance"`
+	Equity           types.Number  `json:"equity"`
+	UnrealizedProfit types.Number  `json:"unrealizedProfit"`
+	AvailableMargin  types.Number  `json:"availableMargin"`
+	UsedMargin       types.Number  `json:"usedMargin"`
+	FreezedMargin    types.Number  `json:"freezedMargin"`
+	ShortUID         string        `json:"shortUid"`
+}
+
+// CoinMTradeDetail represents a coin-margined futures order trade fill.
+type CoinMTradeDetail struct {
+	OrderID      string        `json:"orderId"`
+	Symbol       currency.Pair `json:"symbol"`
+	Type         string        `json:"type"`
+	Side         string        `json:"side"`
+	PositionSide string        `json:"positionSide"`
+	TradeID      string        `json:"tradeId"`
+	Volume       types.Number  `json:"volume"`
+	BaseQty      types.Number  `json:"baseQty"`
+	TradePrice   types.Number  `json:"tradePrice"`
+	Amount       types.Number  `json:"amount"`
+	RealizedPnl  types.Number  `json:"realizedPnl"`
+	Commission   types.Number  `json:"commission"`
+	Currency     currency.Code `json:"currency"`
+	Buyer        bool          `json:"buyer"`
+	Maker        bool          `json:"maker"`
+	TradeTime    types.Time    `json:"tradeTime"`
+}
+
+// CoinMMarginType represents the margin mode of a coin-margined futures symbol.
+type CoinMMarginType struct {
+	Symbol     currency.Pair `json:"symbol"`
+	MarginType string        `json:"marginType"`
 }

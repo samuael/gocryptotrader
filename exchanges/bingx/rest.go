@@ -37,7 +37,7 @@ var (
 	errAssetModeRequired       = errors.New("multi-assets mode is required")
 	errReverseTypeRequired     = errors.New("reverse type is required")
 	errFunctionSwitchRequired  = errors.New("function switch is required")
-	errPriceTypeRequired       = errors.New("price type is required")
+	errTriggerPriceRequired    = errors.New("trigger price is required")
 )
 
 // Exchange implements exchange.IBotExchange for BingX exchange
@@ -228,6 +228,408 @@ func (e *Exchange) GetOldSpotTrades(ctx context.Context, symbol currency.Pair, l
 	var resp []*HistoricalSpotTrade
 	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "market/his/v1/trade", params, &resp)
 }
+
+// params validates and converts a PlaceSpotOrderRequest into url.Values
+func (r *PlaceSpotOrderRequest) params() (url.Values, error) {
+	if r == nil {
+		return nil, common.ErrNilPointer
+	}
+	if r.Symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	if r.Side == "" {
+		return nil, order.ErrSideIsInvalid
+	}
+	if r.OrderType == "" {
+		return nil, order.ErrTypeIsInvalid
+	}
+	params := url.Values{}
+	params.Set("symbol", r.Symbol.String())
+	params.Set("side", r.Side)
+	params.Set("type", r.OrderType)
+	setFloat(params, "stopPrice", r.StopPrice)
+	setFloat(params, "quantity", r.Quantity)
+	setFloat(params, "quoteOrderQty", r.QuoteOrderQty)
+	setFloat(params, "price", r.Price)
+	if r.NewClientOrderID != "" {
+		params.Set("newClientOrderId", r.NewClientOrderID)
+	}
+	if r.TimeInForce != "" {
+		params.Set("timeInForce", r.TimeInForce)
+	}
+	if r.RecvWindow != 0 {
+		params.Set("recvWindow", strconv.FormatInt(r.RecvWindow, 10))
+	}
+	return params, nil
+}
+
+// PlaceSpotOrder submits a spot order.
+func (e *Exchange) PlaceSpotOrder(ctx context.Context, arg *PlaceSpotOrderRequest) (*SpotOrder, error) {
+	params, err := arg.params()
+	if err != nil {
+		return nil, err
+	}
+	var resp *SpotOrder
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/order", params, &resp)
+}
+
+// PlaceMultipleSpotOrders submits up to five spot orders in a single request.
+func (e *Exchange) PlaceMultipleSpotOrders(ctx context.Context, args []PlaceSpotOrderRequest, sync bool) ([]*SpotOrder, error) {
+	if len(args) == 0 {
+		return nil, errBatchOrdersRequired
+	}
+	orders := make([]map[string]string, 0, len(args))
+	for i := range args {
+		params, err := args[i].params()
+		if err != nil {
+			return nil, err
+		}
+		orderParams := make(map[string]string, len(params))
+		for key := range params {
+			orderParams[key] = params.Get(key)
+		}
+		orders = append(orders, orderParams)
+	}
+	payload, err := json.Marshal(orders)
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{}
+	params.Set("data", string(payload))
+	if sync {
+		params.Set("sync", "true")
+	}
+	var resp *SpotOrdersResponse
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/batchOrders", params, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Orders, nil
+}
+
+// CancelSpotOrder cancels an active spot order.
+func (e *Exchange) CancelSpotOrder(ctx context.Context, symbol currency.Pair, orderID int64, clientOrderID, cancelRestrictions string) (*SpotOrder, error) {
+	if symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	if orderID == 0 && clientOrderID == "" {
+		return nil, order.ErrOrderIDNotSet
+	}
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+	if orderID != 0 {
+		params.Set("orderId", strconv.FormatInt(orderID, 10))
+	}
+	if clientOrderID != "" {
+		params.Set("clientOrderID", clientOrderID)
+	}
+	if cancelRestrictions != "" {
+		params.Set("cancelRestrictions", cancelRestrictions)
+	}
+	var resp *SpotOrder
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancel", params, &resp)
+}
+
+// CancelMultipleSpotOrders cancels multiple spot orders by order ID or client order ID
+func (e *Exchange) CancelMultipleSpotOrders(ctx context.Context, symbol currency.Pair, process uint64, orderIDs, clientOrderIDs string) (*SpotCancelOrdersResponse, error) {
+	if symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	if orderIDs == "" && clientOrderIDs == "" {
+		return nil, order.ErrOrderIDNotSet
+	}
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+	if process != 0 {
+		params.Set("process", strconv.FormatUint(process, 10))
+	}
+	if orderIDs != "" {
+		params.Set("orderIds", orderIDs)
+	}
+	if clientOrderIDs != "" {
+		params.Set("clientOrderIDs", clientOrderIDs)
+	}
+	var resp *SpotCancelOrdersResponse
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelOrders", params, &resp)
+}
+
+// CancelAllSpotOpenOrders cancels all open spot orders
+func (e *Exchange) CancelAllSpotOpenOrders(ctx context.Context, symbol currency.Pair) ([]*SpotOrder, error) {
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	var resp *SpotOrdersResponse
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelOpenOrders", params, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Orders, nil
+}
+
+// CancelReplaceSpotOrder cancels an existing spot order and submits a new one.
+func (e *Exchange) CancelReplaceSpotOrder(ctx context.Context, cancelReplaceMode string, cancelOrderID int64, cancelClientOrderID, cancelRestrictions string, arg *PlaceSpotOrderRequest) (*SpotCancelReplaceResponse, error) {
+	if cancelReplaceMode == "" {
+		return nil, errCancelReplaceModeEmpty
+	}
+	if cancelOrderID == 0 && cancelClientOrderID == "" {
+		return nil, order.ErrOrderIDNotSet
+	}
+	params, err := arg.params()
+	if err != nil {
+		return nil, err
+	}
+	params.Set("cancelReplaceMode", cancelReplaceMode)
+	if cancelOrderID != 0 {
+		params.Set("cancelOrderId", strconv.FormatInt(cancelOrderID, 10))
+	}
+	if cancelClientOrderID != "" {
+		params.Set("cancelClientOrderID", cancelClientOrderID)
+	}
+	if cancelRestrictions != "" {
+		params.Set("cancelRestrictions", cancelRestrictions)
+	}
+	var resp *SpotCancelReplaceResponse
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/order/cancelReplace", params, &resp)
+}
+
+// GetSpotOrderDetails retrieves the details of a spot order
+func (e *Exchange) GetSpotOrderDetails(ctx context.Context, symbol currency.Pair, orderID int64, clientOrderID string) (*SpotOrderDetail, error) {
+	if symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	if orderID == 0 && clientOrderID == "" {
+		return nil, order.ErrOrderIDNotSet
+	}
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+	if orderID != 0 {
+		params.Set("orderId", strconv.FormatInt(orderID, 10))
+	}
+	if clientOrderID != "" {
+		params.Set("clientOrderID", clientOrderID)
+	}
+	var resp *SpotOrderDetail
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/query", params, &resp)
+}
+
+// GetSpotOpenOrders retrieves all current open spot orders.
+func (e *Exchange) GetSpotOpenOrders(ctx context.Context, symbol currency.Pair) ([]*SpotOrderDetail, error) {
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	var resp *SpotOrderDetailsResponse
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/openOrders", params, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Orders, nil
+}
+
+// GetSpotOrderHistory retrieves the spot order history
+func (e *Exchange) GetSpotOrderHistory(ctx context.Context, symbol currency.Pair, orderID int64, status, orderType string, startTime, endTime time.Time, pageIndex, pageSize uint64) ([]*SpotOrderDetail, error) {
+	if !startTime.IsZero() && !endTime.IsZero() {
+		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
+			return nil, err
+		}
+	}
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	if orderID != 0 {
+		params.Set("orderId", strconv.FormatInt(orderID, 10))
+	}
+	if !startTime.IsZero() {
+		params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
+	}
+	if !endTime.IsZero() {
+		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
+	}
+	if pageIndex != 0 {
+		params.Set("pageIndex", strconv.FormatUint(pageIndex, 10))
+	}
+	if pageSize != 0 {
+		params.Set("pageSize", strconv.FormatUint(pageSize, 10))
+	}
+	if status != "" {
+		params.Set("status", status)
+	}
+	if orderType != "" {
+		params.Set("type", orderType)
+	}
+	var resp *SpotOrderDetailsResponse
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/historyOrders", params, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Orders, nil
+}
+
+// GetSpotTransactionDetails retrieves the spot trade fills
+func (e *Exchange) GetSpotTransactionDetails(ctx context.Context, symbol currency.Pair, orderID int64, startTime, endTime time.Time, fromID, limit uint64) ([]*SpotTrade, error) {
+	if !startTime.IsZero() && !endTime.IsZero() {
+		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
+			return nil, err
+		}
+	}
+	params := url.Values{}
+	if !symbol.IsEmpty() {
+		params.Set("symbol", symbol.String())
+	}
+	if orderID != 0 {
+		params.Set("orderId", strconv.FormatInt(orderID, 10))
+	}
+	if !startTime.IsZero() {
+		params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
+	}
+	if !endTime.IsZero() {
+		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
+	}
+	if fromID != 0 {
+		params.Set("fromId", strconv.FormatUint(fromID, 10))
+	}
+	if limit != 0 {
+		params.Set("limit", strconv.FormatUint(limit, 10))
+	}
+	var resp *SpotTradesResponse
+	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/trade/myTrades", params, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Fills, nil
+}
+
+// GetSpotCommissionRate retrieves the maker and taker commission rates for a spot symbol.
+func (e *Exchange) GetSpotCommissionRate(ctx context.Context, symbol currency.Pair) (*SpotCommissionRate, error) {
+	if symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+	var resp *SpotCommissionRate
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/user/commissionRate", params, &resp)
+}
+
+// SetSpotCancelAllAfter sets or clears a countdown that cancels all open spot orders after a timeout.
+func (e *Exchange) SetSpotCancelAllAfter(ctx context.Context, requestType string, timeout int64) (*SpotCancelAllAfterResponse, error) {
+	if requestType == "" {
+		return nil, errCountdownTypeRequired
+	}
+	if timeout < 10 || timeout > 120 {
+		return nil, errCountdownTimeoutInvalid
+	}
+	params := url.Values{}
+	params.Set("type", requestType)
+	params.Set("timeOut", strconv.FormatInt(timeout, 10))
+	var resp *SpotCancelAllAfterResponse
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/trade/cancelAllAfter", params, &resp)
+}
+
+// CreateSpotOCOOrder creates a one-cancels-the-other (OCO) order.
+func (e *Exchange) CreateSpotOCOOrder(ctx context.Context, arg *CreateSpotOCOOrderRequest) ([]*SpotOCOOrder, error) {
+	if err := common.NilGuard(arg); err != nil {
+		return nil, err
+	}
+	if arg.Symbol.IsEmpty() {
+		return nil, currency.ErrCurrencyPairEmpty
+	}
+	if arg.Side == "" {
+		return nil, order.ErrSideIsInvalid
+	}
+	if arg.Quantity <= 0 {
+		return nil, order.ErrAmountIsInvalid
+	}
+	if arg.LimitPrice <= 0 {
+		return nil, fmt.Errorf("%w: limit price is required", order.ErrPriceMustBeSetIfLimitOrder)
+	}
+	if arg.OrderPrice <= 0 {
+		return nil, fmt.Errorf("%w: order price is required", order.ErrPriceMustBeSetIfLimitOrder)
+	}
+	if arg.TriggerPrice <= 0 {
+		return nil, errTriggerPriceRequired
+	}
+	params := url.Values{}
+	params.Set("symbol", arg.Symbol.String())
+	params.Set("side", arg.Side)
+	setFloat(params, "quantity", arg.Quantity)
+	setFloat(params, "limitPrice", arg.LimitPrice)
+	setFloat(params, "orderPrice", arg.OrderPrice)
+	setFloat(params, "triggerPrice", arg.TriggerPrice)
+	if arg.ListClientOrderID != "" {
+		params.Set("listClientOrderId", arg.ListClientOrderID)
+	}
+	if arg.AboveClientOrderID != "" {
+		params.Set("aboveClientOrderId", arg.AboveClientOrderID)
+	}
+	if arg.BelowClientOrderID != "" {
+		params.Set("belowClientOrderId", arg.BelowClientOrderID)
+	}
+	if arg.RecvWindow != 0 {
+		params.Set("recvWindow", strconv.FormatInt(arg.RecvWindow, 10))
+	}
+	var resp []*SpotOCOOrder
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/oco/order", params, &resp)
+}
+
+// CancelSpotOCOOrder cancels an OCO order list by order ID or client order ID.
+func (e *Exchange) CancelSpotOCOOrder(ctx context.Context, orderID, clientOrderID string) (*SpotOCOCancelResponse, error) {
+	if orderID == "" && clientOrderID == "" {
+		return nil, order.ErrOrderIDNotSet
+	}
+	params := url.Values{}
+	if orderID != "" {
+		params.Set("orderId", orderID)
+	}
+	if clientOrderID != "" {
+		params.Set("clientOrderId", clientOrderID)
+	}
+	var resp *SpotOCOCancelResponse
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "spot/v1/oco/cancel", params, &resp)
+}
+
+// GetSpotOCOOrderList retrieves a single OCO order list by group ID or client order ID.
+func (e *Exchange) GetSpotOCOOrderList(ctx context.Context, orderListID, clientOrderID string) ([]*SpotOCOOrder, error) {
+	if orderListID == "" && clientOrderID == "" {
+		return nil, order.ErrOrderIDNotSet
+	}
+	params := url.Values{}
+	if orderListID != "" {
+		params.Set("orderListId", orderListID)
+	}
+	if clientOrderID != "" {
+		params.Set("clientOrderId", clientOrderID)
+	}
+	var resp []*SpotOCOOrder
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/orderList", params, &resp)
+}
+
+// GetSpotOpenOCOOrders retrieves all open OCO order lists.
+func (e *Exchange) GetSpotOpenOCOOrders(ctx context.Context, pageIndex, pageSize uint64) ([]*SpotOCOOrder, error) {
+	params := url.Values{}
+	params.Set("pageIndex", strconv.FormatUint(pageIndex, 10))
+	params.Set("pageSize", strconv.FormatUint(pageSize, 10))
+	var resp []*SpotOCOOrder
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/openOrderList", params, &resp)
+}
+
+// GetSpotOCOHistory retrieves the OCO order list history.
+func (e *Exchange) GetSpotOCOHistory(ctx context.Context, startTime, endTime time.Time, pageIndex, pageSize uint64) ([]*SpotOCOOrder, error) {
+	if !startTime.IsZero() && !endTime.IsZero() {
+		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
+			return nil, err
+		}
+	}
+	params := url.Values{}
+	params.Set("pageIndex", strconv.FormatUint(pageIndex, 10))
+	params.Set("pageSize", strconv.FormatUint(pageSize, 10))
+	if !startTime.IsZero() {
+		params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
+	}
+	if !endTime.IsZero() {
+		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
+	}
+	var resp []*SpotOCOOrder
+	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "spot/v1/oco/historyOrderList", params, &resp)
+}
+
+// --------------------- SWAP Endpoints -----------------------------
 
 // GetSwapContracts retrieves USDT-M perpetual futures contracts and their trading rules.
 func (e *Exchange) GetSwapContracts(ctx context.Context, symbol currency.Pair) ([]*SwapContractDetail, error) {
@@ -452,98 +854,6 @@ func (e *Exchange) GetSwapTradingRules(ctx context.Context, symbol currency.Pair
 
 // ---------------------------- Coin Marginid Futures ----------------------
 
-// GetCoinMContracts retrieves coin-margined (Coin-M) futures contracts and their trading rules.
-func (e *Exchange) GetCoinMContracts(ctx context.Context, symbol currency.Pair) ([]*CoinMContract, error) {
-	params := url.Values{}
-	if !symbol.IsEmpty() {
-		params.Set("symbol", symbol.String())
-	}
-	var resp []*CoinMContract
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/contracts", params, &resp)
-}
-
-// GetCoinMMarkPriceAndFundingRate retrieves the latest mark price, index price and funding rate for coin-margined futures symbols.
-func (e *Exchange) GetCoinMMarkPriceAndFundingRate(ctx context.Context, symbol currency.Pair) ([]*CoinMMarkPriceFundingRate, error) {
-	params := url.Values{}
-	if !symbol.IsEmpty() {
-		params.Set("symbol", symbol.String())
-	}
-	var resp []*CoinMMarkPriceFundingRate
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/premiumIndex", params, &resp)
-}
-
-// GetCoinMOpenInterest retrieves the open interest of coin-margined futures symbols.
-func (e *Exchange) GetCoinMOpenInterest(ctx context.Context, symbol currency.Pair) ([]*CoinMOpenInterest, error) {
-	params := url.Values{}
-	if !symbol.IsEmpty() {
-		params.Set("symbol", symbol.String())
-	}
-	var resp []*CoinMOpenInterest
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/openInterest", params, &resp)
-}
-
-// GetCoinMKlineData retrieves candlestick data for a coin-margined futures symbol. Only the last 30 days of data is available.
-func (e *Exchange) GetCoinMKlineData(ctx context.Context, symbol currency.Pair, interval kline.Interval, startTime, endTime time.Time, timeZone, limit uint64) ([]*CoinMCandle, error) {
-	if symbol.IsEmpty() {
-		return nil, currency.ErrCurrencyPairEmpty
-	}
-	if interval == kline.Interval(0) {
-		return nil, kline.ErrInvalidInterval
-	}
-	if !startTime.IsZero() && !endTime.IsZero() {
-		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
-			return nil, err
-		}
-	}
-	params := url.Values{}
-	params.Set("symbol", symbol.String())
-	params.Set("interval", intervalToString(interval))
-	if !startTime.IsZero() {
-		params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
-	}
-	if !endTime.IsZero() {
-		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
-	}
-	if timeZone != 0 {
-		params.Set("timeZone", strconv.FormatUint(timeZone, 10))
-	}
-	if limit != 0 {
-		params.Set("limit", strconv.FormatUint(limit, 10))
-	}
-	var resp []*CoinMCandle
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/klines", params, &resp)
-}
-
-// GetCoinMOrderbookDepth retrieves the order book depth for a coin-margined futures symbol.
-func (e *Exchange) GetCoinMOrderbookDepth(ctx context.Context, symbol currency.Pair, limit uint64) (*CoinMOrderbookDepth, error) {
-	if symbol.IsEmpty() {
-		return nil, currency.ErrCurrencyPairEmpty
-	}
-	params := url.Values{}
-	params.Set("symbol", symbol.String())
-	if limit != 0 {
-		params.Set("limit", strconv.FormatUint(limit, 10))
-	}
-	var resp *CoinMOrderbookDepth
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/depth", params, &resp)
-}
-
-// GetCoinM24HrTickerPriceChange retrieves the 24-hour rolling window price change statistics for coin-margined futures symbols.
-func (e *Exchange) GetCoinM24HrTickerPriceChange(ctx context.Context, symbol currency.Pair) ([]*CoinMTicker24Hr, error) {
-	params := url.Values{}
-	if !symbol.IsEmpty() {
-		params.Set("symbol", symbol.String())
-	}
-	var resp []*CoinMTicker24Hr
-	return resp, e.SendHTTPRequest(ctx, exchange.RestSpot, "cswap/v1/market/ticker", params, &resp)
-}
-
-func setFloat(params url.Values, key string, value float64) {
-	if value != 0 {
-		params.Set(key, strconv.FormatFloat(value, 'f', -1, 64))
-	}
-}
-
 // ------------------------- Trade Endpoint ---------------------------
 
 // params validates and converts a PlaceSwapOrderRequest into url.Values shared by the order, test order and cancel-replace endpoints.
@@ -653,7 +963,7 @@ func (e *Exchange) ModifySwapOrder(ctx context.Context, symbol currency.Pair, or
 }
 
 // PlaceMultipleSwapOrders submits up to five perpetual futures orders in a single request.
-func (e *Exchange) PlaceMultipleSwapOrders(ctx context.Context, args []PlaceSwapOrderRequest) ([]SwapOrderAck, error) {
+func (e *Exchange) PlaceMultipleSwapOrders(ctx context.Context, args []PlaceSwapOrderRequest) ([]*SwapOrderAck, error) {
 	if len(args) == 0 {
 		return nil, errBatchOrdersRequired
 	}
@@ -712,7 +1022,7 @@ func (e *Exchange) CancelSwapOrder(ctx context.Context, symbol currency.Pair, or
 	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodDelete, "swap/v2/trade/order", params, &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Order, nil
+	return resp.Order, nil
 }
 
 // CancelMultipleSwapOrders cancels up to ten perpetual futures orders by order ID or client order ID.
@@ -758,7 +1068,7 @@ func (e *Exchange) CancelAllSwapOpenOrders(ctx context.Context, symbol currency.
 }
 
 // GetSwapOpenOrders retrieves all current open perpetual futures orders, optionally filtered by symbol and order type.
-func (e *Exchange) GetSwapOpenOrders(ctx context.Context, symbol currency.Pair, orderType string) ([]SwapOrder, error) {
+func (e *Exchange) GetSwapOpenOrders(ctx context.Context, symbol currency.Pair, orderType string) ([]*SwapOrder, error) {
 	params := url.Values{}
 	if !symbol.IsEmpty() {
 		params.Set("symbol", symbol.String())
@@ -790,7 +1100,7 @@ func (e *Exchange) GetSwapPendingOrderStatus(ctx context.Context, symbol currenc
 	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/openOrder", params, &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Order, nil
+	return resp.Order, nil
 }
 
 // GetSwapOrderDetails retrieves the full details of a perpetual futures order.
@@ -810,7 +1120,7 @@ func (e *Exchange) GetSwapOrderDetails(ctx context.Context, symbol currency.Pair
 	if err := e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodGet, "swap/v2/trade/order", params, &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Order, nil
+	return resp.Order, nil
 }
 
 // GetSwapMarginType retrieves the margin mode of a perpetual futures symbol.
@@ -869,7 +1179,7 @@ func (e *Exchange) SetSwapLeverage(ctx context.Context, symbol currency.Pair, si
 }
 
 // GetSwapForceOrders retrieves the user's liquidation (force) order history.
-func (e *Exchange) GetSwapForceOrders(ctx context.Context, symbol currency.Pair, currencyCode, autoCloseType string, startTime, endTime time.Time, limit uint64) ([]SwapOrder, error) {
+func (e *Exchange) GetSwapForceOrders(ctx context.Context, symbol currency.Pair, currencyCode, autoCloseType string, startTime, endTime time.Time, limit uint64) ([]*SwapOrder, error) {
 	if !startTime.IsZero() && !endTime.IsZero() {
 		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
 			return nil, err
@@ -902,7 +1212,7 @@ func (e *Exchange) GetSwapForceOrders(ctx context.Context, symbol currency.Pair,
 }
 
 // GetSwapOrderHistory retrieves the perpetual futures order history.
-func (e *Exchange) GetSwapOrderHistory(ctx context.Context, symbol currency.Pair, currencyCode string, orderID int64, startTime, endTime time.Time, limit uint64) ([]SwapOrder, error) {
+func (e *Exchange) GetSwapOrderHistory(ctx context.Context, symbol currency.Pair, currencyCode string, orderID int64, startTime, endTime time.Time, limit uint64) ([]*SwapOrder, error) {
 	if !startTime.IsZero() && !endTime.IsZero() {
 		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
 			return nil, err
@@ -960,7 +1270,7 @@ func (e *Exchange) ModifyIsolatedPositionMargin(ctx context.Context, symbol curr
 }
 
 // GetSwapHistoricalTransactionOrders retrieves historical transaction orders for a perpetual futures symbol.
-func (e *Exchange) GetSwapHistoricalTransactionOrders(ctx context.Context, symbol currency.Pair, currencyCode, tradingUnit string, orderID int64, startTime, endTime time.Time) ([]SwapFillOrder, error) {
+func (e *Exchange) GetSwapHistoricalTransactionOrders(ctx context.Context, symbol currency.Pair, currencyCode, tradingUnit string, orderID int64, startTime, endTime time.Time) ([]*SwapFillOrder, error) {
 	if tradingUnit == "" {
 		return nil, errTradingUnitRequired
 	}
@@ -1068,7 +1378,7 @@ func (e *Exchange) CloseSwapPositionByID(ctx context.Context, positionID string)
 }
 
 // GetAllSwapOrders retrieves the full perpetual futures order history including conditional orders.
-func (e *Exchange) GetAllSwapOrders(ctx context.Context, symbol currency.Pair, orderID int64, startTime, endTime time.Time, limit uint64) ([]SwapOrder, error) {
+func (e *Exchange) GetAllSwapOrders(ctx context.Context, symbol currency.Pair, orderID int64, startTime, endTime time.Time, limit uint64) ([]*SwapOrder, error) {
 	if !startTime.IsZero() && !endTime.IsZero() {
 		if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
 			return nil, err
@@ -1203,8 +1513,8 @@ func (e *Exchange) ApplyVST(ctx context.Context, adjustType string, amount int64
 
 // PlaceTWAPOrder submits a time-weighted average price (TWAP) order.
 func (e *Exchange) PlaceTWAPOrder(ctx context.Context, arg *PlaceTWAPOrderRequest) (*SwapTWAPOrderResponse, error) {
-	if arg == nil {
-		return nil, common.ErrNilPointer
+	if err := common.NilGuard(arg); err != nil {
+		return nil, err
 	}
 	if arg.Symbol.IsEmpty() {
 		return nil, currency.ErrCurrencyPairEmpty
@@ -1216,7 +1526,7 @@ func (e *Exchange) PlaceTWAPOrder(ctx context.Context, arg *PlaceTWAPOrderReques
 		return nil, order.ErrSideIsInvalid
 	}
 	if arg.PriceType == "" {
-		return nil, errPriceTypeRequired
+		return nil, fmt.Errorf("%w price type is required", order.ErrUnknownPriceType)
 	}
 	params := url.Values{}
 	params.Set("symbol", arg.Symbol.String())
@@ -1236,7 +1546,7 @@ func (e *Exchange) PlaceTWAPOrder(ctx context.Context, arg *PlaceTWAPOrderReques
 }
 
 // GetTWAPOpenOrders retrieves the open TWAP orders, optionally filtered by symbol.
-func (e *Exchange) GetTWAPOpenOrders(ctx context.Context, symbol currency.Pair) ([]SwapTWAPOrder, error) {
+func (e *Exchange) GetTWAPOpenOrders(ctx context.Context, symbol currency.Pair) ([]*SwapTWAPOrder, error) {
 	params := url.Values{}
 	if !symbol.IsEmpty() {
 		params.Set("symbol", symbol.String())
@@ -1249,7 +1559,7 @@ func (e *Exchange) GetTWAPOpenOrders(ctx context.Context, symbol currency.Pair) 
 }
 
 // GetTWAPHistoricalOrders retrieves the historical TWAP orders.
-func (e *Exchange) GetTWAPHistoricalOrders(ctx context.Context, symbol currency.Pair, startTime, endTime time.Time, pageIndex, pageSize uint64) ([]SwapTWAPOrder, error) {
+func (e *Exchange) GetTWAPHistoricalOrders(ctx context.Context, symbol currency.Pair, startTime, endTime time.Time, pageIndex, pageSize uint64) ([]*SwapTWAPOrder, error) {
 	if err := common.StartEndTimeCheck(startTime, endTime); err != nil {
 		return nil, err
 	}
@@ -1341,7 +1651,7 @@ func (e *Exchange) OneClickReversePosition(ctx context.Context, reverseType stri
 }
 
 // SetHedgeModeAutoAddMargin toggles automatic margin addition for a hedge-mode position.
-func (e *Exchange) SetHedgeModeAutoAddMargin(ctx context.Context, symbol currency.Pair, positionID int64, functionSwitch, amount string) (*SwapAutoAddMarginResponse, error) {
+func (e *Exchange) SetHedgeModeAutoAddMargin(ctx context.Context, symbol currency.Pair, positionID int64, functionSwitch string, amount float64) (*SwapAutoAddMarginResponse, error) {
 	if symbol.IsEmpty() {
 		return nil, currency.ErrCurrencyPairEmpty
 	}
@@ -1355,9 +1665,7 @@ func (e *Exchange) SetHedgeModeAutoAddMargin(ctx context.Context, symbol currenc
 	params.Set("symbol", symbol.String())
 	params.Set("positionId", strconv.FormatInt(positionID, 10))
 	params.Set("functionSwitch", functionSwitch)
-	if amount != "" {
-		params.Set("amount", amount)
-	}
+	setFloat(params, "amount", amount)
 	var resp *SwapAutoAddMarginResponse
 	return resp, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, http.MethodPost, "swap/v1/trade/autoAddMargin", params, &resp)
 }

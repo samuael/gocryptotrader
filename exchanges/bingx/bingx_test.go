@@ -697,7 +697,7 @@ func TestPlaceTWAPOrder(t *testing.T) {
 	_, err = e.PlaceTWAPOrder(t.Context(), &PlaceTWAPOrderRequest{Symbol: btcUSDT})
 	require.ErrorIs(t, err, order.ErrSideIsInvalid)
 	_, err = e.PlaceTWAPOrder(t.Context(), &PlaceTWAPOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), PositionSide: "LONG"})
-	require.ErrorIs(t, err, errPriceTypeRequired)
+	require.ErrorIs(t, err, order.ErrUnknownPriceType)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
 	result, err := e.PlaceTWAPOrder(t.Context(), &PlaceTWAPOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), PositionSide: "LONG", PriceType: "constant", PriceVariance: "2000", TriggerPrice: "68000", Interval: 8, AmountPerOrder: "0.1", TotalAmount: "0.5"})
@@ -793,15 +793,390 @@ func TestOneClickReversePosition(t *testing.T) {
 
 func TestSetHedgeModeAutoAddMargin(t *testing.T) {
 	t.Parallel()
-	_, err := e.SetHedgeModeAutoAddMargin(t.Context(), currency.EMPTYPAIR, 1, "true", "3")
+	_, err := e.SetHedgeModeAutoAddMargin(t.Context(), currency.EMPTYPAIR, 1, "true", 3)
 	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
-	_, err = e.SetHedgeModeAutoAddMargin(t.Context(), btcUSDT, 0, "true", "3")
+	_, err = e.SetHedgeModeAutoAddMargin(t.Context(), btcUSDT, 0, "true", 3)
 	require.ErrorIs(t, err, errPositionIDRequired)
-	_, err = e.SetHedgeModeAutoAddMargin(t.Context(), btcUSDT, 1, "", "3")
+	_, err = e.SetHedgeModeAutoAddMargin(t.Context(), btcUSDT, 1, "", 3)
 	require.ErrorIs(t, err, errFunctionSwitchRequired)
 
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
-	result, err := e.SetHedgeModeAutoAddMargin(t.Context(), btcUSDT, 1, "true", "3")
+	result, err := e.SetHedgeModeAutoAddMargin(t.Context(), btcUSDT, 1, "true", 3)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+}
+
+func TestPlaceSpotOrder(t *testing.T) {
+	t.Parallel()
+	_, err := e.PlaceSpotOrder(t.Context(), &PlaceSpotOrderRequest{})
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.PlaceSpotOrder(t.Context(), &PlaceSpotOrderRequest{Symbol: btcUSDT})
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	_, err = e.PlaceSpotOrder(t.Context(), &PlaceSpotOrderRequest{Symbol: btcUSDT, Side: order.Buy.String()})
+	require.ErrorIs(t, err, order.ErrTypeIsInvalid)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.PlaceSpotOrder(t.Context(), &PlaceSpotOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), OrderType: "MARKET", Quantity: 0.001})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestPlaceMultipleSpotOrders(t *testing.T) {
+	t.Parallel()
+	_, err := e.PlaceMultipleSpotOrders(t.Context(), nil, false)
+	require.ErrorIs(t, err, errBatchOrdersRequired)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.PlaceMultipleSpotOrders(t.Context(), []PlaceSpotOrderRequest{{Symbol: btcUSDT, Side: order.Buy.String(), OrderType: "LIMIT", Quantity: 0.001, Price: 10000}}, false)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelSpotOrder(t *testing.T) {
+	t.Parallel()
+	_, err := e.CancelSpotOrder(t.Context(), currency.EMPTYPAIR, 1, "", "")
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.CancelSpotOrder(t.Context(), btcUSDT, 0, "", "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CancelSpotOrder(t.Context(), btcUSDT, 123456, "", "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelMultipleSpotOrders(t *testing.T) {
+	t.Parallel()
+	_, err := e.CancelMultipleSpotOrders(t.Context(), currency.EMPTYPAIR, 0, "1,2", "")
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.CancelMultipleSpotOrders(t.Context(), btcUSDT, 0, "", "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CancelMultipleSpotOrders(t.Context(), btcUSDT, 0, "123456,234567", "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelAllSpotOpenOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CancelAllSpotOpenOrders(t.Context(), btcUSDT)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelReplaceSpotOrder(t *testing.T) {
+	t.Parallel()
+	arg := &PlaceSpotOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), OrderType: "LIMIT", Quantity: 0.001, Price: 10000}
+	_, err := e.CancelReplaceSpotOrder(t.Context(), "", 1, "", "", arg)
+	require.ErrorIs(t, err, errCancelReplaceModeEmpty)
+	_, err = e.CancelReplaceSpotOrder(t.Context(), "STOP_ON_FAILURE", 0, "", "", arg)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CancelReplaceSpotOrder(t.Context(), "STOP_ON_FAILURE", 123456, "", "", arg)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotOrderDetails(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetSpotOrderDetails(t.Context(), currency.EMPTYPAIR, 1, "")
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.GetSpotOrderDetails(t.Context(), btcUSDT, 0, "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotOrderDetails(t.Context(), btcUSDT, 123456, "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotOpenOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotOpenOrders(t.Context(), btcUSDT)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotOrderHistory(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotOrderHistory(t.Context(), btcUSDT, 0, "", "", time.Time{}, time.Time{}, 1, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotTransactionDetails(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotTransactionDetails(t.Context(), btcUSDT, 0, time.Time{}, time.Time{}, 0, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotCommissionRate(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetSpotCommissionRate(t.Context(), currency.EMPTYPAIR)
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotCommissionRate(t.Context(), btcUSDT)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestSetSpotCancelAllAfter(t *testing.T) {
+	t.Parallel()
+	_, err := e.SetSpotCancelAllAfter(t.Context(), "", 10)
+	require.ErrorIs(t, err, errCountdownTypeRequired)
+	_, err = e.SetSpotCancelAllAfter(t.Context(), "ACTIVATE", 5)
+	require.ErrorIs(t, err, errCountdownTimeoutInvalid)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.SetSpotCancelAllAfter(t.Context(), "ACTIVATE", 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCreateSpotOCOOrder(t *testing.T) {
+	t.Parallel()
+	_, err := e.CreateSpotOCOOrder(t.Context(), &CreateSpotOCOOrderRequest{})
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.CreateSpotOCOOrder(t.Context(), &CreateSpotOCOOrderRequest{Symbol: btcUSDT})
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	_, err = e.CreateSpotOCOOrder(t.Context(), &CreateSpotOCOOrderRequest{Symbol: btcUSDT, Side: order.Buy.String()})
+	require.ErrorIs(t, err, order.ErrAmountIsInvalid)
+	_, err = e.CreateSpotOCOOrder(t.Context(), &CreateSpotOCOOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), Quantity: 0.001})
+	require.ErrorIs(t, err, order.ErrPriceMustBeSetIfLimitOrder)
+	_, err = e.CreateSpotOCOOrder(t.Context(), &CreateSpotOCOOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), Quantity: 0.001, LimitPrice: 48000})
+	require.ErrorIs(t, err, order.ErrPriceMustBeSetIfLimitOrder)
+	_, err = e.CreateSpotOCOOrder(t.Context(), &CreateSpotOCOOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), Quantity: 0.001, LimitPrice: 48000, OrderPrice: 88000})
+	require.ErrorIs(t, err, errTriggerPriceRequired)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CreateSpotOCOOrder(t.Context(), &CreateSpotOCOOrderRequest{Symbol: btcUSDT, Side: order.Buy.String(), Quantity: 0.001, LimitPrice: 48000, OrderPrice: 88000, TriggerPrice: 87000})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelSpotOCOOrder(t *testing.T) {
+	t.Parallel()
+	_, err := e.CancelSpotOCOOrder(t.Context(), "", "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CancelSpotOCOOrder(t.Context(), "1827980248763858944", "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotOCOOrderList(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetSpotOCOOrderList(t.Context(), "", "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotOCOOrderList(t.Context(), "1827968196914479104", "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotOpenOCOOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotOpenOCOOrders(t.Context(), 1, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetSpotOCOHistory(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetSpotOCOHistory(t.Context(), time.Now().Add(-time.Hour*24), time.Now(), 1, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestPlaceCoinMOrder(t *testing.T) {
+	t.Parallel()
+	_, err := e.PlaceCoinMOrder(t.Context(), &PlaceCoinMOrderRequest{})
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.PlaceCoinMOrder(t.Context(), &PlaceCoinMOrderRequest{Symbol: coinMBTCUSD})
+	require.ErrorIs(t, err, order.ErrTypeIsInvalid)
+	_, err = e.PlaceCoinMOrder(t.Context(), &PlaceCoinMOrderRequest{Symbol: coinMBTCUSD, Type: "MARKET"})
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.PlaceCoinMOrder(t.Context(), &PlaceCoinMOrderRequest{Symbol: coinMBTCUSD, Type: "MARKET", Side: order.Buy.String(), PositionSide: "LONG", Quantity: 1})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMCommissionRate(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMCommissionRate(t.Context())
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMLeverage(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetCoinMLeverage(t.Context(), currency.EMPTYPAIR)
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMLeverage(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestSetCoinMLeverage(t *testing.T) {
+	t.Parallel()
+	_, err := e.SetCoinMLeverage(t.Context(), currency.EMPTYPAIR, "LONG", 4)
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.SetCoinMLeverage(t.Context(), coinMBTCUSD, "", 4)
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+	_, err = e.SetCoinMLeverage(t.Context(), coinMBTCUSD, "LONG", 0)
+	require.ErrorIs(t, err, errLeverageRequired)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.SetCoinMLeverage(t.Context(), coinMBTCUSD, "LONG", 4)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelAllCoinMOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CancelAllCoinMOrders(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCloseAllCoinMPositions(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CloseAllCoinMPositions(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMPositions(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMPositions(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMAccountAssets(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMAccountAssets(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMForceOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMForceOrders(t.Context(), coinMBTCUSD, "", time.Time{}, time.Time{}, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMOrderTradeDetail(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetCoinMOrderTradeDetail(t.Context(), "", 1, 100)
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMOrderTradeDetail(t.Context(), "1796163365782945792", 1, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestCancelCoinMOrder(t *testing.T) {
+	t.Parallel()
+	_, err := e.CancelCoinMOrder(t.Context(), currency.EMPTYPAIR, 1, "")
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.CancelCoinMOrder(t.Context(), coinMBTCUSD, 0, "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	result, err := e.CancelCoinMOrder(t.Context(), coinMBTCUSD, 123456, "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMOpenOrders(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMOpenOrders(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMOrderDetail(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetCoinMOrderDetail(t.Context(), currency.EMPTYPAIR, 1, "")
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	_, err = e.GetCoinMOrderDetail(t.Context(), coinMBTCUSD, 0, "")
+	require.ErrorIs(t, err, order.ErrOrderIDNotSet)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMOrderDetail(t.Context(), coinMBTCUSD, 123456, "")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMOrderHistory(t *testing.T) {
+	t.Parallel()
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMOrderHistory(t.Context(), coinMBTCUSD, 0, time.Time{}, time.Time{}, 100)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestGetCoinMMarginType(t *testing.T) {
+	t.Parallel()
+	_, err := e.GetCoinMMarginType(t.Context(), currency.EMPTYPAIR)
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e)
+	result, err := e.GetCoinMMarginType(t.Context(), coinMBTCUSD)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestSetCoinMMarginType(t *testing.T) {
+	t.Parallel()
+	err := e.SetCoinMMarginType(t.Context(), currency.EMPTYPAIR, "ISOLATED")
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	err = e.SetCoinMMarginType(t.Context(), coinMBTCUSD, "")
+	require.ErrorIs(t, err, margin.ErrInvalidMarginType)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	err = e.SetCoinMMarginType(t.Context(), coinMBTCUSD, "ISOLATED")
+	require.NoError(t, err)
+}
+
+func TestAdjustCoinMIsolatedMargin(t *testing.T) {
+	t.Parallel()
+	err := e.AdjustCoinMIsolatedMargin(t.Context(), currency.EMPTYPAIR, 0.01, 1, "LONG")
+	require.ErrorIs(t, err, currency.ErrCurrencyPairEmpty)
+	err = e.AdjustCoinMIsolatedMargin(t.Context(), coinMBTCUSD, 0, 1, "LONG")
+	require.ErrorIs(t, err, errMarginAmountRequired)
+	err = e.AdjustCoinMIsolatedMargin(t.Context(), coinMBTCUSD, 0.01, 0, "LONG")
+	require.ErrorIs(t, err, errAdjustmentTypeRequired)
+	err = e.AdjustCoinMIsolatedMargin(t.Context(), coinMBTCUSD, 0.01, 1, "")
+	require.ErrorIs(t, err, order.ErrSideIsInvalid)
+
+	sharedtestvalues.SkipTestIfCredentialsUnset(t, e, canManipulateRealOrders)
+	err = e.AdjustCoinMIsolatedMargin(t.Context(), coinMBTCUSD, 0.01, 1, "LONG")
+	require.NoError(t, err)
 }
