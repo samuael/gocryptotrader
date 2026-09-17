@@ -1975,7 +1975,7 @@ func (e *Exchange) GetSinglePosition(ctx context.Context, settle currency.Code, 
 		return nil, fmt.Errorf("%w: contract pair is required", currency.ErrCurrencyPairEmpty)
 	}
 	var response *Position
-	return response, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, perpetualPositionEPL, http.MethodPost, futuresPath+settle.Item.Lower+positionsPath+contract.String(), nil, nil, &response)
+	return response, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, perpetualPositionEPL, http.MethodGet, futuresPath+settle.Item.Lower+positionsPath+contract.String(), nil, nil, &response)
 }
 
 // UpdateFuturesPositionMargin represents account position margin for a futures contract.
@@ -2038,7 +2038,7 @@ func (e *Exchange) EnableOrDisableDualMode(ctx context.Context, settle currency.
 	params := url.Values{}
 	params.Set("dual_mode", strconv.FormatBool(dualMode))
 	var response *DualModeResponse
-	return response, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, perpetualToggleDualModeEPL, http.MethodGet, futuresPath+settle.Item.Lower+"/dual_mode", params, nil, &response)
+	return response, e.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, perpetualToggleDualModeEPL, http.MethodPost, futuresPath+settle.Item.Lower+"/dual_mode", params, nil, &response)
 }
 
 // GetPositionDetailInDualMode retrieve position detail in dual mode
